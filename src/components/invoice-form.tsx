@@ -62,9 +62,8 @@ export function InvoiceForm() {
       startTime: "09:00",
       endTime: "17:00",
       totalFee: undefined,
-      // companyName: "Your Company LLC", // Removed
-      // companyAddress: "123 Main St, Anytown, USA", // Removed
-      clientAddress: "456 Client Ave, Otherville, USA",
+      // companyName and companyAddress will use Zod defaults
+      // clientAddress will use Zod defaults
       invoiceNotes: "Thank you for your business! Payment is due within 30 days.",
     },
   });
@@ -79,7 +78,6 @@ export function InvoiceForm() {
   useEffect(() => {
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
-      // Validation is now primarily handled by Zod schema
       fileToDataUrl(file).then(setWatermarkPreview);
     } else {
       setWatermarkPreview(null);
@@ -172,7 +170,6 @@ export function InvoiceForm() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            {/* Company Name and Address Fields Removed */}
              <FormField
                 control={form.control}
                 name="customerName"
@@ -186,19 +183,7 @@ export function InvoiceForm() {
                   </FormItem>
                 )}
               />
-            <FormField
-              control={form.control}
-              name="clientAddress"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Client Address</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="e.g., 456 Client St, Apt B, City, Country" {...field} rows={2} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Client Address Field Removed - will use Zod default */}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
@@ -396,5 +381,4 @@ export function InvoiceForm() {
     </Card>
   );
 }
-
     

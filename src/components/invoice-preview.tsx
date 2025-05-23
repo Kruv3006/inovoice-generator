@@ -1,16 +1,15 @@
 
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Edit, Loader2, AlertTriangle, Home } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowRight, Edit, Loader2, AlertTriangle, Home } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { StoredInvoiceData } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
 import { InvoiceTemplate } from './invoice-template';
-import { generatePdf, generateDoc, generateJpeg } from '@/lib/invoice-generator'; // Ensure paths are correct
 
 export default function InvoicePreview() {
   const router = useRouter();
@@ -18,10 +17,8 @@ export default function InvoicePreview() {
   const { toast } = useToast();
   const [invoiceData, setInvoiceData] = useState<StoredInvoiceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
 
   const invoiceId = typeof params.invoiceId === 'string' ? params.invoiceId : null;
-  const invoiceTemplateRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (invoiceId) {
@@ -38,32 +35,10 @@ export default function InvoicePreview() {
       }
       setIsLoading(false);
     } else {
-      // Should not happen if route is set up correctly
       router.replace('/invoice/details');
       setIsLoading(false);
     }
   }, [invoiceId, router, toast]);
-
-  const handleGenerate = async (
-    generator: (data: StoredInvoiceData, watermark?: string, element?: HTMLElement) => Promise<void>,
-    format: string
-  ) => {
-    if (!invoiceData || !invoiceTemplateRef.current) {
-      toast({ title: "Error", description: "Invoice data or template not available.", variant: "destructive" });
-      return;
-    }
-    setIsGenerating(true);
-    toast({ title: `Generating ${format}...`, description: "Please wait." });
-    try {
-      await generator(invoiceData, invoiceData.watermarkDataUrl || undefined, invoiceTemplateRef.current);
-      toast({ title: `${format} Generated!`, description: "Your download should start shortly.", variant: "default" });
-    } catch (e) {
-      console.error(`Error generating ${format}:`, e);
-      toast({ variant: "destructive", title: "Generation Error", description: `Could not generate the ${format}.` });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -75,7 +50,6 @@ export default function InvoicePreview() {
   }
 
   if (!invoiceData) {
-    // This case is mostly handled by useEffect redirect, but as a fallback:
     return (
       <Card className="m-auto mt-10 max-w-lg text-center">
         <CardHeader>
@@ -111,46 +85,21 @@ export default function InvoicePreview() {
 
         <Card className="shadow-xl mb-8 overflow-hidden">
           <CardContent className="p-0">
-            {/* The InvoiceTemplate component itself will be used for display */}
-            {/* For generation, we pass a ref to its parent div if needed by html2canvas */}
-            <div ref={invoiceTemplateRef} className="bg-background"> {/* This div will be captured by html2canvas */}
+            <div className="bg-background">
               <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />
             </div>
           </CardContent>
         </Card>
         
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl">Download Invoice</CardTitle>
-            <CardDescription>Choose your preferred format to download the invoice.</CardDescription>
-          </CardHeader>
-          <CardFooter className="flex flex-col sm:flex-row gap-3 pt-2">
+        <div className="flex justify-end">
             <Button 
-              onClick={() => handleGenerate(generatePdf, 'PDF')} 
-              disabled={isGenerating} 
-              className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground"
+                onClick={() => router.push(`/invoice/download/${invoiceId}`)} 
+                size="lg"
+                className="bg-accent hover:bg-accent/90 text-accent-foreground"
             >
-              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              Download PDF
+                Proceed to Download Options <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button 
-              onClick={() => handleGenerate(generateDoc, 'DOC')} 
-              disabled={isGenerating} 
-              className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground"
-            >
-              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              Download DOC
-            </Button>
-            <Button 
-              onClick={() => handleGenerate(generateJpeg, 'JPEG')} 
-              disabled={isGenerating} 
-              className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground"
-            >
-              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              Download JPEG
-            </Button>
-          </CardFooter>
-        </Card>
+        </div>
       </div>
     </div>
   );

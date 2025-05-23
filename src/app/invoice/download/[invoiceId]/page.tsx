@@ -9,8 +9,9 @@ import { Download, Edit, Loader2, AlertTriangle, Home, Eye } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast';
 import type { StoredInvoiceData } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
-import { InvoiceTemplate } from '@/components/invoice-template'; // Re-added import
+import { InvoiceTemplate } from '@/components/invoice-template';
 import { generatePdf, generateDoc, generateJpeg } from '@/lib/invoice-generator';
+import { format, parseISO } from 'date-fns'; // Added format and parseISO imports
 
 export default function InvoiceDownloadPage() {
   const router = useRouter();
@@ -38,27 +39,45 @@ export default function InvoiceDownloadPage() {
       }
       setIsLoading(false);
     } else {
+      // If no invoiceId, redirect
+      toast({
+        title: "Invalid Access",
+        description: "No invoice ID provided. Redirecting.",
+        variant: "destructive",
+      });
       router.replace('/invoice/details');
       setIsLoading(false);
     }
   }, [invoiceId, router, toast]);
 
   const handleGenerate = async (
-    generator: (data: StoredInvoiceData, watermark?: string, element?: HTMLElement) => Promise<void>,
+    // Added element parameter for PDF/JPEG generators
+    generator: (data: StoredInvoiceData, watermark?: string, element?: HTMLElement | null) => Promise<void>,
     format: string
   ) => {
-    if (!invoiceData || !invoiceTemplateRef.current) {
-      toast({ title: "Error", description: "Invoice data or template not available for generation.", variant: "destructive" });
+    if (!invoiceData) { // Removed check for invoiceTemplateRef.current here as DOC doesn't need it
+      toast({ title: "Error", description: "Invoice data not available for generation.", variant: "destructive" });
       return;
     }
+     // Check for template ref only if not DOC
+    if (format !== 'DOC' && !invoiceTemplateRef.current) {
+        toast({ title: "Error", description: "Invoice template element not ready for generation.", variant: "destructive" });
+        return;
+    }
+
     setIsGenerating(true);
     toast({ title: `Generating ${format}...`, description: "Please wait." });
     try {
-      await generator(invoiceData, invoiceData.watermarkDataUrl || undefined, invoiceTemplateRef.current);
+      // Pass ref only if needed
+      if (format === 'PDF' || format === 'JPEG') {
+        await generator(invoiceData, invoiceData.watermarkDataUrl || undefined, invoiceTemplateRef.current);
+      } else { // For DOC
+        await generator(invoiceData, invoiceData.watermarkDataUrl || undefined);
+      }
       toast({ title: `${format} Generated!`, description: "Your download should start shortly.", variant: "default" });
     } catch (e) {
       console.error(`Error generating ${format}:`, e);
-      toast({ variant: "destructive", title: "Generation Error", description: `Could not generate the ${format}.` });
+      toast({ variant: "destructive", title: "Generation Error", description: `Could not generate the ${format}. Please try again or check console.` });
     } finally {
       setIsGenerating(false);
     }
@@ -75,12 +94,12 @@ export default function InvoiceDownloadPage() {
 
   if (!invoiceData) {
     return (
-      <Card className="m-auto mt-10 max-w-lg text-center">
+      <Card className="m-auto mt-10 max-w-lg text-center shadow-xl">
         <CardHeader>
           <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
           <CardTitle>Invoice Data Not Found</CardTitle>
           <CardDescription>
-            We couldn't retrieve the details for this invoice.
+            We couldn't retrieve the details for this invoice. It might have been cleared or the link is invalid.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -96,7 +115,7 @@ export default function InvoiceDownloadPage() {
     <div className="py-8">
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <h1 className="text-3xl font-bold text-primary">Download Invoice</h1>
+          <h1 className="text-3xl font-bold text-primary">Download Your Invoice</h1>
           <div className="flex gap-2 flex-wrap justify-center">
              <Button onClick={() => router.push(`/invoice/preview/${invoiceId}`)} variant="outline">
               <Eye className="mr-2 h-4 w-4" /> Back to Preview
@@ -110,15 +129,17 @@ export default function InvoiceDownloadPage() {
           </div>
         </div>
         
-        {/* Hidden or minimized invoice template for html2canvas capture */}
-        <div className="opacity-0 absolute -z-10 overflow-hidden max-h-0"> {/* Making it effectively hidden but available for capture */}
-            <div ref={invoiceTemplateRef} className="bg-background">
+        {/* Hidden invoice template for html2canvas capture. Styled for proper capture. */}
+        <div 
+          className="fixed top-0 left-[-9999px] opacity-100 z-[1] bg-transparent" // Positioned off-screen but fully rendered
+        > 
+            <div ref={invoiceTemplateRef} className="bg-card" style={{ width: '800px' }}> {/* Ensure a fixed width for consistent capture */}
               {invoiceData && <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />}
             </div>
         </div>
 
 
-        <Card className="shadow-lg">
+        <Card className="shadow-lg rounded-lg">
           <CardHeader>
             <CardTitle className="text-xl">Choose Download Format</CardTitle>
             <CardDescription>Select your preferred format to download invoice <span className="font-semibold">{invoiceData.invoiceNumber}</span>.</CardDescription>
@@ -127,7 +148,7 @@ export default function InvoiceDownloadPage() {
             <Button 
               onClick={() => handleGenerate(generatePdf, 'PDF')} 
               disabled={isGenerating} 
-              className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground"
+              className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground shadow-md"
             >
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Download PDF
@@ -135,7 +156,7 @@ export default function InvoiceDownloadPage() {
             <Button 
               onClick={() => handleGenerate(generateDoc, 'DOC')} 
               disabled={isGenerating} 
-              className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground"
+              className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground shadow-md"
             >
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Download DOC
@@ -143,7 +164,7 @@ export default function InvoiceDownloadPage() {
             <Button 
               onClick={() => handleGenerate(generateJpeg, 'JPEG')} 
               disabled={isGenerating} 
-              className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground"
+              className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground shadow-md"
             >
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Download JPEG
@@ -151,7 +172,7 @@ export default function InvoiceDownloadPage() {
           </CardFooter>
         </Card>
         
-        <Card className="mt-8 shadow-md">
+        <Card className="mt-8 shadow-md rounded-lg">
           <CardHeader>
             <CardTitle className="text-lg">Invoice Summary</CardTitle>
           </CardHeader>
@@ -159,7 +180,7 @@ export default function InvoiceDownloadPage() {
             <p><strong>Invoice Number:</strong> {invoiceData.invoiceNumber}</p>
             <p><strong>Customer:</strong> {invoiceData.customerName}</p>
             <p><strong>Total Amount:</strong> {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(invoiceData.totalFee || 0)}</p>
-            <p><strong>Invoice Date:</strong> {format(parseISO(invoiceData.invoiceDate), "MMMM d, yyyy")}</p>
+            <p><strong>Invoice Date:</strong> {invoiceData.invoiceDate ? format(parseISO(invoiceData.invoiceDate), "MMMM d, yyyy") : 'N/A'}</p>
           </CardContent>
         </Card>
 
@@ -167,4 +188,3 @@ export default function InvoiceDownloadPage() {
     </div>
   );
 }
-

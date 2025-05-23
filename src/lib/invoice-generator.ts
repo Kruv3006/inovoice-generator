@@ -1,6 +1,8 @@
 
 import type { StoredInvoiceData } from './invoice-types';
 import { format, parseISO } from 'date-fns';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 // Helper function to simulate file download
 const simulateDownload = (filename: string, dataUrlOrContent: string, mimeType: string, isDataUrl: boolean = false) => {
@@ -21,7 +23,7 @@ const simulateDownload = (filename: string, dataUrlOrContent: string, mimeType: 
 };
 
 // Function to get HTML content of the invoice for DOC generation
-const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
+const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string): string => {
   const {
     companyName, customerName, invoiceNumber, invoiceDate, dueDate,
     startDate, startTime, endDate, endTime, duration, totalFee, invoiceNotes,
@@ -30,11 +32,19 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
 
   const parsedInvoiceDate = invoiceDate ? parseISO(invoiceDate) : new Date();
   const parsedDueDate = dueDate ? parseISO(dueDate) : new Date();
-  const parsedServiceStartDate = startDate ? new Date(startDate) : new Date();
-  const parsedServiceEndDate = endDate ? new Date(endDate) : new Date();
+  // Ensure startDate and endDate are Date objects before formatting
+  const parsedServiceStartDate = startDate instanceof Date ? startDate : (startDate ? parseISO(startDate as unknown as string) : new Date());
+  const parsedServiceEndDate = endDate instanceof Date ? endDate : (endDate ? parseISO(endDate as unknown as string) : new Date());
 
-  const formatAddress = (address: string | undefined) => address?.replace(/,/g, '<br/>') || 'N/A';
-  const fCurrency = (val?: number) => val?.toFixed(2) || '0.00';
+
+  const formatAddressHtml = (address: string | undefined) => address?.split(',').map(part => part.trim()).join('<br/>') || 'N/A';
+  const fCurrency = (val?: number) => val != null ? val.toFixed(2) : '0.00';
+
+  // Watermark style for DOC (very basic, might not render perfectly in all Word versions)
+  // A true background image watermark is hard with pure HTML to DOC.
+  const watermarkStyle = watermarkDataUrl 
+    ? `background-image: url(${watermarkDataUrl}); background-repeat: no-repeat; background-position: center; background-size: contain; opacity: 0.1;` 
+    : '';
 
   return `
     <html>
@@ -42,113 +52,143 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
         <meta charset="UTF-8">
         <title>Invoice ${invoiceNumber}</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-          .header, .footer { text-align: center; margin-bottom: 20px; }
-          .details { margin-bottom: 30px; }
-          .details table { width: 100%; border-collapse: collapse; }
-          .details th, .details td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          .company-info, .client-info { width: 48%; display: inline-block; vertical-align: top; margin-bottom: 20px; }
-          .items th { background-color: #f2f2f2; }
-          .total { text-align: right; margin-top: 20px; }
-          .total-amount { font-size: 1.2em; font-weight: bold; }
+          body { font-family: Arial, sans-serif; margin: 40px; color: #333333; font-size: 10pt; }
+          .invoice-container { border: 1px solid #cccccc; padding: 20px; ${watermarkStyle} }
+          .header-section { display: table; width: 100%; margin-bottom: 30px; }
+          .company-details, .invoice-meta { display: table-cell; vertical-align: top; }
+          .company-details { width: 60%; }
+          .invoice-meta { width: 40%; text-align: right; }
+          .company-name { font-size: 18pt; font-weight: bold; color: #0056b3; margin-bottom: 5px; }
+          .address { font-size: 9pt; line-height: 1.4; color: #555555; }
+          .invoice-title { font-size: 22pt; font-weight: bold; margin-bottom: 5px; color: #333333; }
+          .meta-item { margin-bottom: 3px; font-size: 10pt; }
+          .meta-item strong { color: #000000; }
+          .billing-section { display: table; width: 100%; margin-bottom: 30px; }
+          .bill-to { display: table-cell; width: 50%; }
+          .bill-to strong { font-size: 11pt; color: #000000; }
+          .items-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 10pt; }
+          .items-table th, .items-table td { border: 1px solid #dddddd; padding: 10px; text-align: left; }
+          .items-table th { background-color: #f0f0f0; font-weight: bold; color: #000000; }
+          .items-table td.amount, .items-table th.amount { text-align: right; }
+          .totals-section { text-align: right; margin-bottom: 30px; }
+          .totals-section div { margin-bottom: 5px; font-size: 11pt; }
+          .totals-section .grand-total { font-weight: bold; font-size: 14pt; color: #0056b3; }
+          .notes-section { margin-bottom: 30px; border-top: 1px solid #cccccc; padding-top: 15px; font-size: 9pt; color: #555555; }
+          .notes-section strong { color: #000000; }
+          .footer-section { text-align: center; font-size: 8pt; color: #888888; border-top: 1px solid #cccccc; padding-top: 15px; margin-top:30px; }
         </style>
       </head>
       <body>
-        <div class="header"><h1>Invoice</h1></div>
-        
-        <div class="company-info">
-          <strong>From:</strong><br/>
-          ${companyName || 'Your Company LLC'}<br/>
-          ${formatAddress(companyAddress)}
-        </div>
-        <div class="client-info" style="text-align: right;">
-          <strong>Invoice #: ${invoiceNumber}</strong><br/>
-          Date: ${format(parsedInvoiceDate, "MMMM d, yyyy")}<br/>
-          Due Date: ${format(parsedDueDate, "MMMM d, yyyy")}
-        </div>
-        <br style="clear:both;"/>
-        <div class="client-info">
-          <strong>To:</strong><br/>
-          ${customerName}<br/>
-          ${formatAddress(clientAddress)}
-        </div>
-        <br style="clear:both;"/>
+        <div class="invoice-container">
+          <div class="header-section">
+            <div class="company-details">
+              <div class="company-name">${companyName || 'Your Company LLC'}</div>
+              <div class="address">${formatAddressHtml(companyAddress)}</div>
+            </div>
+            <div class="invoice-meta">
+              <div class="invoice-title">INVOICE</div>
+              <div class="meta-item"><strong>Invoice #:</strong> ${invoiceNumber}</div>
+              <div class="meta-item"><strong>Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</div>
+              <div class="meta-item"><strong>Due Date:</strong> ${format(parsedDueDate, "MMMM d, yyyy")}</div>
+            </div>
+          </div>
 
-        <div class="details items">
-          <table>
+          <div class="billing-section">
+            <div class="bill-to">
+              <strong>Bill To:</strong><br/>
+              ${customerName}<br/>
+              <div class="address">${formatAddressHtml(clientAddress)}</div>
+            </div>
+          </div>
+
+          <table class="items-table">
             <thead>
-              <tr><th>Description</th><th>Duration</th><th>Amount</th></tr>
+              <tr>
+                <th>Description</th>
+                <th class="amount">Duration</th>
+                <th class="amount">Amount</th>
+              </tr>
             </thead>
             <tbody>
               <tr>
-                <td>Service Rendered<br/><small>From ${format(parsedServiceStartDate, "MMM d, yyyy")} ${startTime} to ${format(parsedServiceEndDate, "MMM d, yyyy")} ${endTime}</small></td>
-                <td>${duration ? `${duration.days}d ${duration.hours}h` : "N/A"}</td>
-                <td>${fCurrency(totalFee)}</td>
+                <td>
+                  Service Rendered<br/>
+                  <small style="font-size:8pt; color:#777777;">
+                    From ${format(parsedServiceStartDate, "MMM d, yyyy")} ${startTime} 
+                    to ${format(parsedServiceEndDate, "MMM d, yyyy")} ${endTime}
+                  </small>
+                </td>
+                <td class="amount">${duration ? `${duration.days}d ${duration.hours}h` : "N/A"}</td>
+                <td class="amount">$${fCurrency(totalFee)}</td>
               </tr>
             </tbody>
           </table>
+
+          <div class="totals-section">
+            <div>Subtotal: $${fCurrency(totalFee)}</div>
+            <div class="grand-total">Total Due: $${fCurrency(totalFee)}</div>
+          </div>
+
+          ${invoiceNotes ? `
+            <div class="notes-section">
+              <strong>Notes:</strong>
+              <p>${invoiceNotes.replace(/\n/g, '<br/>')}</p>
+            </div>
+          ` : ''}
+
+          <div class="footer-section">
+            <p>If you have any questions concerning this invoice, please contact ${companyName || "us"}.</p>
+            <p>&copy; ${new Date().getFullYear()} ${companyName || 'Your Company'}. All rights reserved.</p>
+          </div>
         </div>
-        <div class="total">
-          <p>Subtotal: ${fCurrency(totalFee)}</p>
-          <p class="total-amount">Total Due: ${fCurrency(totalFee)}</p>
-        </div>
-        ${invoiceNotes ? `<div class="notes"><p><strong>Notes:</strong></p><p>${invoiceNotes.replace(/\n/g, '<br/>')}</p></div>` : ''}
-        <div class="footer"><p>&copy; ${new Date().getFullYear()} ${companyName || 'Your Company'}</p></div>
       </body>
     </html>
   `;
 };
 
 
-// Assumed: html2canvas is available globally or via import if using bundler
-declare const html2canvas: any; 
-// Assumed: jsPDF is available globally or via import
-declare const jspdf: any;
-
-
-export const generatePdf = async (data: StoredInvoiceData, watermarkDataUrl?: string, elementToCapture?: HTMLElement): Promise<void> => {
+export const generatePdf = async (data: StoredInvoiceData, watermarkDataUrl?: string, elementToCapture?: HTMLElement | null): Promise<void> => {
   console.log("Generating PDF for:", data.invoiceNumber);
   if (!elementToCapture) {
-    alert("PDF generation requires a visible template element.");
-    return;
-  }
-
-  if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
-    alert("PDF generation libraries (html2canvas, jsPDF) not found. Simulating text download.");
-    const content = `Simulated PDF for Invoice ${data.invoiceNumber}\nCustomer: ${data.customerName}\nTotal: ${data.totalFee}`;
-    simulateDownload(`invoice_${data.invoiceNumber}.pdf`, content, 'application/pdf');
-    return;
+    alert("PDF generation failed: template element not found.");
+    throw new Error("Template element not provided for PDF generation.");
   }
   
-  const { jsPDF } = jspdf; // if using module import: import { jsPDF } from "jspdf";
-
   try {
     const canvas = await html2canvas(elementToCapture, {
-      scale: 2, // Higher scale for better quality
-      useCORS: true, // If images are from other domains
+      scale: 2, 
+      useCORS: true,
       logging: false,
+      backgroundColor: null, // Allow transparent background if any part of template is transparent
+      onclone: (document) => {
+        // If there are specific styles that are only applied for screen, you might need to adjust them here.
+        // For example, ensure the hidden div is temporarily made visible for capture if opacity was an issue.
+      }
     });
     const imgData = canvas.toDataURL('image/png');
+    
+    // Calculate PDF dimensions to maintain aspect ratio
+    const pdfWidth = canvas.width;
+    const pdfHeight = canvas.height;
+    
     const pdf = new jsPDF({
-      orientation: 'p',
+      orientation: pdfWidth > pdfHeight ? 'l' : 'p', // landscape or portrait
       unit: 'px',
-      format: [canvas.width, canvas.height] // Use canvas dimensions for PDF page size
+      format: [pdfWidth, pdfHeight]
     });
-    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+    
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
     pdf.save(`invoice_${data.invoiceNumber}.pdf`);
   } catch (error) {
     console.error("Error generating PDF with html2canvas:", error);
     alert("Failed to generate PDF. Check console for details.");
-    // Fallback to text
-    const content = `Error generating PDF. Invoice ${data.invoiceNumber}\nCustomer: ${data.customerName}\nTotal: ${data.totalFee}`;
-    simulateDownload(`invoice_${data.invoiceNumber}_error.pdf`, content, 'application/pdf');
+    throw error;
   }
 };
 
 export const generateDoc = async (data: StoredInvoiceData, watermarkDataUrl?: string): Promise<void> => {
   console.log("Generating DOC for:", data.invoiceNumber);
-  const htmlContent = getInvoiceHtmlForDoc(data);
-  // For DOC, we can create an HTML string and use a data URI trick or a blob
+  const htmlContent = getInvoiceHtmlForDoc(data, watermarkDataUrl);
   const content = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office"
     xmlns:w="urn:schemas-microsoft-com:office:word"
@@ -159,38 +199,25 @@ export const generateDoc = async (data: StoredInvoiceData, watermarkDataUrl?: st
   simulateDownload(`invoice_${data.invoiceNumber}.doc`, content, 'application/msword');
 };
 
-export const generateJpeg = async (data: StoredInvoiceData, watermarkDataUrl?: string, elementToCapture?: HTMLElement): Promise<void> => {
+export const generateJpeg = async (data: StoredInvoiceData, watermarkDataUrl?: string, elementToCapture?: HTMLElement | null): Promise<void> => {
   console.log("Generating JPEG for:", data.invoiceNumber);
   if (!elementToCapture) {
-    alert("JPEG generation requires a visible template element.");
-    return;
-  }
-
-  if (typeof html2canvas === 'undefined') {
-    alert("html2canvas library not found. Simulating text download.");
-    const content = `Simulated JPEG for Invoice ${data.invoiceNumber}\nCustomer: ${data.customerName}\nTotal: ${data.totalFee}`;
-    simulateDownload(`invoice_${data.invoiceNumber}.txt`, content, 'text/plain'); // Fallback to .txt
-    return;
+    alert("JPEG generation failed: template element not found.");
+    throw new Error("Template element not provided for JPEG generation.");
   }
 
   try {
     const canvas = await html2canvas(elementToCapture, {
-        scale: 1.5,
+        scale: 1.5, // Good quality for JPEG
         useCORS: true,
         logging: false,
+        backgroundColor: '#ffffff', // JPEGs don't support transparency, set a white background
     });
     const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9); // 0.9 quality
     simulateDownload(`invoice_${data.invoiceNumber}.jpeg`, jpegDataUrl, 'image/jpeg', true);
   } catch (error) {
     console.error("Error generating JPEG with html2canvas:", error);
     alert("Failed to generate JPEG. Check console for details.");
+    throw error;
   }
 };
-
-// Note: For full html2canvas and jsPDF functionality, you would typically install them:
-// npm install html2canvas jspdf
-// And then import them:
-// import html2canvas from 'html2canvas';
-// import jsPDF from 'jspdf';
-// The current setup assumes they might be loaded via CDN or are globally available for prototype purposes.
-// If not, the simulated text downloads will occur.

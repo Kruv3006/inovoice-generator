@@ -3,12 +3,12 @@
 
 import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
-import { z } from "zod";
-import { format, differenceInMilliseconds, isValid, parse } from "date-fns";
-import { CalendarIcon, Download, ImageUp, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { format, differenceInMilliseconds, isValid, parse, addDays } from "date-fns";
+import { CalendarIcon, ImageUp, PartyPopper } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,51 +21,39 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { generatePdf, generateDoc, generateJpeg } from "@/lib/invoice-generator";
+import type { InvoiceFormSchemaType, StoredInvoiceData } from "@/lib/invoice-types";
+import { invoiceFormSchema } from "@/lib/invoice-types";
+import { saveInvoiceData } from "@/lib/invoice-store";
 
-const invoiceFormSchema = z.object({
-  customerName: z.string().min(1, "Customer name is required").regex(/^[a-zA-Z\s]+$/, "Name must contain only letters and spaces."),
-  startDate: z.date({ required_error: "Start date is required." }),
-  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Valid 24-hour time (HH:MM) is required."),
-  endDate: z.date({ required_error: "End date is required." }),
-  endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Valid 24-hour time (HH:MM) is required."),
-  totalFee: z.preprocess(
-    (val) => parseFloat(String(val).replace(/[^0-9.-]+/g, "")), // Sanitize input
-    z.number({ invalid_type_error: "Total fee must be a number." })
-     .positive({ message: "Total fee must be a positive amount." })
-     .max(1000000000, "Total fee seems too large.")
-  ),
-  watermarkFile: z.custom<FileList>((val) => val instanceof FileList, "Please upload a file").optional(),
-}).refine(data => {
-  if (data.startDate && data.startTime && data.endDate && data.endTime) {
-    const startFullDate = parse(`${format(data.startDate, "yyyy-MM-dd")} ${data.startTime}`, 'yyyy-MM-dd HH:mm', new Date());
-    const endFullDate = parse(`${format(data.endDate, "yyyy-MM-dd")} ${data.endTime}`, 'yyyy-MM-dd HH:mm', new Date());
-    return endFullDate > startFullDate;
-  }
-  return true;
-}, {
-  message: "End date & time must be after start date & time.",
-  path: ["endDate"], 
-});
-
-export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
+const fileToDataUrl = (file: File): Promise<string | null> => {
+  return new Promise((resolve) => {
+    if (!file) resolve(null);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      resolve(reader.result as string);
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+};
 
 export function InvoiceForm() {
   const { toast } = useToast();
+  const router = useRouter();
   const [duration, setDuration] = useState<{ days: number; hours: number; error?: string } | null>(null);
   const [watermarkPreview, setWatermarkPreview] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const watermarkFileRef = useRef<HTMLInputElement | null>(null);
-
 
   const form = useForm<InvoiceFormSchemaType>({
     resolver: zodResolver(invoiceFormSchema),
@@ -74,6 +62,10 @@ export function InvoiceForm() {
       startTime: "09:00",
       endTime: "17:00",
       totalFee: undefined,
+      companyName: "Your Company LLC",
+      companyAddress: "123 Main St, Anytown, USA",
+      clientAddress: "456 Client Ave, Otherville, USA",
+      invoiceNotes: "Thank you for your business! Payment is due within 30 days.",
     },
   });
 
@@ -87,33 +79,12 @@ export function InvoiceForm() {
   useEffect(() => {
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast({ variant: "destructive", title: "File too large", description: "Watermark image must be less than 5MB." });
-        setWatermarkPreview(null);
-        if (watermarkFileRef.current) {
-          watermarkFileRef.current.value = ""; 
-        }
-        form.setValue("watermarkFile", undefined);
-        return;
-      }
-      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
-        toast({ variant: "destructive", title: "Invalid file type", description: "Please upload a PNG, JPEG, or GIF image." });
-        setWatermarkPreview(null);
-        if (watermarkFileRef.current) {
-          watermarkFileRef.current.value = "";
-        }
-        form.setValue("watermarkFile", undefined);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setWatermarkPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      // Validation is now primarily handled by Zod schema
+      fileToDataUrl(file).then(setWatermarkPreview);
     } else {
       setWatermarkPreview(null);
     }
-  }, [watchedWatermarkFile, toast, form]);
+  }, [watchedWatermarkFile]);
 
   useEffect(() => {
     if (watchedStartDate && watchedStartTime && watchedEndDate && watchedEndTime &&
@@ -136,55 +107,55 @@ export function InvoiceForm() {
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       diff -= days * (1000 * 60 * 60 * 24);
       const hours = Math.floor(diff / (1000 * 60 * 60));
-      setDuration({ days, hours });
+      setDuration({ days, hours, error: undefined });
     } else {
       setDuration(null);
     }
   }, [watchedStartDate, watchedStartTime, watchedEndDate, watchedEndTime]);
   
   async function onSubmit(data: InvoiceFormSchemaType) {
-    setIsGenerating(true);
+    setIsSubmitting(true);
     try {
-      toast({
-        title: "Invoice Generation",
-        description: "Processing your request...",
-      });
-      // For generation functions, we pass watermarkPreview which is a base64 data URL
-      // This is a simplification; ideally, file object or more robust handling is needed for server-side.
-      // For client-side generation (like with html2canvas), data URL is fine.
+      const invoiceId = `inv_${Date.now()}`;
+      const invoiceNumber = `INV-${String(Date.now()).slice(-6)}`;
+      const currentDate = new Date();
+      const dueDate = addDays(currentDate, 30);
+
+      let watermarkDataUrl: string | null = null;
+      if (data.watermarkFile && data.watermarkFile.length > 0) {
+        watermarkDataUrl = await fileToDataUrl(data.watermarkFile[0]);
+      }
       
-      // Here we pick one as an example, or you can have specific buttons call specific generators
-      // For this example, let's assume a "Generate All" or specific buttons are handled outside this onSubmit
-      // This onSubmit is more for form validation feedback, actual generation will be triggered by specific buttons.
-      console.log("Form data is valid:", data);
-      // Actual generation will be triggered by specific buttons, example shown in JSX below.
+      const storedData: StoredInvoiceData = {
+        ...data,
+        id: invoiceId,
+        invoiceNumber,
+        invoiceDate: currentDate.toISOString(),
+        dueDate: dueDate.toISOString(),
+        watermarkDataUrl,
+        duration: duration && !duration.error ? {days: duration.days, hours: duration.hours} : undefined,
+      };
+
+      saveInvoiceData(invoiceId, storedData);
+
+      toast({
+        title: "Invoice Details Saved!",
+        description: "Redirecting to preview...",
+        variant: "default"
+      });
+      router.push(`/invoice/preview/${invoiceId}`);
+
     } catch (error) {
-      console.error("Generation error:", error);
+      console.error("Submission error:", error);
       toast({
         variant: "destructive",
-        title: "Generation Failed",
-        description: "An unexpected error occurred.",
+        title: "Submission Failed",
+        description: "An unexpected error occurred. Please try again.",
       });
-    } finally {
-      setIsGenerating(false); // Ensure this is reset
+      setIsSubmitting(false);
     }
+    // setIsSubmitting will be false on successful navigation or caught error
   }
-
-  const handleGenerate = async (generator: (data: InvoiceFormSchemaType, watermark?: string) => Promise<void>) => {
-    const isValid = await form.trigger();
-    if (!isValid) {
-      toast({ variant: "destructive", title: "Validation Error", description: "Please correct the errors in the form."});
-      return;
-    }
-    setIsGenerating(true);
-    try {
-      await generator(form.getValues(), watermarkPreview || undefined);
-    } catch (e) {
-       toast({ variant: "destructive", title: "Generation Error", description: "Could not generate the file."});
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const formatDateWithTime = (date?: Date, time?: string) => {
     if (!date || !time || !/^[0-2]\d:[0-5]\d$/.test(time)) return "Select date & time";
@@ -194,26 +165,69 @@ export function InvoiceForm() {
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto shadow-xl">
+    <Card className="w-full max-w-3xl mx-auto shadow-xl my-8">
       <CardHeader>
-        <CardTitle className="text-2xl font-bold text-center text-primary">Create New Invoice</CardTitle>
+        <CardTitle className="text-3xl font-bold text-center text-primary">Create New Invoice</CardTitle>
+        <CardDescription className="text-center text-muted-foreground">Fill in the details below to generate your invoice.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="companyName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Company Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Acme Corp" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="companyAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Company Address</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="e.g., 123 Business Rd, Suite 100, City, Country" {...field} rows={2}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+             <FormField
+                control={form.control}
+                name="customerName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., John Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             <FormField
               control={form.control}
-              name="customerName"
+              name="clientAddress"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Customer Name</FormLabel>
+                  <FormLabel>Client Address</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., John Doe" {...field} />
+                    <Textarea placeholder="e.g., 456 Client St, Apt B, City, Country" {...field} rows={2} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
@@ -221,14 +235,14 @@ export function InvoiceForm() {
                 name="startDate"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Start Date</FormLabel>
+                    <FormLabel>Service Start Date</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
                             variant={"outline"}
                             className={cn(
-                              "w-full pl-3 text-left font-normal",
+                              "w-full pl-3 text-left font-normal justify-start",
                               !field.value && "text-muted-foreground"
                             )}
                           >
@@ -277,14 +291,14 @@ export function InvoiceForm() {
                 name="endDate"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>End Date</FormLabel>
+                    <FormLabel>Service End Date</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
                             variant={"outline"}
                             className={cn(
-                              "w-full pl-3 text-left font-normal",
+                              "w-full pl-3 text-left font-normal justify-start",
                               !field.value && "text-muted-foreground"
                             )}
                           >
@@ -328,10 +342,10 @@ export function InvoiceForm() {
 
 
             {duration && (
-              <div className="p-3 bg-secondary rounded-md">
-                <p className="font-medium text-foreground">
+              <div className={cn("p-3 rounded-md", duration.error ? "bg-destructive/10" : "bg-secondary")}>
+                <p className={cn("font-medium", duration.error ? "text-destructive" : "text-foreground")}>
                   Calculated Duration: 
-                  {duration.error ? <span className="text-destructive"> {duration.error}</span> : ` ${duration.days} days and ${duration.hours} hours`}
+                  {duration.error ? <span> {duration.error}</span> : ` ${duration.days} days and ${duration.hours} hours`}
                 </p>
               </div>
             )}
@@ -341,9 +355,9 @@ export function InvoiceForm() {
               name="totalFee"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Total Fee</FormLabel>
+                  <FormLabel>Total Fee (e.g., USD)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 150.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || '')} />
+                    <Input type="number" step="0.01" placeholder="e.g., 150.00" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -353,7 +367,7 @@ export function InvoiceForm() {
             <FormField
               control={control}
               name="watermarkFile"
-              render={({ field: { onChange, onBlur, name, ref } }) => (
+              render={({ field: { onChange, onBlur, name } }) => ( // removed ref as it's handled by Zod with custom FileList
                 <FormItem>
                   <FormLabel>Custom Watermark (Optional, PNG/JPEG/GIF, &lt;5MB)</FormLabel>
                   <FormControl>
@@ -365,10 +379,7 @@ export function InvoiceForm() {
                         type="file"
                         accept="image/png, image/jpeg, image/gif"
                         className="hidden"
-                        ref={(e) => {
-                          ref(e); // react-hook-form ref
-                          watermarkFileRef.current = e; // local ref
-                        }}
+                        ref={watermarkFileRef} // local ref for click trigger
                         name={name}
                         onBlur={onBlur}
                         onChange={(e) => onChange(e.target.files)}
@@ -389,27 +400,28 @@ export function InvoiceForm() {
                 </div>
               </div>
             )}
+
+            <FormField
+              control={form.control}
+              name="invoiceNotes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes/Terms</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="e.g., Payment due in 30 days. Late fees may apply." {...field} rows={3} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
-            <div className="flex flex-col sm:flex-row gap-3 pt-6">
-              <Button type="button" onClick={() => handleGenerate(generatePdf)} disabled={isGenerating} className="w-full sm:w-auto bg-accent hover:bg-accent/90">
-                {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                Download PDF
-              </Button>
-              <Button type="button" onClick={() => handleGenerate(generateDoc)} disabled={isGenerating} className="w-full sm:w-auto bg-accent hover:bg-accent/90">
-                {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                Download DOC
-              </Button>
-              <Button type="button" onClick={() => handleGenerate(generateJpeg)} disabled={isGenerating} className="w-full sm:w-auto bg-accent hover:bg-accent/90">
-                {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                Download JPEG
-              </Button>
-            </div>
-            {/* Hidden submit button for form validation on enter, if desired, but explicit generate buttons are better UX */}
-            {/* <Button type="submit" className="hidden">Validate</Button> */}
+            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
+              {isSubmitting ? "Processing..." : "Preview Invoice"}
+              {!isSubmitting && <PartyPopper className="ml-2 h-5 w-5" />}
+            </Button>
           </form>
         </Form>
       </CardContent>
     </Card>
   );
 }
-

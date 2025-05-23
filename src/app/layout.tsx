@@ -1,9 +1,10 @@
+
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
 import { Toaster } from '@/components/ui/toaster';
-import { FileText } from 'lucide-react';
+import { FileText } from 'lucide-react'; // Or consider a more business-y icon like Briefcase
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -27,17 +28,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
-        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-14 items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileText className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-semibold">InvoiceCraft</h1>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-background`}>
+        <header className="sticky top-0 z-50 w-full border-b bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+          <div className="container flex h-16 items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FileText className="h-7 w-7 text-primary" />
+              <h1 className="text-2xl font-semibold tracking-tight">InvoiceCraft</h1>
             </div>
             <ThemeToggleButton />
           </div>
         </header>
-        <main className="flex-1 container py-8">
+        <main className="flex-1 w-full"> {/* Container usually in page, not layout for more control */}
           {children}
         </main>
         <Toaster />

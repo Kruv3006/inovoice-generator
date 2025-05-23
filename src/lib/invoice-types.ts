@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { format, parse } from 'date-fns'; // Import at the top
+import { format, parse } from 'date-fns';
 
 export const invoiceFormSchema = z.object({
   customerName: z.string().min(1, "Customer name is required").regex(/^[a-zA-Z\s.'-]+$/, "Name must contain only letters, spaces, periods, apostrophes, and hyphens."),
@@ -31,7 +31,6 @@ export const invoiceFormSchema = z.object({
   invoiceNotes: z.string().optional().default("Thank you for your business!"),
 }).refine(data => {
   if (data.startDate && data.startTime && data.endDate && data.endTime) {
-    // Use imported format and parse
     const startFullDateString = `${format(data.startDate, "yyyy-MM-dd")} ${data.startTime}`;
     const endFullDateString = `${format(data.endDate, "yyyy-MM-dd")} ${data.endTime}`;
     const startFullDate = parse(startFullDateString, 'yyyy-MM-dd HH:mm', new Date());
@@ -41,7 +40,7 @@ export const invoiceFormSchema = z.object({
   return true;
 }, {
   message: "End date & time must be after start date & time.",
-  path: ["endDate"], // Or use a more general path if preferred, like ["endTime"] or a global error
+  path: ["endDate"],
 });
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
@@ -55,5 +54,5 @@ export interface StoredInvoiceData extends InvoiceFormSchemaType {
   duration?: { days: number; hours: number };
   // Note: startDate and endDate from InvoiceFormSchemaType are Date objects.
   // When serialized to JSON, they become strings.
-  // We'll handle deserialization back to Date objects in invoice-store.ts.
+  // Deserialization back to Date objects happens in getInvoiceData.
 }

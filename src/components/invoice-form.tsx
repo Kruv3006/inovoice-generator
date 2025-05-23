@@ -62,8 +62,8 @@ export function InvoiceForm() {
       startTime: "09:00",
       endTime: "17:00",
       totalFee: undefined,
-      companyName: "Your Company LLC",
-      companyAddress: "123 Main St, Anytown, USA",
+      // companyName: "Your Company LLC", // Removed
+      // companyAddress: "123 Main St, Anytown, USA", // Removed
       clientAddress: "456 Client Ave, Otherville, USA",
       invoiceNotes: "Thank you for your business! Payment is due within 30 days.",
     },
@@ -154,7 +154,6 @@ export function InvoiceForm() {
       });
       setIsSubmitting(false);
     }
-    // setIsSubmitting will be false on successful navigation or caught error
   }
 
   const formatDateWithTime = (date?: Date, time?: string) => {
@@ -173,34 +172,7 @@ export function InvoiceForm() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="companyName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Company Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Acme Corp" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="companyAddress"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Company Address</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="e.g., 123 Business Rd, Suite 100, City, Country" {...field} rows={2}/>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            {/* Company Name and Address Fields Removed */}
              <FormField
                 control={form.control}
                 name="customerName"
@@ -227,7 +199,6 @@ export function InvoiceForm() {
                 </FormItem>
               )}
             />
-
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
@@ -367,7 +338,7 @@ export function InvoiceForm() {
             <FormField
               control={control}
               name="watermarkFile"
-              render={({ field: { onChange, onBlur, name } }) => ( // removed ref as it's handled by Zod with custom FileList
+              render={({ field: { onChange, onBlur, name } }) => ( 
                 <FormItem>
                   <FormLabel>Custom Watermark (Optional, PNG/JPEG/GIF, &lt;5MB)</FormLabel>
                   <FormControl>
@@ -379,7 +350,7 @@ export function InvoiceForm() {
                         type="file"
                         accept="image/png, image/jpeg, image/gif"
                         className="hidden"
-                        ref={watermarkFileRef} // local ref for click trigger
+                        ref={watermarkFileRef} 
                         name={name}
                         onBlur={onBlur}
                         onChange={(e) => onChange(e.target.files)}
@@ -425,3 +396,5 @@ export function InvoiceForm() {
     </Card>
   );
 }
+
+    

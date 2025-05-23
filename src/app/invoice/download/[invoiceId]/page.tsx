@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -11,7 +10,7 @@ import type { StoredInvoiceData } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { generatePdf, generateDoc, generateJpeg } from '@/lib/invoice-generator';
-import { format, parseISO } from 'date-fns'; // Added format and parseISO imports
+import { format, parseISO } from 'date-fns';
 
 export default function InvoiceDownloadPage() {
   const router = useRouter();
@@ -39,7 +38,6 @@ export default function InvoiceDownloadPage() {
       }
       setIsLoading(false);
     } else {
-      // If no invoiceId, redirect
       toast({
         title: "Invalid Access",
         description: "No invoice ID provided. Redirecting.",
@@ -51,33 +49,30 @@ export default function InvoiceDownloadPage() {
   }, [invoiceId, router, toast]);
 
   const handleGenerate = async (
-    // Added element parameter for PDF/JPEG generators
     generator: (data: StoredInvoiceData, watermark?: string, element?: HTMLElement | null) => Promise<void>,
-    format: string
+    formatName: string // Changed 'format' to 'formatName' to avoid conflict with date-fns 'format'
   ) => {
-    if (!invoiceData) { // Removed check for invoiceTemplateRef.current here as DOC doesn't need it
+    if (!invoiceData) {
       toast({ title: "Error", description: "Invoice data not available for generation.", variant: "destructive" });
       return;
     }
-     // Check for template ref only if not DOC
-    if (format !== 'DOC' && !invoiceTemplateRef.current) {
+    if (formatName !== 'DOC' && !invoiceTemplateRef.current) {
         toast({ title: "Error", description: "Invoice template element not ready for generation.", variant: "destructive" });
         return;
     }
 
     setIsGenerating(true);
-    toast({ title: `Generating ${format}...`, description: "Please wait." });
+    toast({ title: `Generating ${formatName}...`, description: "Please wait." });
     try {
-      // Pass ref only if needed
-      if (format === 'PDF' || format === 'JPEG') {
+      if (formatName === 'PDF' || formatName === 'JPEG') {
         await generator(invoiceData, invoiceData.watermarkDataUrl || undefined, invoiceTemplateRef.current);
-      } else { // For DOC
+      } else { 
         await generator(invoiceData, invoiceData.watermarkDataUrl || undefined);
       }
-      toast({ title: `${format} Generated!`, description: "Your download should start shortly.", variant: "default" });
+      toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
     } catch (e) {
-      console.error(`Error generating ${format}:`, e);
-      toast({ variant: "destructive", title: "Generation Error", description: `Could not generate the ${format}. Please try again or check console.` });
+      console.error(`Error generating ${formatName}:`, e);
+      toast({ variant: "destructive", title: "Generation Error", description: `Could not generate the ${formatName}. Please try again or check console.` });
     } finally {
       setIsGenerating(false);
     }
@@ -120,7 +115,7 @@ export default function InvoiceDownloadPage() {
              <Button onClick={() => router.push(`/invoice/preview/${invoiceId}`)} variant="outline">
               <Eye className="mr-2 h-4 w-4" /> Back to Preview
             </Button>
-            <Button onClick={() => router.push('/invoice/details')} variant="outline">
+            <Button onClick={() => router.push(`/invoice/details?id=${invoiceId}`)} variant="outline">
               <Edit className="mr-2 h-4 w-4" /> Edit Invoice
             </Button>
              <Button onClick={() => router.push('/')} variant="outline">
@@ -129,11 +124,11 @@ export default function InvoiceDownloadPage() {
           </div>
         </div>
         
-        {/* Hidden invoice template for html2canvas capture. Styled for proper capture. */}
+        {/* Hidden invoice template for html2canvas capture. Ensure it's fully rendered and styled. */}
         <div 
-          className="fixed top-0 left-[-9999px] opacity-100 z-[1] bg-transparent" // Positioned off-screen but fully rendered
+          className="fixed top-0 left-[-9999px] opacity-100 z-[1] bg-transparent print:hidden"
         > 
-            <div ref={invoiceTemplateRef} className="bg-card" style={{ width: '800px' }}> {/* Ensure a fixed width for consistent capture */}
+            <div ref={invoiceTemplateRef} className="bg-card print:bg-white" style={{ width: '800px' }}> {/* Ensure a fixed width and background for consistent capture */}
               {invoiceData && <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />}
             </div>
         </div>

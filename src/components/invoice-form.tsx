@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { ElementRef } from "react";
@@ -8,7 +7,7 @@ import { format, differenceInMilliseconds, isValid, parse, addDays } from "date-
 import { CalendarIcon, ImageUp, PartyPopper } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { InvoiceFormSchemaType, StoredInvoiceData } from "@/lib/invoice-types";
 import { invoiceFormSchema } from "@/lib/invoice-types";
-import { saveInvoiceData } from "@/lib/invoice-store";
+import { getInvoiceData, saveInvoiceData } from "@/lib/invoice-store";
 
 const fileToDataUrl = (file: File): Promise<string | null> => {
   return new Promise((resolve) => {
@@ -50,25 +49,28 @@ const fileToDataUrl = (file: File): Promise<string | null> => {
 export function InvoiceForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [duration, setDuration] = useState<{ days: number; hours: number; error?: string } | null>(null);
   const [watermarkPreview, setWatermarkPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const watermarkFileRef = useRef<HTMLInputElement | null>(null);
+
+  const defaultFormValues: Partial<InvoiceFormSchemaType> = {
+    customerName: "",
+    startTime: "09:00",
+    endTime: "17:00",
+    totalFee: undefined,
+    invoiceNotes: "Thank you for your business! Payment is due within 30 days.",
+    // companyName, companyAddress, clientAddress will use Zod defaults if not overridden by loaded data
+  };
 
   const form = useForm<InvoiceFormSchemaType>({
     resolver: zodResolver(invoiceFormSchema),
-    defaultValues: {
-      customerName: "",
-      startTime: "09:00",
-      endTime: "17:00",
-      totalFee: undefined,
-      // companyName and companyAddress will use Zod defaults
-      // clientAddress will use Zod defaults
-      invoiceNotes: "Thank you for your business! Payment is due within 30 days.",
-    },
+    defaultValues: defaultFormValues,
   });
 
-  const { watch, control } = form;
+  const { watch, control, reset } = form;
   const watchedStartDate = watch("startDate");
   const watchedStartTime = watch("startTime");
   const watchedEndDate = watch("endDate");
@@ -76,13 +78,73 @@ export function InvoiceForm() {
   const watchedWatermarkFile = watch("watermarkFile");
 
   useEffect(() => {
+    const invoiceIdToEdit = searchParams.get('id');
+    if (invoiceIdToEdit && !initialDataLoaded) {
+      const data = getInvoiceData(invoiceIdToEdit);
+      if (data) {
+        const formData: Partial<InvoiceFormSchemaType> = {
+          ...data,
+          startDate: data.startDate ? new Date(data.startDate) : undefined,
+          endDate: data.endDate ? new Date(data.endDate) : undefined,
+          // totalFee is already a number from getInvoiceData
+          // watermarkFile cannot be pre-filled, user must re-select
+          watermarkFile: undefined,
+        };
+        reset(formData); // Use reset to update form values
+
+        if (data.watermarkDataUrl) {
+          setWatermarkPreview(data.watermarkDataUrl);
+        }
+        // Recalculate duration
+        if (data.startDate && data.startTime && data.endDate && data.endTime) {
+            const startDateObj = data.startDate instanceof Date ? data.startDate : parseISO(data.startDate as unknown as string);
+            const endDateObj = data.endDate instanceof Date ? data.endDate : parseISO(data.endDate as unknown as string);
+
+            const startFullDate = parse(`${format(startDateObj, "yyyy-MM-dd")} ${data.startTime}`, 'yyyy-MM-dd HH:mm', new Date());
+            const endFullDate = parse(`${format(endDateObj, "yyyy-MM-dd")} ${data.endTime}`, 'yyyy-MM-dd HH:mm', new Date());
+
+            if (isValid(startFullDate) && isValid(endFullDate) && endFullDate > startFullDate) {
+                let diffMs = differenceInMilliseconds(endFullDate, startFullDate);
+                const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                diffMs -= days * (1000 * 60 * 60 * 24);
+                const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                setDuration({ days, hours, error: undefined });
+            } else {
+                setDuration({ days: 0, hours: 0, error: "End date/time must be after start." });
+            }
+        } else {
+            setDuration(null);
+        }
+      } else {
+        toast({ title: "Edit Error", description: "Could not load invoice data for editing.", variant: "destructive" });
+        reset(defaultFormValues); // Reset to defaults if data not found
+        setWatermarkPreview(null);
+        setDuration(null);
+      }
+      setInitialDataLoaded(true);
+    } else if (!invoiceIdToEdit && !initialDataLoaded) {
+      // This case handles navigating to the form for a new invoice
+      // or if initialDataLoaded was false for some reason without an ID
+      reset(defaultFormValues);
+      setWatermarkPreview(null);
+      setDuration(null);
+      setInitialDataLoaded(true); // Ensure this is set for the "new" case too
+    }
+  }, [searchParams, reset, toast, initialDataLoaded, defaultFormValues]);
+
+
+  useEffect(() => {
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
       fileToDataUrl(file).then(setWatermarkPreview);
-    } else {
-      setWatermarkPreview(null);
+    } else if (!searchParams.get('id') || (watchedWatermarkFile && watchedWatermarkFile.length === 0 && watermarkPreview)) {
+        // Clear preview if file is removed, unless it's an edit and no new file is chosen yet
+        // This logic might need refinement if we want to keep old preview until new file is chosen
+        if (watchedWatermarkFile && watchedWatermarkFile.length === 0) {
+             // setWatermarkPreview(null); // Commented out to preserve loaded preview on edit until explicitly cleared/changed
+        }
     }
-  }, [watchedWatermarkFile]);
+  }, [watchedWatermarkFile, searchParams, watermarkPreview]);
 
   useEffect(() => {
     if (watchedStartDate && watchedStartTime && watchedEndDate && watchedEndTime &&
@@ -114,13 +176,24 @@ export function InvoiceForm() {
   async function onSubmit(data: InvoiceFormSchemaType) {
     setIsSubmitting(true);
     try {
-      const invoiceId = `inv_${Date.now()}`;
-      const invoiceNumber = `INV-${String(Date.now()).slice(-6)}`;
-      const currentDate = new Date();
-      const dueDate = addDays(currentDate, 30);
+      const invoiceIdToEdit = searchParams.get('id');
+      // If editing, try to use existing invoice number, otherwise generate new.
+      // For simplicity, we'll generate a new ID and number for now even on "edit",
+      // effectively creating a new version. A true edit would update the existing record.
+      const existingInvoiceData = invoiceIdToEdit ? getInvoiceData(invoiceIdToEdit) : null;
 
-      let watermarkDataUrl: string | null = null;
-      if (data.watermarkFile && data.watermarkFile.length > 0) {
+      const invoiceId = existingInvoiceData?.id || `inv_${Date.now()}`; // Prefer existing ID if "true edit" was implemented
+      const invoiceNumber = existingInvoiceData?.invoiceNumber || `INV-${String(Date.now()).slice(-6)}`;
+      
+      const currentDate = new Date();
+      // If editing, preserve original invoiceDate unless explicitly changed by form (not currently possible)
+      const invoiceDateToStore = existingInvoiceData?.invoiceDate || currentDate.toISOString();
+      // Due date could be recalculated or preserved. Let's recalculate for simplicity.
+      const dueDate = addDays(parseISO(invoiceDateToStore), 30);
+
+
+      let watermarkDataUrl: string | null = watermarkPreview; // Start with existing preview
+      if (data.watermarkFile && data.watermarkFile.length > 0) { // If new file uploaded
         watermarkDataUrl = await fileToDataUrl(data.watermarkFile[0]);
       }
       
@@ -128,16 +201,20 @@ export function InvoiceForm() {
         ...data,
         id: invoiceId,
         invoiceNumber,
-        invoiceDate: currentDate.toISOString(),
+        invoiceDate: invoiceDateToStore,
         dueDate: dueDate.toISOString(),
         watermarkDataUrl,
         duration: duration && !duration.error ? {days: duration.days, hours: duration.hours} : undefined,
+        // Ensure companyName, companyAddress, clientAddress use schema defaults if not in 'data'
+        companyName: data.companyName || invoiceFormSchema.shape.companyName.default(),
+        companyAddress: data.companyAddress || invoiceFormSchema.shape.companyAddress.default(),
+        clientAddress: data.clientAddress || invoiceFormSchema.shape.clientAddress.default(),
       };
 
       saveInvoiceData(invoiceId, storedData);
 
       toast({
-        title: "Invoice Details Saved!",
+        title: `Invoice ${invoiceIdToEdit ? 'Updated' : 'Details Saved'}!`,
         description: "Redirecting to preview...",
         variant: "default"
       });
@@ -150,6 +227,7 @@ export function InvoiceForm() {
         title: "Submission Failed",
         description: "An unexpected error occurred. Please try again.",
       });
+    } finally {
       setIsSubmitting(false);
     }
   }
@@ -164,7 +242,9 @@ export function InvoiceForm() {
   return (
     <Card className="w-full max-w-3xl mx-auto shadow-xl my-8">
       <CardHeader>
-        <CardTitle className="text-3xl font-bold text-center text-primary">Create New Invoice</CardTitle>
+        <CardTitle className="text-3xl font-bold text-center text-primary">
+          {searchParams.get('id') ? "Edit Invoice" : "Create New Invoice"}
+        </CardTitle>
         <CardDescription className="text-center text-muted-foreground">Fill in the details below to generate your invoice.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -183,7 +263,6 @@ export function InvoiceForm() {
                   </FormItem>
                 )}
               />
-            {/* Client Address Field Removed - will use Zod default */}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
@@ -323,13 +402,13 @@ export function InvoiceForm() {
             <FormField
               control={control}
               name="watermarkFile"
-              render={({ field: { onChange, onBlur, name } }) => ( 
+              render={({ field: { onChange, onBlur, name, value } }) => ( 
                 <FormItem>
                   <FormLabel>Custom Watermark (Optional, PNG/JPEG/GIF, &lt;5MB)</FormLabel>
                   <FormControl>
                     <div className="flex items-center gap-2">
                        <Button type="button" variant="outline" onClick={() => watermarkFileRef.current?.click()}>
-                        <ImageUp className="mr-2 h-4 w-4" /> Upload Image
+                        <ImageUp className="mr-2 h-4 w-4" /> {watermarkPreview ? "Change Image" : "Upload Image"}
                       </Button>
                       <Input
                         type="file"
@@ -338,11 +417,27 @@ export function InvoiceForm() {
                         ref={watermarkFileRef} 
                         name={name}
                         onBlur={onBlur}
-                        onChange={(e) => onChange(e.target.files)}
+                        onChange={(e) => {
+                            onChange(e.target.files);
+                            if (e.target.files && e.target.files.length > 0) {
+                                fileToDataUrl(e.target.files[0]).then(setWatermarkPreview);
+                            } else {
+                                // If file input is cleared, but we had an existing preview (from edit),
+                                // we might want to keep it or clear it.
+                                // For now, clearing if new selection is empty.
+                                // setWatermarkPreview(null); // Or keep old if data.watermarkDataUrl existed
+                            }
+                        }}
                       />
-                      {watchedWatermarkFile && watchedWatermarkFile.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[200px]">{watchedWatermarkFile[0].name}</span>}
+                      {value && value.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[200px]">{value[0].name}</span>}
+                       {watermarkPreview && (!value || value.length === 0) && <span className="text-sm text-muted-foreground truncate max-w-[200px]">Current watermark active</span>}
                     </div>
                   </FormControl>
+                  <FormDescription>
+                    {searchParams.get('id') && watermarkPreview && (!value || value.length === 0) 
+                      ? "Current watermark will be used unless a new image is uploaded." 
+                      : "Upload a new image to set or change the watermark."}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -371,8 +466,8 @@ export function InvoiceForm() {
               )}
             />
             
-            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
-              {isSubmitting ? "Processing..." : "Preview Invoice"}
+            <Button type="submit" disabled={isSubmitting || !initialDataLoaded} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
+              {isSubmitting ? "Processing..." : (searchParams.get('id') ? "Update & Preview Invoice" : "Preview Invoice")}
               {!isSubmitting && <PartyPopper className="ml-2 h-5 w-5" />}
             </Button>
           </form>

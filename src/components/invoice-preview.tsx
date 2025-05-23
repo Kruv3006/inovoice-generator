@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -35,6 +34,12 @@ export default function InvoicePreview() {
       }
       setIsLoading(false);
     } else {
+      // Should not happen if route is matched correctly, but good fallback
+      toast({
+          title: "Invalid Access",
+          description: "No invoice ID provided for preview. Redirecting.",
+          variant: "destructive",
+      });
       router.replace('/invoice/details');
       setIsLoading(false);
     }
@@ -51,7 +56,7 @@ export default function InvoicePreview() {
 
   if (!invoiceData) {
     return (
-      <Card className="m-auto mt-10 max-w-lg text-center">
+      <Card className="m-auto mt-10 max-w-lg text-center shadow-xl">
         <CardHeader>
           <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
           <CardTitle>Invoice Data Not Found</CardTitle>
@@ -74,7 +79,7 @@ export default function InvoicePreview() {
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <h1 className="text-3xl font-bold text-primary">Invoice Preview</h1>
           <div className="flex gap-2 flex-wrap justify-center">
-            <Button onClick={() => router.push('/invoice/details')} variant="outline">
+            <Button onClick={() => router.push(`/invoice/details?id=${invoiceId}`)} variant="outline">
               <Edit className="mr-2 h-4 w-4" /> Edit Invoice
             </Button>
              <Button onClick={() => router.push('/')} variant="outline">
@@ -86,6 +91,7 @@ export default function InvoicePreview() {
         <Card className="shadow-xl mb-8 overflow-hidden">
           <CardContent className="p-0">
             <div className="bg-background">
+              {/* Ensure invoiceData is passed correctly, especially watermarkDataUrl */}
               <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />
             </div>
           </CardContent>
@@ -95,7 +101,7 @@ export default function InvoicePreview() {
             <Button 
                 onClick={() => router.push(`/invoice/download/${invoiceId}`)} 
                 size="lg"
-                className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-md"
             >
                 Proceed to Download Options <ArrowRight className="ml-2 h-5 w-5" />
             </Button>

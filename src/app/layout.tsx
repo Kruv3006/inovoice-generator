@@ -32,7 +32,7 @@ export default function RootLayout({
           <div className="container flex h-14 items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-semibold">5tt</h1>
+              <h1 className="text-xl font-semibold">InvoiceCraft</h1>
             </div>
             <ThemeToggleButton />
           </div>

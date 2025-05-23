@@ -1,5 +1,6 @@
 
-import type { z } from 'zod';
+import { z } from 'zod';
+import { format, parse } from 'date-fns'; // Import at the top
 
 export const invoiceFormSchema = z.object({
   customerName: z.string().min(1, "Customer name is required").regex(/^[a-zA-Z\s.'-]+$/, "Name must contain only letters, spaces, periods, apostrophes, and hyphens."),
@@ -30,15 +31,17 @@ export const invoiceFormSchema = z.object({
   invoiceNotes: z.string().optional().default("Thank you for your business!"),
 }).refine(data => {
   if (data.startDate && data.startTime && data.endDate && data.endTime) {
-    const { format, parse } = require('date-fns'); // Dynamically import for schema context
-    const startFullDate = parse(`${format(data.startDate, "yyyy-MM-dd")} ${data.startTime}`, 'yyyy-MM-dd HH:mm', new Date());
-    const endFullDate = parse(`${format(data.endDate, "yyyy-MM-dd")} ${data.endTime}`, 'yyyy-MM-dd HH:mm', new Date());
+    // Use imported format and parse
+    const startFullDateString = `${format(data.startDate, "yyyy-MM-dd")} ${data.startTime}`;
+    const endFullDateString = `${format(data.endDate, "yyyy-MM-dd")} ${data.endTime}`;
+    const startFullDate = parse(startFullDateString, 'yyyy-MM-dd HH:mm', new Date());
+    const endFullDate = parse(endFullDateString, 'yyyy-MM-dd HH:mm', new Date());
     return endFullDate > startFullDate;
   }
   return true;
 }, {
   message: "End date & time must be after start date & time.",
-  path: ["endDate"],
+  path: ["endDate"], // Or use a more general path if preferred, like ["endTime"] or a global error
 });
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
@@ -50,4 +53,7 @@ export interface StoredInvoiceData extends InvoiceFormSchemaType {
   dueDate: string; // ISO string
   watermarkDataUrl?: string | null;
   duration?: { days: number; hours: number };
+  // Note: startDate and endDate from InvoiceFormSchemaType are Date objects.
+  // When serialized to JSON, they become strings.
+  // We'll handle deserialization back to Date objects in invoice-store.ts.
 }

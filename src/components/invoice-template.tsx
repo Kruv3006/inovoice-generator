@@ -2,13 +2,13 @@
 "use client";
 
 import type { StoredInvoiceData } from "@/lib/invoice-types";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addDays } from "date-fns"; // Use addDays from date-fns
 import Image from "next/image";
 import { Paperclip } from "lucide-react"; // Example logo icon
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
-  watermarkDataUrl?: string | null; // Added this prop explicitly
+  watermarkDataUrl?: string | null;
 }
 
 const formatCurrency = (amount?: number) => {
@@ -23,27 +23,33 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
     customerName,
     clientAddress,
     invoiceNumber,
-    invoiceDate,
-    dueDate,
-    startDate,
+    invoiceDate, // ISO String
+    dueDate,     // ISO String
+    startDate,   // Should be Date object from store
+    endDate,     // Should be Date object from store
     startTime,
-    endDate,
     endTime,
     duration,
     totalFee,
     invoiceNotes,
   } = data;
 
-  const parsedInvoiceDate = invoiceDate ? parseISO(invoiceDate) : new Date();
-  const parsedDueDate = dueDate ? parseISO(dueDate) : addDays(new Date(), 30);
-  const parsedServiceStartDate = startDate ? new Date(startDate) : new Date();
-  const parsedServiceEndDate = endDate ? new Date(endDate) : new Date();
+  const defaultDisplayDate = new Date();
 
-  // Helper function to format address string
+  const parsedInvoiceDate = invoiceDate ? parseISO(invoiceDate) : defaultDisplayDate;
+  const parsedDueDate = dueDate ? parseISO(dueDate) : addDays(defaultDisplayDate, 30); // Use imported addDays
+
+  // startDate and endDate should be Date objects if getInvoiceData correctly parses them
+  const displayServiceStartDate = startDate instanceof Date && !isNaN(startDate.valueOf())
+                                  ? startDate
+                                  : defaultDisplayDate;
+  const displayServiceEndDate = endDate instanceof Date && !isNaN(endDate.valueOf())
+                                ? endDate
+                                : defaultDisplayDate;
+
   const formatAddress = (address: string | undefined) => {
     return address?.split(',').map((part, index) => <div key={index}>{part.trim()}</div>);
   };
-
 
   return (
     <div className="bg-card p-8 md:p-12 shadow-lg rounded-lg border border-border text-card-foreground font-sans relative min-w-[800px] max-w-4xl mx-auto">
@@ -56,9 +62,9 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
           <Image
             src={watermarkDataUrl}
             alt="Watermark"
-            layout="intrinsic"
-            width={400}
-            height={400}
+            layout="intrinsic" // Keep as is for now, or change to fill if parent is explicitly sized
+            width={400} // Example width
+            height={400} // Example height
             objectFit="contain"
           />
         </div>
@@ -118,7 +124,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
                 <td className="p-3 align-top">
                   <p className="font-medium text-foreground">Service Rendered</p>
                   <p className="text-xs text-muted-foreground">
-                    From {format(parsedServiceStartDate, "MMM d, yyyy")} {startTime} to {format(parsedServiceEndDate, "MMM d, yyyy")} {endTime}
+                    From {format(displayServiceStartDate, "MMM d, yyyy")} {startTime} to {format(displayServiceEndDate, "MMM d, yyyy")} {endTime}
                   </p>
                 </td>
                 <td className="p-3 text-right align-top text-muted-foreground">
@@ -138,11 +144,6 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
               <span className="font-medium text-muted-foreground">Subtotal:</span>
               <span className="font-medium text-foreground">{formatCurrency(totalFee)}</span>
             </div>
-            {/* Add Tax or Discount rows here if needed */}
-            {/* <div className="flex justify-between py-2 border-b border-border">
-              <span className="font-medium text-muted-foreground">Tax (0%):</span>
-              <span className="font-medium text-foreground">{formatCurrency(0)}</span>
-            </div> */}
             <div className="flex justify-between py-3 bg-primary/10 px-3 rounded-md mt-2">
               <span className="text-xl font-bold text-primary">Total Due:</span>
               <span className="text-xl font-bold text-primary">{formatCurrency(totalFee)}</span>
@@ -167,11 +168,3 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
     </div>
   );
 };
-
-// Helper to add days, include here if not globally available for template
-const addDays = (date: Date, days: number): Date => {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-};
-

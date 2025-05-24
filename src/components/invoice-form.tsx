@@ -3,9 +3,9 @@
 
 import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { format, differenceInMilliseconds, isValid, parse, parseISO } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash } from "lucide-react"; // Added Hash
+import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { format, isValid, parse, parseISO } from "date-fns";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, DollarSign } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -29,13 +29,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { InvoiceFormSchemaType, StoredInvoiceData } from "@/lib/invoice-types";
+import type { InvoiceFormSchemaType, StoredInvoiceData, LineItem } from "@/lib/invoice-types";
 import { invoiceFormSchema } from "@/lib/invoice-types";
 import { getInvoiceData, saveInvoiceData } from "@/lib/invoice-store";
 
-const fileToDataUrl = (file: File, toastFn: (options: any) => void): Promise<string | null> => {
+const fileToDataUrl = (file: File, toastFn: ReturnType<typeof useToast>['toast']): Promise<string | null> => {
   return new Promise((resolve) => {
     if (!file) {
         resolve(null);
@@ -57,22 +58,27 @@ export function InvoiceForm() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [duration, setDuration] = useState<{ days: number; hours: number; error?: string } | null>(null);
+  
   const [watermarkPreview, setWatermarkPreview] = useState<string | null>(null);
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  const [calculatedTotalFee, setCalculatedTotalFee] = useState<number>(0);
   
   const watermarkFileRef = useRef<HTMLInputElement | null>(null);
   const companyLogoFileRef = useRef<HTMLInputElement | null>(null);
 
+  const defaultItem: LineItem = { description: "", quantity: 1, rate: 0 };
+
   const defaultFormValues: Partial<InvoiceFormSchemaType> = {
-    invoiceNumber: String(Date.now()).slice(-6), // Default generated invoice number
+    invoiceNumber: String(Date.now()).slice(-6),
     customerName: "",
     companyName: "",
+    items: [defaultItem],
+    startDate: new Date(),
     startTime: "09:00",
+    endDate: new Date(),
     endTime: "17:00",
-    totalFee: undefined,
     invoiceNotes: "Thank you for your business! Payment is due within 30 days.",
     companyLogoFile: undefined,
     watermarkFile: undefined,
@@ -81,71 +87,67 @@ export function InvoiceForm() {
   const form = useForm<InvoiceFormSchemaType>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: defaultFormValues,
+    mode: "onChange", // Important for useFieldArray and live calculations
   });
 
-  const { watch, control, reset, setValue, trigger } = form;
-  const watchedStartDate = watch("startDate");
-  const watchedStartTime = watch("startTime");
-  const watchedEndDate = watch("endDate");
-  const watchedEndTime = watch("endTime");
-  const watchedWatermarkFile = watch("watermarkFile");
-  const watchedCompanyLogoFile = watch("companyLogoFile");
+  const { watch, control, reset, setValue, trigger, getValues } = form;
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "items",
+  });
+
+  const watchedItems = watch("items");
+
+  useEffect(() => {
+    if (watchedItems) {
+      const total = watchedItems.reduce((sum, item) => {
+        const quantity = typeof item.quantity === 'number' ? item.quantity : 0;
+        const rate = typeof item.rate === 'number' ? item.rate : 0;
+        return sum + (quantity * rate);
+      }, 0);
+      setCalculatedTotalFee(total);
+    }
+  }, [watchedItems]);
+
 
   useEffect(() => {
     const invoiceIdToEdit = searchParams.get('id');
     if (invoiceIdToEdit && !initialDataLoaded) {
       const data = getInvoiceData(invoiceIdToEdit);
       if (data) {
-        const formData: Partial<InvoiceFormSchemaType> = {
-          ...data,
-          invoiceNumber: data.invoiceNumber, // Ensure invoiceNumber is loaded
-          startDate: data.startDate ? (data.startDate instanceof Date ? data.startDate : parseISO(data.startDate as unknown as string)) : undefined,
-          endDate: data.endDate ? (data.endDate instanceof Date ? data.endDate : parseISO(data.endDate as unknown as string)) : undefined,
-          totalFee: data.totalFee,
-          companyName: data.companyName,
-          invoiceNotes: data.invoiceNotes,
-          watermarkFile: undefined, 
-          companyLogoFile: undefined,
+        const formData: InvoiceFormSchemaType = {
+          ...defaultFormValues, // Start with defaults
+          ...data, // Override with loaded data
+          invoiceNumber: data.invoiceNumber,
+          startDate: data.startDate ? (data.startDate instanceof Date ? data.startDate : parseISO(data.startDate as unknown as string)) : new Date(),
+          endDate: data.endDate ? (data.endDate instanceof Date ? data.endDate : parseISO(data.endDate as unknown as string)) : new Date(),
+          items: data.items && data.items.length > 0 ? data.items : [defaultItem],
+          companyLogoFile: undefined, 
+          watermarkFile: undefined,
         };
         reset(formData);
 
         if (data.watermarkDataUrl) setWatermarkPreview(data.watermarkDataUrl);
         if (data.companyLogoDataUrl) setCompanyLogoPreview(data.companyLogoDataUrl);
         
-        if (formData.startDate && data.startTime && formData.endDate && data.endTime) {
-            const startDateObj = formData.startDate;
-            const endDateObj = formData.endDate;
-            const startFullDate = parse(`${format(startDateObj, "yyyy-MM-dd")} ${data.startTime}`, 'yyyy-MM-dd HH:mm', new Date());
-            const endFullDate = parse(`${format(endDateObj, "yyyy-MM-dd")} ${data.endTime}`, 'yyyy-MM-dd HH:mm', new Date());
-            if (isValid(startFullDate) && isValid(endFullDate) && endFullDate > startFullDate) {
-                let diffMs = differenceInMilliseconds(endFullDate, startFullDate);
-                const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                diffMs -= days * (1000 * 60 * 60 * 24);
-                const hours = Math.floor(diffMs / (1000 * 60 * 60));
-                setDuration({ days, hours, error: undefined });
-            } else {
-                setDuration({ days: 0, hours: 0, error: "End date/time must be after start." });
-            }
-        } else {
-            setDuration(null);
-        }
       } else {
         toast({ title: "Edit Error", description: "Could not load invoice data for editing.", variant: "destructive" });
         reset(defaultFormValues);
         setWatermarkPreview(null);
         setCompanyLogoPreview(null);
-        setDuration(null);
       }
       setInitialDataLoaded(true);
     } else if (!invoiceIdToEdit && !initialDataLoaded) {
       reset(defaultFormValues);
       setWatermarkPreview(null);
       setCompanyLogoPreview(null);
-      setDuration(null);
       setInitialDataLoaded(true); 
     }
   }, [searchParams, reset, toast, initialDataLoaded, defaultFormValues]);
 
+  const watchedCompanyLogoFile = watch("companyLogoFile");
+  const watchedWatermarkFile = watch("watermarkFile");
 
   useEffect(() => {
     const currentInvoiceId = searchParams.get('id');
@@ -153,7 +155,7 @@ export function InvoiceForm() {
   
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit for logo
+      if (file.size > 2 * 1024 * 1024) {
         toast({ variant: "destructive", title: "File Too Large", description: "Company logo must be less than 2MB." });
         setValue('companyLogoFile', undefined, { shouldValidate: true });
         setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
@@ -173,17 +175,14 @@ export function InvoiceForm() {
         }
       });
     } else {
-      if (currentInvoiceId && existingData?.companyLogoDataUrl) {
-        if (!companyLogoPreview && form.getValues('companyLogoFile') === undefined) {
-            setCompanyLogoPreview(existingData.companyLogoDataUrl);
-        }
-      } else if (!currentInvoiceId) { 
-         if (form.getValues('companyLogoFile') === undefined) {
+        const currentLogoFileValue = form.getValues('companyLogoFile');
+        if (existingData?.companyLogoDataUrl && (!currentLogoFileValue || currentLogoFileValue.length === 0)) {
+             setCompanyLogoPreview(existingData.companyLogoDataUrl);
+        } else if (!existingData && (!currentLogoFileValue || currentLogoFileValue.length === 0)) {
             setCompanyLogoPreview(null);
-         }
-      }
+        }
     }
-  }, [watchedCompanyLogoFile, searchParams, setValue, toast, trigger, form, companyLogoPreview]);
+  }, [watchedCompanyLogoFile, searchParams, setValue, toast, trigger, form]);
 
   useEffect(() => {
     const currentInvoiceId = searchParams.get('id');
@@ -211,45 +210,14 @@ export function InvoiceForm() {
         }
       });
     } else {
-      if (currentInvoiceId && existingData?.watermarkDataUrl) {
-         if (!watermarkPreview && form.getValues('watermarkFile') === undefined) {
-            setWatermarkPreview(existingData.watermarkDataUrl);
-         }
-      } else if (!currentInvoiceId) { 
-        if (form.getValues('watermarkFile') === undefined) {
+        const currentWatermarkFileValue = form.getValues('watermarkFile');
+        if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
+             setWatermarkPreview(existingData.watermarkDataUrl);
+        } else if (!existingData && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
             setWatermarkPreview(null);
         }
-      }
     }
-  }, [watchedWatermarkFile, searchParams, setValue, toast, trigger, form, watermarkPreview]);
-
-
-  useEffect(() => {
-    if (watchedStartDate && watchedStartTime && watchedEndDate && watchedEndTime &&
-        /^[0-2]\d:[0-5]\d$/.test(watchedStartTime) && /^[0-2]\d:[0-5]\d$/.test(watchedEndTime) ) {
-      
-      const startFullDate = parse(`${format(watchedStartDate, "yyyy-MM-dd")} ${watchedStartTime}`, 'yyyy-MM-dd HH:mm', new Date());
-      const endFullDate = parse(`${format(watchedEndDate, "yyyy-MM-dd")} ${watchedEndTime}`, 'yyyy-MM-dd HH:mm', new Date());
-
-      if (!isValid(startFullDate) || !isValid(endFullDate)) {
-        setDuration({days: 0, hours: 0, error: "Invalid date or time format."});
-        return;
-      }
-
-      if (endFullDate <= startFullDate) {
-        setDuration({ days: 0, hours: 0, error: "End date/time must be after start." });
-        return;
-      }
-
-      let diff = differenceInMilliseconds(endFullDate, startFullDate);
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      diff -= days * (1000 * 60 * 60 * 24);
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      setDuration({ days, hours, error: undefined });
-    } else {
-      setDuration(null);
-    }
-  }, [watchedStartDate, watchedStartTime, watchedEndDate, watchedEndTime]);
+  }, [watchedWatermarkFile, searchParams, setValue, toast, trigger, form]);
   
   async function onSubmit(data: InvoiceFormSchemaType) {
     setIsSubmitting(true);
@@ -258,35 +226,36 @@ export function InvoiceForm() {
       const existingInvoiceData = invoiceIdToEdit ? getInvoiceData(invoiceIdToEdit) : null;
 
       const invoiceId = existingInvoiceData?.id || `inv_${Date.now()}`;
-      // Invoice number now comes directly from the form data
       const invoiceNumber = data.invoiceNumber; 
       
       const currentDate = new Date();
       const invoiceDateToStore = existingInvoiceData?.invoiceDate || currentDate.toISOString();
 
-      let companyLogoDataUrlToStore: string | null = null;
-      if (data.companyLogoFile && data.companyLogoFile.length > 0) {
-        companyLogoDataUrlToStore = companyLogoPreview; 
-         if (!companyLogoDataUrlToStore) { 
-            companyLogoDataUrlToStore = await fileToDataUrl(data.companyLogoFile[0], toast);
-        }
-      } else if (existingInvoiceData?.companyLogoDataUrl) {
-        companyLogoDataUrlToStore = existingInvoiceData.companyLogoDataUrl;
+      let companyLogoDataUrlToStore: string | null = companyLogoPreview;
+      if (data.companyLogoFile && data.companyLogoFile.length > 0 && !companyLogoDataUrlToStore) {
+        // If preview isn't set but file exists (e.g., error during preview gen but still submitted)
+        companyLogoDataUrlToStore = await fileToDataUrl(data.companyLogoFile[0], toast);
+      } else if (!data.companyLogoFile && existingInvoiceData?.companyLogoDataUrl && !companyLogoPreview) {
+         // If no new file is selected and no preview is set (e.g. user cleared selection), but there was an existing logo
+         // This case might need clarification: if a user clears a selection, should we remove the existing logo?
+         // For now, if `companyLogoPreview` is null, it implies the logo should be removed or was never there.
       }
 
-      let watermarkDataUrlToStore: string | null = null;
-      if (data.watermarkFile && data.watermarkFile.length > 0) { 
-        watermarkDataUrlToStore = watermarkPreview; 
-        if (!watermarkDataUrlToStore) { 
-            watermarkDataUrlToStore = await fileToDataUrl(data.watermarkFile[0], toast);
-        }
-      } else if (existingInvoiceData?.watermarkDataUrl) {
-        watermarkDataUrlToStore = existingInvoiceData.watermarkDataUrl;
+
+      let watermarkDataUrlToStore: string | null = watermarkPreview;
+      if (data.watermarkFile && data.watermarkFile.length > 0 && !watermarkDataUrlToStore) {
+        watermarkDataUrlToStore = await fileToDataUrl(data.watermarkFile[0], toast);
       }
+
+      const totalFee = data.items.reduce((sum, item) => {
+        const quantity = Number(item.quantity) || 0;
+        const rate = Number(item.rate) || 0;
+        return sum + (quantity * rate);
+      }, 0);
       
       const storedData: StoredInvoiceData = {
         id: invoiceId,
-        invoiceNumber, // Use invoiceNumber from form data
+        invoiceNumber,
         invoiceDate: invoiceDateToStore,
         customerName: data.customerName,
         companyName: data.companyName,
@@ -295,10 +264,10 @@ export function InvoiceForm() {
         startTime: data.startTime,
         endDate: data.endDate,
         endTime: data.endTime,
-        totalFee: data.totalFee,
+        items: data.items,
+        totalFee: totalFee, // Store the calculated total fee
         invoiceNotes: data.invoiceNotes,
         watermarkDataUrl: watermarkDataUrlToStore,
-        duration: duration && !duration.error ? {days: duration.days, hours: duration.hours} : undefined,
       };
 
       saveInvoiceData(invoiceId, storedData);
@@ -351,7 +320,7 @@ export function InvoiceForm() {
                         <FormControl>
                         <div className="relative">
                             <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="e.g., 123456" {...field} className="pl-8" />
+                            <Input placeholder="e.g., INV-001" {...field} className="pl-8" />
                         </div>
                         </FormControl>
                         <FormMessage />
@@ -376,7 +345,7 @@ export function InvoiceForm() {
             <FormField
               control={control}
               name="companyLogoFile"
-              render={({ field: { onChange, onBlur, name, value: formFieldValue } }) => ( 
+              render={({ field: { onChange, onBlur, name, value: formFieldValue, ref: fieldRef } }) => ( 
                 <FormItem>
                   <FormLabel>Company Logo (Optional, PNG/JPEG/GIF, &lt;2MB)</FormLabel>
                   <FormControl>
@@ -388,7 +357,7 @@ export function InvoiceForm() {
                         type="file"
                         accept="image/png, image/jpeg, image/gif"
                         className="hidden"
-                        ref={companyLogoFileRef} 
+                        ref={companyLogoFileRef}
                         name={name}
                         onBlur={onBlur}
                         onChange={(e) => {
@@ -486,7 +455,7 @@ export function InvoiceForm() {
                 )}
               />
             </div>
-            {watchedStartDate && watchedStartTime && <FormDescription className="text-sm text-muted-foreground">Selected Start: {formatDateWithTime(watchedStartDate, watchedStartTime)}</FormDescription>}
+            {watch("startDate") && watch("startTime") && <FormDescription className="text-sm text-muted-foreground">Selected Start: {formatDateWithTime(watch("startDate"), watch("startTime"))}</FormDescription>}
 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -542,46 +511,99 @@ export function InvoiceForm() {
                 )}
               />
             </div>
-            {watchedEndDate && watchedEndTime && <FormDescription className="text-sm text-muted-foreground">Selected End: {formatDateWithTime(watchedEndDate, watchedEndTime)}</FormDescription>}
+            {watch("endDate") && watch("endTime") && <FormDescription className="text-sm text-muted-foreground">Selected End: {formatDateWithTime(watch("endDate"), watch("endTime"))}</FormDescription>}
 
-
-            {duration && (
-              <div className={cn("p-3 rounded-md", duration.error ? "bg-destructive/10" : "bg-secondary")}>
-                <p className={cn("font-medium", duration.error ? "text-destructive" : "text-foreground")}>
-                  Calculated Duration: 
-                  {duration.error ? <span> {duration.error}</span> : ` ${duration.days} days and ${duration.hours} hours`}
-                </p>
-              </div>
-            )}
-
-            <FormField
-              control={form.control}
-              name="totalFee"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Total Fee (₹)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="e.g., ₹ 15000.00"
-                      {...field}
-                      value={(field.value === undefined || field.value === null) ? '' : String(field.value)}
-                      onChange={e => {
-                        const stringValue = e.target.value;
-                        field.onChange(stringValue === '' ? undefined : parseFloat(stringValue));
-                      }}
+            <Separator className="my-6" />
+            
+            <div>
+              <FormLabel className="text-lg font-semibold">Invoice Items</FormLabel>
+              <CardDescription>Add items or services provided.</CardDescription>
+              <div className="space-y-4 mt-4">
+                {fields.map((item, index) => (
+                  <div key={item.id} className="p-4 border rounded-md shadow-sm space-y-3 bg-card">
+                    <FormField
+                      control={control}
+                      name={`items.${index}.description`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., Web Development Services" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <FormField
+                        control={control}
+                        name={`items.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Quantity</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="1" {...field} 
+                                onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={control}
+                        name={`items.${index}.rate`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Rate (₹)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="100.00" {...field} 
+                                onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                       <div className="flex items-end">
+                        <p className="text-sm text-muted-foreground whitespace-nowrap">
+                            Amount: ₹{((Number(getValues(`items.${index}.quantity`)) || 0) * (Number(getValues(`items.${index}.rate`)) || 0)).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    {fields.length > 1 && (
+                       <Button type="button" variant="destructive" size="sm" onClick={() => remove(index)}>
+                        <Trash2 className="mr-1 h-4 w-4" /> Remove Item
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append(defaultItem)}
+                  className="mt-2"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+                </Button>
+              </div>
+            </div>
+
+            <Separator className="my-6" />
+
+            <div className="text-right">
+                <h3 className="text-xl font-semibold">Total Amount: <span className="text-primary">₹{calculatedTotalFee.toFixed(2)}</span></h3>
+            </div>
             
             <FormField
               control={control}
               name="watermarkFile"
-              render={({ field: { onChange, onBlur, name, value: formFieldValue } }) => ( 
+              render={({ field: { onChange, onBlur, name, value: formFieldValue, ref: fieldRef } }) => ( 
                 <FormItem>
                   <FormLabel>Custom Watermark (Optional, PNG/JPEG/GIF, &lt;5MB)</FormLabel>
                   <FormControl>
@@ -593,7 +615,7 @@ export function InvoiceForm() {
                         type="file"
                         accept="image/png, image/jpeg, image/gif"
                         className="hidden"
-                        ref={watermarkFileRef} 
+                        ref={watermarkFileRef}
                         name={name}
                         onBlur={onBlur}
                         onChange={(e) => {

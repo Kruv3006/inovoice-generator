@@ -63,10 +63,7 @@ export default function InvoiceDownloadPage() {
              toast({ title: "Error", description: "Invoice template element not ready for generation.", variant: "destructive" });
              return;
         }
-        // Ensure the hidden template is styled to be 'visible' for html2canvas
-        // These styles are applied directly before capture in invoice-generator.ts
     }
-
 
     setIsGenerating(true);
     toast({ title: `Generating ${formatName}...`, description: "Please wait." });
@@ -112,6 +109,11 @@ export default function InvoiceDownloadPage() {
       </Card>
     );
   }
+  
+  const invoiceDateForDisplay = invoiceData.invoiceDate 
+    ? (parseISO(invoiceData.invoiceDate) instanceof Date && !isNaN(parseISO(invoiceData.invoiceDate).valueOf()) ? parseISO(invoiceData.invoiceDate) : new Date()) 
+    : new Date();
+
 
   return (
     <div className="py-8 bg-muted/40 dark:bg-muted/20 min-h-[calc(100vh-4rem)]">
@@ -131,13 +133,11 @@ export default function InvoiceDownloadPage() {
           </div>
         </div>
         
-        {/* Hidden invoice template for html2canvas capture. Crucial for PDF/JPEG. */}
-        {/* Styling ensures it's off-screen but rendered with full dimensions for capture. */}
         <div 
           className="fixed top-0 left-[-9999px] opacity-100 z-[-1] print:hidden"
           aria-hidden="true" 
         > 
-            <div ref={invoiceTemplateRef} className="bg-transparent print:bg-white" style={{ width: '800px', padding: '0', margin: '0' }}> {/* Ensure this width matches desired output */}
+            <div ref={invoiceTemplateRef} className="bg-transparent print:bg-white" style={{ width: '800px', padding: '0', margin: '0' }}>
               {invoiceData && <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />}
             </div>
         </div>
@@ -185,7 +185,7 @@ export default function InvoiceDownloadPage() {
             <p><strong>Company:</strong> {invoiceData.companyName}</p>
             <p><strong>Customer:</strong> {invoiceData.customerName}</p>
             <p><strong>Total Amount:</strong> {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(invoiceData.totalFee || 0)}</p>
-            <p><strong>Invoice Date:</strong> {invoiceData.invoiceDate ? format(parseISO(invoiceData.invoiceDate), "MMMM d, yyyy") : 'N/A'}</p>
+            <p><strong>Invoice Date:</strong> {format(invoiceDateForDisplay, "MMMM d, yyyy")}</p>
           </CardContent>
         </Card>
 

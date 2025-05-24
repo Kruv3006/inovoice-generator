@@ -1,5 +1,5 @@
 
-import type { StoredInvoiceData } from './invoice-types';
+import type { StoredInvoiceData, LineItem } from './invoice-types';
 import { format, parseISO } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -27,7 +27,7 @@ const simulateDownload = (filename: string, dataUrlOrContent: string, mimeType: 
 const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string): string => {
   const {
     companyName, customerName, invoiceNumber, invoiceDate,
-    startDate, startTime, endDate, endTime, duration, totalFee, invoiceNotes,
+    startDate, startTime, endDate, endTime, items, totalFee, invoiceNotes,
     companyLogoDataUrl,
   } = data;
 
@@ -42,19 +42,33 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
     : '';
   
   const watermarkHtml = watermarkDataUrl 
-    ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.03; pointer-events: none; z-index: -1; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
+    ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.03; pointer-events: none; z-index: 0; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
          <img src="${watermarkDataUrl}" style="max-width: 70%; max-height: 70%; object-fit: contain;" alt="Watermark"/>
        </div>`
     : '';
 
-  // Define some basic styles for DOC output to mimic the theme
-  const primaryColor = '#2563eb'; // blue-600
-  const textColor = '#1f2937'; // gray-800
-  const mutedTextColor = '#6b7280'; // gray-500
-  const borderColor = '#e5e7eb'; // gray-200
-  const headerBgColor = '#f3f4f6'; // gray-100
-  const invoiceBgColor = '#ffffff';
+  const primaryColor = 'hsl(var(--invoice-primary-color, #2563eb))';
+  const textColor = 'hsl(var(--invoice-text, #1f2937))';
+  const mutedTextColor = 'hsl(var(--invoice-muted-text, #6b7280))';
+  const borderColor = 'hsl(var(--invoice-border-color, #e5e7eb))';
+  const headerBgColor = 'hsl(var(--invoice-header-bg, #f3f4f6))';
+  const invoiceBgColor = 'hsl(var(--invoice-background, #ffffff))';
 
+  let itemsHtml = '';
+  if (items && items.length > 0) {
+    items.forEach(item => {
+      itemsHtml += `
+        <tr>
+          <td class="description-col">${item.description}</td>
+          <td class="qty-col">${item.quantity}</td>
+          <td class="rate-col">${fCurrency(item.rate)}</td>
+          <td class="amount-col">${fCurrency(item.quantity * item.rate)}</td>
+        </tr>
+      `;
+    });
+  } else {
+    itemsHtml = `<tr><td colspan="4" style="text-align:center; padding: 20px;">No items listed.</td></tr>`;
+  }
 
   return `
     <html>
@@ -86,14 +100,15 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
           .items-table-doc { width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 25px; font-size: 9.5pt; }
           .items-table-doc th, .items-table-doc td { padding: 10px; border: 1px solid ${borderColor}; }
           .items-table-doc th { background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt;}
-          .items-table-doc .description-col { width: 60%; }
-          .items-table-doc .duration-col, .items-table-doc .amount-col { text-align: right; }
-          .items-table-doc .item-description-detail { font-size: 8pt; color: ${mutedTextColor}; }
+          .items-table-doc .description-col { width: 55%; }
+          .items-table-doc .qty-col { width: 10%; text-align: right;}
+          .items-table-doc .rate-col { width: 15%; text-align: right; }
+          .items-table-doc .amount-col { width: 20%; text-align: right; }
           
           .totals-section { text-align: right; margin-top: 20px; margin-bottom: 25px; font-size: 10pt; }
           .totals-section div { margin-bottom: 6px; }
           .totals-section strong {color: ${textColor};}
-          .totals-section .subtotal-line { padding-bottom: 5px; border-bottom: 1px dashed ${borderColor}; }
+          /* .totals-section .subtotal-line { padding-bottom: 5px; border-bottom: 1px dashed ${borderColor}; } */
           .totals-section .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColor}; background-color: rgba(37, 99, 235, 0.05); padding: 8px; margin-top:8px; border-radius: 4px;}
           
           .notes-section { margin-top: 25px; padding-top:15px; border-top: 1px solid ${borderColor}; font-size: 9pt; color: ${mutedTextColor}; }
@@ -124,7 +139,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
                 <p>${customerName}</p>
               </div>
               <div class="client-info-right">
-                <h3>Service Details</h3>
+                <h3>Service Period</h3>
                 <p><strong>Start:</strong> ${format(parsedServiceStartDate, "MMM d, yyyy")} ${startTime}</p>
                 <p><strong>End:</strong> ${format(parsedServiceEndDate, "MMM d, yyyy")} ${endTime}</p>
               </div>
@@ -134,24 +149,17 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
               <thead>
                 <tr>
                   <th class="description-col">Description</th>
-                  <th class="duration-col">Duration</th>
+                  <th class="qty-col">Qty</th>
+                  <th class="rate-col">Rate</th>
                   <th class="amount-col">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td class="description-col">
-                    Service Rendered<br/>
-                    <span class="item-description-detail">Consultation / Project Work as per agreement.</span>
-                  </td>
-                  <td class="duration-col">${duration ? `${duration.days}d ${duration.hours}h` : "N/A"}</td>
-                  <td class="amount-col">${fCurrency(totalFee)}</td>
-                </tr>
+                ${itemsHtml}
               </tbody>
             </table>
 
             <div class="totals-section">
-              <div class="subtotal-line"><strong>Subtotal:</strong> ${fCurrency(totalFee)}</div>
               <div class="grand-total-line">TOTAL: ${fCurrency(totalFee)}</div>
             </div>
 
@@ -183,35 +191,35 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
       throw new Error("Capture element (PDF) has no dimensions.");
   }
   
-  // Ensure styles are applied, especially for off-screen elements
   elementToCapture.style.opacity = '1';
-  elementToCapture.style.position = 'fixed'; // Or 'absolute'
-  elementToCapture.style.left = '0px'; // Or '-9999px' if that was working
+  elementToCapture.style.position = 'fixed';
+  elementToCapture.style.left = '0px'; 
   elementToCapture.style.top = '0px';
-  elementToCapture.style.zIndex = '10000'; // Ensure it's on top if needed for capture
-  elementToCapture.style.backgroundColor = 'var(--invoice-background, white)'; // Explicit background
+  elementToCapture.style.zIndex = '10000'; 
+  const docInvoiceBg = getComputedStyle(document.documentElement).getPropertyValue('--invoice-background').trim();
+  elementToCapture.style.backgroundColor = docInvoiceBg || 'white';
 
 
-  await new Promise(resolve => setTimeout(resolve, 300)); // Increased delay slightly
+  await new Promise(resolve => setTimeout(resolve, 300)); 
 
   try {
     const canvas = await html2canvas(elementToCapture, {
       scale: 2, 
       useCORS: true,
       logging: true,
-      backgroundColor: null, // Let the element's background shine through
+      backgroundColor: null, 
       scrollX: -window.scrollX, 
       scrollY: -window.scrollY,
       windowWidth: elementToCapture.scrollWidth,
       windowHeight: elementToCapture.scrollHeight,
-      removeContainer: true, // Clean up the cloned container
+      removeContainer: true, 
     });
 
-    // Revert styles after capture
-    elementToCapture.style.opacity = '1'; // As it was for download page logic
+    elementToCapture.style.opacity = '1'; 
     elementToCapture.style.position = 'fixed';
     elementToCapture.style.left = '-9999px';
-    // elementToCapture.style.zIndex = '1'; // Reset z-index
+    elementToCapture.style.zIndex = ''; 
+
 
     if (canvas.width === 0 || canvas.height === 0) {
         console.error("html2canvas returned an empty canvas for PDF.");
@@ -265,23 +273,23 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
       throw new Error("Capture element (JPEG) has no dimensions.");
   }
   
-  // Ensure styles are applied
   elementToCapture.style.opacity = '1';
   elementToCapture.style.position = 'fixed';
   elementToCapture.style.left = '0px';
   elementToCapture.style.top = '0px';
   elementToCapture.style.zIndex = '10000';
-  elementToCapture.style.backgroundColor = 'var(--invoice-background, white)';
+  const docInvoiceBg = getComputedStyle(document.documentElement).getPropertyValue('--invoice-background').trim();
+  elementToCapture.style.backgroundColor = docInvoiceBg || 'white';
 
 
-  await new Promise(resolve => setTimeout(resolve, 300)); // Increased delay
+  await new Promise(resolve => setTimeout(resolve, 300)); 
 
   try {
     const canvas = await html2canvas(elementToCapture, {
         scale: 1.5, 
         useCORS: true,
         logging: true,
-        backgroundColor: '#ffffff', // Explicit white background for JPEG
+        backgroundColor: '#ffffff', 
         scrollX: -window.scrollX,
         scrollY: -window.scrollY,
         windowWidth: elementToCapture.scrollWidth,
@@ -289,11 +297,10 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
         removeContainer: true,
     });
 
-    // Revert styles after capture
     elementToCapture.style.opacity = '1';
     elementToCapture.style.position = 'fixed';
     elementToCapture.style.left = '-9999px';
-    // elementToCapture.style.zIndex = '1';
+    elementToCapture.style.zIndex = '';
 
 
     if (canvas.width === 0 || canvas.height === 0) {

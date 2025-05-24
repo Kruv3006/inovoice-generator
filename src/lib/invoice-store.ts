@@ -18,9 +18,11 @@ export const saveInvoiceData = (invoiceId: string, data: StoredInvoiceData): voi
       watermarkOpacity: typeof data.watermarkOpacity === 'number' ? data.watermarkOpacity : 0.05,
       globalDiscountType: data.globalDiscountType,
       globalDiscountValue: data.globalDiscountValue,
-      subTotal: data.subTotal, // ensure subTotal is stored
-      totalFee: data.totalFee, // ensure totalFee is stored
+      subTotal: data.subTotal,
+      totalFee: data.totalFee,
       themeColor: data.themeColor || 'default',
+      invoiceNotes: data.invoiceNotes,
+      termsAndConditions: data.termsAndConditions,
     };
     localStorage.setItem(`${INVOICE_STORAGE_KEY_PREFIX}${invoiceId}`, JSON.stringify(dataToStore));
   }
@@ -53,6 +55,9 @@ export const getInvoiceData = (invoiceId: string): StoredInvoiceData | null => {
     parsedData.totalFee = Number(parsedData.totalFee) || 0;
     parsedData.watermarkOpacity = typeof parsedData.watermarkOpacity === 'number' ? parsedData.watermarkOpacity : 0.05;
     parsedData.themeColor = parsedData.themeColor || 'default';
+    parsedData.invoiceNotes = parsedData.invoiceNotes || '';
+    parsedData.termsAndConditions = parsedData.termsAndConditions || '';
+
 
     return parsedData;
   }

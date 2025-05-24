@@ -82,6 +82,7 @@ export const invoiceFormSchema = z.object({
     .optional(),
   watermarkOpacity: z.number().min(0).max(1).optional().default(0.05),
   invoiceNotes: z.string().optional(),
+  termsAndConditions: z.string().optional(),
   themeColor: z.string().optional().default('default'),
 });
 
@@ -92,13 +93,14 @@ export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEn
   itemEndDate?: string;
   discount?: number;
 }
-export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'watermarkOpacity' | 'invoiceNotes' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor'> {
+export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'watermarkOpacity' | 'invoiceNotes' | 'termsAndConditions' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor'> {
   id: string;
   invoiceDate: string;
   companyLogoDataUrl?: string | null;
   watermarkDataUrl?: string | null;
   watermarkOpacity: number;
   invoiceNotes?: string;
+  termsAndConditions?: string;
   items: StoredLineItem[];
   subTotal: number; // Sum of line items before global discount
   globalDiscountType?: 'percentage' | 'fixed';
@@ -112,6 +114,7 @@ export interface CompanyProfileData {
   companyName?: string;
   companyLogoDataUrl?: string | null;
   defaultInvoiceNotes?: string;
+  defaultTermsAndConditions?: string;
 }
 
 export interface ClientData {

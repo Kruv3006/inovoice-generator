@@ -3,7 +3,7 @@
 
 import type { StoredInvoiceData } from "@/lib/invoice-types";
 import { format, parseISO, isValid, differenceInCalendarDays } from "date-fns";
-import { cn } from "@/lib/utils"; // Added this import
+import { cn } from "@/lib/utils";
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
@@ -22,11 +22,12 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     invoiceNumber,
     invoiceDate,
     items,
-    subTotal, // Use subTotal
+    subTotal, 
     globalDiscountType,
     globalDiscountValue,
-    totalFee, // Final totalFee
+    totalFee, 
     invoiceNotes,
+    termsAndConditions,
     watermarkDataUrl,
     watermarkOpacity,
     themeColor = 'default',
@@ -62,7 +63,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     >
       {/* Watermark Layer */}
       {watermarkDataUrl && (
-         <div
+        <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
           style={{ zIndex: 0 }}
         >
@@ -202,11 +203,19 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
         </section>
 
         {invoiceNotes && (
-          <section className="mb-8 pt-4 border-t border-[var(--invoice-border-color)]">
-            <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Notes & Terms</h4>
-            <p className="text-xs text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
+          <section className="mb-6 pt-4 border-t border-[var(--invoice-border-color)]">
+            <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Notes</h4>
+            <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
           </section>
         )}
+        
+        {termsAndConditions && (
+          <section className="mb-8 pt-4 border-t border-[var(--invoice-border-color)]">
+            <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Terms &amp; Conditions</h4>
+            <p className="text-xs text-[var(--invoice-muted-text)]/80 whitespace-pre-line print:text-gray-500 print:text-[10px]">{termsAndConditions}</p>
+          </section>
+        )}
+
 
         <footer className="text-center text-xs text-[var(--invoice-muted-text)] pt-6 border-t border-[var(--invoice-border-color)] print:text-gray-500">
           <p>Thank you for your business!</p>
@@ -215,4 +224,3 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     </div>
   );
 };
-

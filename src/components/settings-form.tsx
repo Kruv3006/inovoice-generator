@@ -6,7 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Image from 'next/image';
-import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info } from 'lucide-react';
+import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ const companyProfileSchema = z.object({
   companyName: z.string().optional(),
   companyLogoFile: z.custom<FileList>().optional(),
   defaultInvoiceNotes: z.string().optional(),
+  defaultTermsAndConditions: z.string().optional(),
 });
 type CompanyProfileFormValues = z.infer<typeof companyProfileSchema>;
 
@@ -62,7 +63,7 @@ export function SettingsForm() {
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
   const companyProfileForm = useForm<CompanyProfileFormValues>({
     resolver: zodResolver(companyProfileSchema),
-    defaultValues: { companyName: '', defaultInvoiceNotes: '' },
+    defaultValues: { companyName: '', defaultInvoiceNotes: '', defaultTermsAndConditions: '' },
   });
 
   // Client Management State
@@ -79,6 +80,7 @@ export function SettingsForm() {
       companyProfileForm.reset({
         companyName: profile.companyName || '',
         defaultInvoiceNotes: profile.defaultInvoiceNotes || '',
+        defaultTermsAndConditions: profile.defaultTermsAndConditions || '',
       });
       if (profile.companyLogoDataUrl) {
         setCompanyLogoPreview(profile.companyLogoDataUrl);
@@ -122,6 +124,7 @@ export function SettingsForm() {
       companyName: data.companyName,
       companyLogoDataUrl: logoDataUrl,
       defaultInvoiceNotes: data.defaultInvoiceNotes,
+      defaultTermsAndConditions: data.defaultTermsAndConditions,
     });
     toast({ title: "Company Profile Saved!", variant: "default" });
   };
@@ -158,12 +161,15 @@ export function SettingsForm() {
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
       if (file.size > 2 * 1024 * 1024 || !['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+        // Validation handled in submit, preview just tries its best
         return;
       }
       fileToDataUrl(file).then(dataUrl => {
         if (dataUrl) setCompanyLogoPreview(dataUrl);
       });
-    } else if (!watchedCompanyLogoFile) { 
+    } else if (!watchedCompanyLogoFile && !companyProfileForm.formState.isDirty) { 
+        // Only revert to stored preview if the field hasn't been touched
+        // or if the form isn't dirty (meaning it was just loaded or reset)
         const profile = getCompanyProfile();
         if (profile?.companyLogoDataUrl) {
             setCompanyLogoPreview(profile.companyLogoDataUrl);
@@ -171,7 +177,7 @@ export function SettingsForm() {
             setCompanyLogoPreview(null); 
         }
     }
-  }, [watchedCompanyLogoFile]);
+  }, [watchedCompanyLogoFile, companyProfileForm.formState.isDirty]);
 
 
   return (
@@ -194,12 +200,23 @@ export function SettingsForm() {
                 <Button type="button" variant="outline" onClick={() => companyLogoFileRef.current?.click()}>
                  {companyLogoPreview ? "Change Logo" : "Upload Logo"}
                 </Button>
-                <Input
-                  type="file"
-                  accept="image/png, image/jpeg, image/gif"
-                  className="hidden"
-                  ref={companyLogoFileRef}
-                  {...companyProfileForm.register("companyLogoFile")}
+                <Controller
+                    name="companyLogoFile"
+                    control={companyProfileForm.control}
+                    render={({ field: { onChange, onBlur, name, ref } }) => (
+                        <Input
+                        type="file"
+                        accept="image/png, image/jpeg, image/gif"
+                        className="hidden"
+                        ref={companyLogoFileRef} // Use the ref for the button click
+                        name={name}
+                        onBlur={onBlur}
+                        onChange={(e) => {
+                            const files = e.target.files;
+                            onChange(files && files.length > 0 ? files : undefined);
+                        }}
+                        />
+                    )}
                 />
                 {companyProfileForm.getValues("companyLogoFile")?.[0]?.name && (
                   <span className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">
@@ -217,8 +234,12 @@ export function SettingsForm() {
               )}
             </div>
             <div>
-              <Label htmlFor="defaultInvoiceNotes">Default Invoice Notes/Terms</Label>
+              <Label htmlFor="defaultInvoiceNotes">Default Invoice Notes</Label>
               <Textarea id="defaultInvoiceNotes" {...companyProfileForm.register("defaultInvoiceNotes")} placeholder="e.g., Payment is due within 30 days. Thank you for your business!" rows={3} />
+            </div>
+            <div>
+              <Label htmlFor="defaultTermsAndConditions">Default Terms &amp; Conditions</Label>
+              <Textarea id="defaultTermsAndConditions" {...companyProfileForm.register("defaultTermsAndConditions")} placeholder="e.g., All services are subject to..." rows={5} />
             </div>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
               <Save className="mr-2 h-4 w-4" /> Save Company Profile
@@ -313,5 +334,3 @@ export function SettingsForm() {
     </div>
   );
 }
-
-    

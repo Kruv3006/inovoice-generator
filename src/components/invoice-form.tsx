@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, MinusCircle } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -100,6 +100,7 @@ export function InvoiceForm() {
     globalDiscountType: 'percentage',
     globalDiscountValue: 0,
     invoiceNotes: "",
+    termsAndConditions: "",
     companyLogoFile: undefined,
     watermarkFile: undefined,
     watermarkOpacity: 0.05,
@@ -175,6 +176,7 @@ export function InvoiceForm() {
     if (companyProfile) {
       baseFormValues.companyName = companyProfile.companyName || baseFormValues.companyName;
       baseFormValues.invoiceNotes = companyProfile.defaultInvoiceNotes || baseFormValues.invoiceNotes;
+      baseFormValues.termsAndConditions = companyProfile.defaultTermsAndConditions || baseFormValues.termsAndConditions;
       if (companyProfile.companyLogoDataUrl) {
         setCompanyLogoPreview(companyProfile.companyLogoDataUrl);
       }
@@ -201,6 +203,7 @@ export function InvoiceForm() {
           watermarkFile: undefined,
           watermarkOpacity: data.watermarkOpacity ?? baseFormValues.watermarkOpacity,
           invoiceNotes: data.invoiceNotes ?? baseFormValues.invoiceNotes,
+          termsAndConditions: data.termsAndConditions ?? baseFormValues.termsAndConditions,
           globalDiscountType: data.globalDiscountType ?? baseFormValues.globalDiscountType,
           globalDiscountValue: data.globalDiscountValue ?? baseFormValues.globalDiscountValue,
           themeColor: data.themeColor ?? baseFormValues.themeColor,
@@ -249,13 +252,18 @@ export function InvoiceForm() {
         if (dataUrl) {
           setCompanyLogoPreview(dataUrl);
         } else {
+          // If conversion fails, clear the file input and revert to old/profile preview
           setValue('companyLogoFile', undefined, { shouldValidate: true });
           setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
         }
       });
     } else {
+      // This part handles the case when the file input is cleared (e.g., user removes the file)
+      // or when loading existing data/profile without a new file selection.
       const currentLogoFileValue = getValues('companyLogoFile');
       if (!currentLogoFileValue || currentLogoFileValue.length === 0) {
+        // No new file is selected or the file selection was cleared.
+        // Revert to existing invoice's logo, then profile's logo, then null.
         if (existingData?.companyLogoDataUrl) {
           setCompanyLogoPreview(existingData.companyLogoDataUrl);
         } else if (profileData?.companyLogoDataUrl) {
@@ -294,6 +302,7 @@ export function InvoiceForm() {
         }
       });
     } else {
+      // Similar logic for watermark preview when no new file is selected or field is cleared
       const currentWatermarkFileValue = getValues('watermarkFile');
        if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
         setWatermarkPreview(existingData.watermarkDataUrl);
@@ -310,14 +319,21 @@ export function InvoiceForm() {
       const invoiceId = invoiceIdToEdit || `inv_${Date.now()}`;
 
       let companyLogoDataUrlToStore: string | null = companyLogoPreview;
-      if (!data.companyLogoFile || data.companyLogoFile.length === 0) {
-        companyLogoDataUrlToStore = companyLogoPreview;
+      if (data.companyLogoFile && data.companyLogoFile.length > 0) {
+        // If a new file was uploaded and successfully previewed, companyLogoPreview already has it.
+        // If preview failed, companyLogoPreview would have been reset, or is null.
+        // This assumes fileToDataUrl was successful if a file is present here (due to earlier validation).
+         const newLogoUrl = await fileToDataUrl(data.companyLogoFile[0], toast);
+         if (newLogoUrl) companyLogoDataUrlToStore = newLogoUrl;
       }
 
+
       let watermarkDataUrlToStore: string | null = watermarkPreview;
-      if (!data.watermarkFile || data.watermarkFile.length === 0) {
-        watermarkDataUrlToStore = watermarkPreview;
+       if (data.watermarkFile && data.watermarkFile.length > 0) {
+         const newWatermarkUrl = await fileToDataUrl(data.watermarkFile[0], toast);
+         if (newWatermarkUrl) watermarkDataUrlToStore = newWatermarkUrl;
       }
+
 
       const itemsToStore: StoredLineItem[] = data.items.map(item => {
         let quantity = Number(item.quantity) || 0;
@@ -363,6 +379,7 @@ export function InvoiceForm() {
         globalDiscountValue: data.globalDiscountValue,
         totalFee: totalFee,
         invoiceNotes: data.invoiceNotes,
+        termsAndConditions: data.termsAndConditions,
         watermarkDataUrl: watermarkDataUrlToStore,
         watermarkOpacity: data.watermarkOpacity ?? 0.05,
         themeColor: data.themeColor ?? 'default',
@@ -398,7 +415,6 @@ export function InvoiceForm() {
       trigger(`items.${itemIndex}.rate`);
     }
   };
-
 
   return (
     <Card className="w-full max-w-3xl mx-auto shadow-xl my-8">
@@ -797,7 +813,7 @@ export function InvoiceForm() {
                                 <FormControl>
                                     <RadioGroup
                                         onValueChange={field.onChange}
-                                        defaultValue={field.value}
+                                        value={field.value}
                                         className="flex flex-col space-y-1"
                                     >
                                         <FormItem className="flex items-center space-x-3 space-y-0">
@@ -873,7 +889,7 @@ export function InvoiceForm() {
 
 
             <Separator />
-            <CardTitle className="text-xl font-semibold">Optional Details & Appearance</CardTitle>
+            <CardTitle className="text-xl font-semibold">Optional Details &amp; Appearance</CardTitle>
 
             <FormField
               control={form.control}
@@ -946,7 +962,7 @@ export function InvoiceForm() {
                 <div className="mt-2">
                   <FormLabel>Watermark Preview</FormLabel>
                   <div className="mt-1 p-2 border rounded-md aspect-video relative w-full max-w-xs bg-muted overflow-hidden">
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                     <div style={{position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                         <img
                             src={watermarkPreview}
                             alt="Watermark preview"
@@ -994,11 +1010,26 @@ export function InvoiceForm() {
               name="invoiceNotes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes/Terms</FormLabel>
+                  <FormLabel className="flex items-center"><StickyNote className="mr-2 h-4 w-4"/>Notes</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="e.g., Payment terms, project details, thank you note, etc." {...field} rows={3} value={field.value || ''} />
+                    <Textarea placeholder="e.g., Specific project details, thank you note, etc." {...field} rows={3} value={field.value || ''} />
                   </FormControl>
-                   <FormDescription>Any additional notes or terms. You can set default notes in Settings.</FormDescription>
+                   <FormDescription>Any additional notes specific to this invoice. You can set default notes in Settings.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="termsAndConditions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center"><FileSignature className="mr-2 h-4 w-4"/>Terms &amp; Conditions</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="e.g., Payment terms, late fee policy, confidentiality clause..." {...field} rows={4} value={field.value || ''} />
+                  </FormControl>
+                   <FormDescription>Your standard terms and conditions. You can set default terms in Settings.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -1014,5 +1045,3 @@ export function InvoiceForm() {
     </Card>
   );
 }
-
-    

@@ -52,8 +52,8 @@ export default function InvoiceList() {
       return allInvoices;
     }
     return allInvoices.filter(invoice =>
-      invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+      (invoice.invoiceNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (invoice.customerName?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
   }, [allInvoices, searchTerm]);
 
@@ -69,9 +69,6 @@ export default function InvoiceList() {
       toast({ title: "Duplication Error", description: "Could not find the original invoice to duplicate.", variant: "destructive" });
       return;
     }
-    // No need to create a new StoredInvoiceData object here;
-    // The InvoiceForm will handle the creation of a new ID and modified invoice number
-    // when it loads with the `duplicate` query parameter.
     router.push(`/invoice/details?duplicate=${invoiceIdToDuplicate}`);
   };
 
@@ -150,7 +147,7 @@ export default function InvoiceList() {
                     <TableHead>Customer</TableHead>
                     <TableHead className="whitespace-nowrap">Date</TableHead>
                     <TableHead className="text-right whitespace-nowrap min-w-[100px]">Amount</TableHead>
-                    <TableHead className="text-center min-w-[200px]">Actions</TableHead> {/* Increased min-width for more buttons */}
+                    <TableHead className="text-center min-w-[200px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -161,7 +158,7 @@ export default function InvoiceList() {
                       <TableCell className="whitespace-nowrap">{formatDate(invoice.invoiceDate)}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{formatCurrency(invoice.totalFee)}</TableCell>
                       <TableCell className="text-center">
-                        <div className="flex justify-center items-center gap-1 sm:gap-2 flex-wrap">
+                        <div className="flex justify-center items-center gap-1 sm:gap-2"> {/* Removed flex-wrap */}
                           <Button variant="ghost" size="icon" asChild title="Preview Invoice">
                             <Link href={`/invoice/preview/${invoice.id}`}><Eye className="h-4 w-4" /></Link>
                           </Button>

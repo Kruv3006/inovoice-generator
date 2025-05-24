@@ -6,7 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Image from 'next/image';
-import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Cubes, Hash } from 'lucide-react';
+import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -331,7 +331,7 @@ export function SettingsForm() {
               <div>
                 <Label htmlFor="itemDefaultUnitInput">Default Unit (Optional)</Label>
                  <div className="relative">
-                    <Cubes className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Shapes className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input id="itemDefaultUnitInput" {...newSavedItemForm.register("itemDefaultUnit")} placeholder="e.g., hours, pcs" className="pl-8"/>
                  </div>
                 {newSavedItemForm.formState.errors.itemDefaultUnit && <p className="text-sm text-destructive mt-1">{newSavedItemForm.formState.errors.itemDefaultUnit.message}</p>}

@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, FontText, Cubes, CalendarClock } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, FontText, Shapes, CalendarClock } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -826,7 +826,7 @@ export function InvoiceForm() {
                             <FormLabel>Unit (Opt.)</FormLabel>
                             <FormControl>
                              <div className="relative">
-                                <Cubes className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Shapes className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input placeholder="e.g. hrs, pcs" {...field} value={field.value || ''} className="pl-8"/>
                              </div>
                             </FormControl>

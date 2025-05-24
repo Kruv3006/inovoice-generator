@@ -8,11 +8,12 @@ export const saveInvoiceData = (invoiceId: string, data: StoredInvoiceData): voi
   if (typeof window !== 'undefined') {
     const dataToStore: StoredInvoiceData = {
       ...data,
-      invoiceDate: data.invoiceDate, 
+      invoiceDate: data.invoiceDate,
       items: data.items.map(item => ({
         ...item,
         itemStartDate: item.itemStartDate ? item.itemStartDate : undefined,
         itemEndDate: item.itemEndDate ? item.itemEndDate : undefined,
+        discount: Number(item.discount) || 0, // Ensure discount is stored
       })),
       watermarkOpacity: typeof data.watermarkOpacity === 'number' ? data.watermarkOpacity : 0.05,
     };
@@ -28,7 +29,7 @@ export const getInvoiceData = (invoiceId: string): StoredInvoiceData | null => {
     }
     const parsedData = JSON.parse(dataString) as StoredInvoiceData;
 
-    // Ensure items is an array and items have numeric quantity/rate
+    // Ensure items is an array and items have numeric quantity/rate/discount
     if (parsedData.items && Array.isArray(parsedData.items)) {
       parsedData.items = parsedData.items.map(item => ({
         ...item,
@@ -36,11 +37,12 @@ export const getInvoiceData = (invoiceId: string): StoredInvoiceData | null => {
         itemEndDate: item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? item.itemEndDate : undefined,
         quantity: Number(item.quantity) || 0,
         rate: Number(item.rate) || 0,
+        discount: Number(item.discount) || 0, // Ensure discount is retrieved, default to 0
       }));
     } else {
-      parsedData.items = [{ description: "Default Item", quantity: 1, rate: 0 }];
+      parsedData.items = [{ description: "Default Item", quantity: 1, rate: 0, discount: 0 }];
     }
-    
+
     parsedData.totalFee = Number(parsedData.totalFee) || 0;
     parsedData.watermarkOpacity = typeof parsedData.watermarkOpacity === 'number' ? parsedData.watermarkOpacity : 0.05;
 
@@ -64,7 +66,7 @@ export const getAllInvoiceIds = (): string[] => {
       ids.push(key.replace(INVOICE_STORAGE_KEY_PREFIX, ''));
     }
   }
-  return ids.sort((a, b) => b.localeCompare(a)); // Sort by most recent first if IDs are timestamp-based
+  return ids.sort((a, b) => b.localeCompare(a));
 };
 
 export const getAllInvoices = (): StoredInvoiceData[] => {

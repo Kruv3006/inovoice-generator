@@ -3,7 +3,6 @@
 
 import type { StoredInvoiceData } from "@/lib/invoice-types";
 import { format, parseISO, isValid, differenceInCalendarDays } from "date-fns";
-// Removed Next.js Image import, using standard <img> for watermark for potentially better html2canvas compatibility.
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
@@ -33,40 +32,40 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
 
   return (
-    <div 
+    <div
       className="bg-[var(--invoice-background)] text-[var(--invoice-text)] font-sans shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white"
-      style={{ 
-        width: '100%', 
-        border: '1px solid var(--invoice-border-color)', 
-        borderRadius: '0.5rem', 
-        overflow: 'hidden', 
-        position: 'relative' // Establishes stacking context
+      style={{
+        width: '100%',
+        border: '1px solid var(--invoice-border-color)',
+        borderRadius: '0.5rem',
+        overflow: 'hidden',
+        position: 'relative'
       }}
     >
-      {/* Watermark Layer: Absolutely positioned, behind content */}
+      {/* Watermark Layer */}
       {watermarkDataUrl && (
-        <div 
-          className="absolute inset-0 flex items-center justify-center pointer-events-none" // Fills parent, centers child
-          style={{ zIndex: 0 }} // Ensures it's behind the content layer
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{ zIndex: 0 }}
         >
           <img
             src={watermarkDataUrl}
             alt="Watermark"
             style={{
-              maxWidth: '80%', // Relative to its flex container
-              maxHeight: '70%', // Relative to its flex container
+              maxWidth: '80%',
+              maxHeight: '70%',
               objectFit: 'contain',
-              opacity: displayWatermarkOpacity, // Opacity applied *only* to the image
+              opacity: displayWatermarkOpacity,
             }}
             data-ai-hint="abstract pattern"
           />
         </div>
       )}
 
-      {/* Content Layer: Positioned relative, above watermark */}
-      <div 
-        className="relative p-6 sm:p-8 md:p-10" 
-        style={{ zIndex: 1 }} // Ensures content is above the watermark layer
+      {/* Content Layer */}
+      <div
+        className="relative p-6 sm:p-8 md:p-10"
+        style={{ zIndex: 1 }}
       >
         <header className="flex flex-col sm:flex-row justify-between items-start pb-6 mb-6 border-b border-[var(--invoice-border-color)]">
           <div className="flex items-center gap-4 mb-4 sm:mb-0">
@@ -102,9 +101,10 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
             <table className="w-full table-auto">
               <thead className="bg-[var(--invoice-header-bg)] print:bg-gray-100">
                 <tr>
-                  <th className="p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600 w-2/5 sm:w-3/5">Description</th>
-                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Qty / Days</th>
-                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Rate / Per Day (₹)</th>
+                  <th className="p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600 w-2/5 sm:w-[45%]">Description</th>
+                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Qty/Days</th>
+                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Rate (₹)</th>
+                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Disc (%)</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Amount (₹)</th>
                 </tr>
               </thead>
@@ -114,12 +114,15 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                     const itemStartDate = item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? parseISO(item.itemStartDate) : null;
                     const itemEndDate = item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? parseISO(item.itemEndDate) : null;
                     let displayQuantity = Number(item.quantity) || 0;
-                    
+
                     if (itemStartDate && itemEndDate && itemEndDate >= itemStartDate) {
                         displayQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
                     }
 
                     const itemRate = Number(item.rate) || 0;
+                    const itemDiscount = Number(item.discount) || 0;
+                    const itemSubtotal = displayQuantity * itemRate;
+                    const discountedAmount = itemSubtotal * (1 - itemDiscount / 100);
 
                     return (
                     <tr key={item.id || index} className="bg-[var(--invoice-background)] hover:bg-[var(--invoice-header-bg)]/50 print:bg-white">
@@ -137,14 +140,17 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700">
                         {formatCurrency(itemRate)}
                       </td>
+                      <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700">
+                        {itemDiscount > 0 ? `${itemDiscount}%` : '-'}
+                      </td>
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-black">
-                        {formatCurrency(displayQuantity * itemRate)}
+                        {formatCurrency(discountedAmount)}
                       </td>
                     </tr>
                   )})
                 ) : (
                   <tr className="bg-[var(--invoice-background)] print:bg-white">
-                    <td colSpan={4} className="p-3 text-center text-[var(--invoice-muted-text)] print:text-gray-500">
+                    <td colSpan={5} className="p-3 text-center text-[var(--invoice-muted-text)] print:text-gray-500">
                       No items listed.
                     </td>
                   </tr>
@@ -153,7 +159,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
             </table>
           </div>
         </section>
-        
+
         <section className="flex justify-end mb-8">
           <div className="w-full sm:w-1/2 md:w-2/5 lg:w-1/3 space-y-2">
             <div className="flex justify-between items-center py-3 bg-[var(--invoice-primary-color)]/10 dark:bg-[var(--invoice-primary-color)]/20 px-3 rounded-md">

@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, User, ListCollapse } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, User, ListCollapse, Percent } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -69,25 +69,26 @@ export function InvoiceForm() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const [watermarkPreview, setWatermarkPreview] = useState<string | null>(null);
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [calculatedTotalFee, setCalculatedTotalFee] = useState<number>(0);
-  
+
   const [clients, setClients] = useState<ClientData[]>([]);
   const [savedItems, setSavedItems] = useState<SavedItemData[]>([]);
-  
+
   const watermarkFileRef = useRef<HTMLInputElement | null>(null);
   const companyLogoFileRef = useRef<HTMLInputElement | null>(null);
 
-  const defaultItem: LineItem = { 
-    description: "", 
-    quantity: 1, 
-    rate: 0, 
-    itemStartDate: undefined, 
-    itemEndDate: undefined 
+  const defaultItem: LineItem = {
+    description: "",
+    quantity: 1,
+    rate: 0,
+    discount: 0,
+    itemStartDate: undefined,
+    itemEndDate: undefined
   };
 
   const defaultFormValues: InvoiceFormSchemaType = {
@@ -96,7 +97,7 @@ export function InvoiceForm() {
     companyName: "",
     invoiceDate: new Date(),
     items: [defaultItem],
-    invoiceNotes: "", 
+    invoiceNotes: "",
     companyLogoFile: undefined,
     watermarkFile: undefined,
     watermarkOpacity: 0.05,
@@ -105,7 +106,7 @@ export function InvoiceForm() {
   const form = useForm<InvoiceFormSchemaType>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: defaultFormValues,
-    mode: "onChange", 
+    mode: "onChange",
   });
 
   const { watch, control, reset, setValue, trigger, getValues, formState: { errors } } = form;
@@ -129,12 +130,14 @@ export function InvoiceForm() {
       watchedItems.forEach((item) => {
         let quantity = Number(item.quantity) || 0;
         const rate = Number(item.rate) || 0;
+        const discount = Number(item.discount) || 0;
 
         if (item.itemStartDate && item.itemEndDate && isValid(item.itemStartDate) && isValid(item.itemEndDate) && item.itemEndDate >= item.itemStartDate) {
           const days = differenceInCalendarDays(item.itemEndDate, item.itemStartDate) + 1;
           quantity = days;
         }
-        total += quantity * rate;
+        const itemSubtotal = quantity * rate;
+        total += itemSubtotal * (1 - discount / 100);
       });
       setCalculatedTotalFee(total);
     }
@@ -152,7 +155,7 @@ export function InvoiceForm() {
         setCompanyLogoPreview(companyProfile.companyLogoDataUrl);
       }
     }
-    
+
     if (invoiceIdToEdit && !initialDataLoaded) {
       const data = getInvoiceData(invoiceIdToEdit);
       if (data) {
@@ -162,14 +165,15 @@ export function InvoiceForm() {
           itemEndDate: item.itemEndDate ? parseISO(item.itemEndDate) : undefined,
           quantity: Number(item.quantity) || 0,
           rate: Number(item.rate) || 0,
+          discount: Number(item.discount) || 0,
         })) || [defaultItem];
 
         const formData: InvoiceFormSchemaType = {
-          ...baseFormValues, 
-          ...data, 
+          ...baseFormValues,
+          ...data,
           invoiceDate: data.invoiceDate ? (parseISO(data.invoiceDate) instanceof Date && !isNaN(parseISO(data.invoiceDate).valueOf()) ? parseISO(data.invoiceDate) : new Date()) : new Date(),
           items: formItems.length > 0 ? formItems : [defaultItem],
-          companyLogoFile: undefined, 
+          companyLogoFile: undefined,
           watermarkFile: undefined,
           watermarkOpacity: data.watermarkOpacity ?? baseFormValues.watermarkOpacity,
           invoiceNotes: data.invoiceNotes ?? baseFormValues.invoiceNotes,
@@ -178,19 +182,19 @@ export function InvoiceForm() {
 
         if (data.watermarkDataUrl) setWatermarkPreview(data.watermarkDataUrl);
         if (data.companyLogoDataUrl) setCompanyLogoPreview(data.companyLogoDataUrl);
-        
+
       } else {
         toast({ title: "Edit Error", description: "Could not load invoice data for editing. Using defaults.", variant: "destructive" });
-        reset(baseFormValues); 
-        setWatermarkPreview(null); 
+        reset(baseFormValues);
+        setWatermarkPreview(null);
       }
       setInitialDataLoaded(true);
-    } else if (!initialDataLoaded) { // Added check for !invoiceIdToEdit here as well
-      reset(baseFormValues); 
+    } else if (!initialDataLoaded) {
+      reset(baseFormValues);
       setWatermarkPreview(null);
-      setInitialDataLoaded(true); 
+      setInitialDataLoaded(true);
     }
-  }, [searchParams, reset, toast, initialDataLoaded, defaultItem]); // Removed defaultFormValues from dep array as it's constant
+  }, [searchParams, reset, toast, initialDataLoaded, defaultItem]);
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -199,7 +203,7 @@ export function InvoiceForm() {
     const currentInvoiceId = searchParams.get('id');
     const existingData = currentInvoiceId ? getInvoiceData(currentInvoiceId) : null;
     const profileData = getCompanyProfile();
-  
+
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
        if (file.size > 2 * 1024 * 1024) {
@@ -217,7 +221,7 @@ export function InvoiceForm() {
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setCompanyLogoPreview(dataUrl);
-        } else { 
+        } else {
           setValue('companyLogoFile', undefined, { shouldValidate: true });
           setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
         }
@@ -239,7 +243,7 @@ export function InvoiceForm() {
   useEffect(() => {
     const currentInvoiceId = searchParams.get('id');
     const existingData = currentInvoiceId ? getInvoiceData(currentInvoiceId) : null;
-  
+
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
       if (file.size > 5 * 1024 * 1024) {
@@ -258,7 +262,7 @@ export function InvoiceForm() {
         if (dataUrl) {
           setWatermarkPreview(dataUrl);
         } else {
-          setValue('watermarkFile', undefined, { shouldValidate: true }); 
+          setValue('watermarkFile', undefined, { shouldValidate: true });
           setWatermarkPreview(existingData?.watermarkDataUrl || null);
         }
       });
@@ -271,17 +275,17 @@ export function InvoiceForm() {
       }
     }
   }, [watchedWatermarkFile, searchParams, setValue, toast, getValues]);
-  
+
   async function onSubmit(data: InvoiceFormSchemaType) {
     setIsSubmitting(true);
     try {
       const invoiceIdToEdit = searchParams.get('id');
-      const existingInvoiceData = invoiceIdToEdit ? getInvoiceData(invoiceIdToEdit) : null;
-      const companyProfile = getCompanyProfile();
+      // const existingInvoiceData = invoiceIdToEdit ? getInvoiceData(invoiceIdToEdit) : null;
+      // const companyProfile = getCompanyProfile();
 
-      const invoiceId = existingInvoiceData?.id || `inv_${Date.now()}`;
-      
-      let companyLogoDataUrlToStore: string | null = companyLogoPreview; 
+      const invoiceId = invoiceIdToEdit || `inv_${Date.now()}`;
+
+      let companyLogoDataUrlToStore: string | null = companyLogoPreview;
       if (!data.companyLogoFile || data.companyLogoFile.length === 0) {
         companyLogoDataUrlToStore = companyLogoPreview;
       }
@@ -301,15 +305,18 @@ export function InvoiceForm() {
           quantity,
           itemStartDate: item.itemStartDate ? item.itemStartDate.toISOString() : undefined,
           itemEndDate: item.itemEndDate ? item.itemEndDate.toISOString() : undefined,
+          discount: Number(item.discount) || 0,
         };
       });
 
       const totalFee = itemsToStore.reduce((sum, item) => {
         const quantity = Number(item.quantity) || 0;
         const rate = Number(item.rate) || 0;
-        return sum + (quantity * rate);
+        const discount = Number(item.discount) || 0;
+        const itemSubtotal = quantity * rate;
+        return sum + (itemSubtotal * (1 - discount / 100));
       }, 0);
-      
+
       const storedData: StoredInvoiceData = {
         id: invoiceId,
         invoiceNumber: data.invoiceNumber,
@@ -350,8 +357,11 @@ export function InvoiceForm() {
     if (selectedSavedItem) {
       setValue(`items.${itemIndex}.description`, selectedSavedItem.description);
       setValue(`items.${itemIndex}.rate`, selectedSavedItem.rate);
-      trigger(`items.${itemIndex}.description`); 
-      trigger(`items.${index}.rate`);
+      // Discount is not part of saved items schema for now
+      // setValue(`items.${itemIndex}.discount`, selectedSavedItem.discount || 0);
+      trigger(`items.${itemIndex}.description`);
+      trigger(`items.${itemIndex}.rate`);
+      // trigger(`items.${itemIndex}.discount`);
     }
   };
 
@@ -367,7 +377,7 @@ export function InvoiceForm() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                     control={form.control}
@@ -426,7 +436,7 @@ export function InvoiceForm() {
                   )}
                 />
             </div>
-            
+
             <Separator />
             <CardTitle className="text-xl font-semibold">Your Details</CardTitle>
 
@@ -448,7 +458,7 @@ export function InvoiceForm() {
             <FormField
               control={control}
               name="companyLogoFile"
-              render={({ field: { onChange, onBlur, name, value: formFieldValue } }) => ( 
+              render={({ field: { onChange, onBlur, name, value: formFieldValue } }) => (
                 <FormItem>
                   <FormLabel>Company Logo (Optional, PNG/JPEG/GIF, &lt;2MB)</FormLabel>
                   <FormControl>
@@ -465,7 +475,7 @@ export function InvoiceForm() {
                         onBlur={onBlur}
                         onChange={(e) => {
                             const files = e.target.files;
-                            onChange(files && files.length > 0 ? files : undefined); 
+                            onChange(files && files.length > 0 ? files : undefined);
                         }}
                       />
                       {formFieldValue && formFieldValue.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">{formFieldValue[0].name}</span>}
@@ -473,8 +483,8 @@ export function InvoiceForm() {
                     </div>
                   </FormControl>
                    <FormDescription>
-                    {(searchParams.get('id') || getCompanyProfile()?.companyLogoDataUrl) && companyLogoPreview && (!formFieldValue || formFieldValue.length === 0) 
-                      ? "Current logo (from profile or this invoice) will be used unless a new image is uploaded." 
+                    {(searchParams.get('id') || getCompanyProfile()?.companyLogoDataUrl) && companyLogoPreview && (!formFieldValue || formFieldValue.length === 0)
+                      ? "Current logo (from profile or this invoice) will be used unless a new image is uploaded."
                       : "Upload a logo for the invoice. Set a default in Settings."}
                   </FormDescription>
                   <FormMessage />
@@ -490,7 +500,7 @@ export function InvoiceForm() {
                 </div>
               </div>
             )}
-            
+
             <Separator />
             <CardTitle className="text-xl font-semibold">Client Details</CardTitle>
 
@@ -527,12 +537,12 @@ export function InvoiceForm() {
               />
 
             <Separator className="my-6" />
-            
+
             <div>
               <div className="flex justify-between items-center mb-1">
                 <FormLabel className="text-xl font-semibold">Invoice Items</FormLabel>
               </div>
-              <FormDescription className="mb-4">Add items or services provided. For services with a duration, provide start/end dates and a per-day rate. The quantity will be calculated automatically as days.</FormDescription>
+              <FormDescription className="mb-4">Add items or services provided. For services with a duration, provide start/end dates and a per-day rate. The quantity will be calculated automatically as days. Add a discount if applicable.</FormDescription>
               <div className="space-y-6 mt-4">
                 {fields.map((item, index) => {
                   const itemStartDate = watch(`items.${index}.itemStartDate`);
@@ -544,10 +554,13 @@ export function InvoiceForm() {
                     calculatedDays = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
                     quantityIsCalculated = true;
                   }
-                  
+
                   const currentQuantity = quantityIsCalculated ? calculatedDays : (getValues(`items.${index}.quantity`) || 0);
                   const currentRate = getValues(`items.${index}.rate`) || 0;
-                  const itemAmount = (Number(currentQuantity) * Number(currentRate)).toFixed(2);
+                  const currentDiscount = getValues(`items.${index}.discount`) || 0;
+                  const itemSubtotal = (Number(currentQuantity) * Number(currentRate));
+                  const itemAmount = (itemSubtotal * (1 - (Number(currentDiscount) / 100))).toFixed(2);
+
 
                   return (
                   <div key={item.id} className="p-4 border rounded-md shadow-sm space-y-4 bg-card">
@@ -636,7 +649,7 @@ export function InvoiceForm() {
                         )}
                       />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
                        <FormField
                         control={control}
                         name={`items.${index}.quantity`}
@@ -644,10 +657,10 @@ export function InvoiceForm() {
                           <FormItem>
                             <FormLabel>{quantityIsCalculated ? "Days (Calculated)" : "Quantity"}</FormLabel>
                             <FormControl>
-                              <Input 
-                                type="number" 
-                                placeholder="1" 
-                                {...field} 
+                              <Input
+                                type="number"
+                                placeholder="1"
+                                {...field}
                                 value={quantityIsCalculated ? calculatedDays : (field.value === undefined || field.value === null ? '' : String(field.value))}
                                 readOnly={quantityIsCalculated}
                                 onChange={e => {
@@ -670,16 +683,43 @@ export function InvoiceForm() {
                           <FormItem>
                             <FormLabel>{quantityIsCalculated ? "Per Day Rate (₹)" : "Rate (₹)"}</FormLabel>
                             <FormControl>
-                              <Input 
-                                type="number" 
-                                placeholder="100.00" 
-                                {...field} 
+                              <Input
+                                type="number"
+                                placeholder="100.00"
+                                {...field}
                                 value={field.value === undefined || field.value === null ? '' : String(field.value)}
                                 onChange={e => {
                                     const val = parseFloat(e.target.value);
                                     field.onChange(isNaN(val) ? 0 : val)
                                 }}
                               />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={control}
+                        name={`items.${index}.discount`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Discount (%)</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  type="number"
+                                  placeholder="0"
+                                  {...field}
+                                  value={field.value === undefined || field.value === null ? '' : String(field.value)}
+                                  onChange={e => {
+                                      const val = parseFloat(e.target.value);
+                                      const finalVal = isNaN(val) ? 0 : (val < 0 ? 0 : (val > 100 ? 100 : val));
+                                      field.onChange(finalVal);
+                                  }}
+                                  className="pl-8"
+                                />
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -713,14 +753,14 @@ export function InvoiceForm() {
             <div className="text-right">
                 <h3 className="text-xl font-semibold">Total Amount: <span className="text-primary">₹{calculatedTotalFee.toFixed(2)}</span></h3>
             </div>
-            
+
             <Separator />
             <CardTitle className="text-xl font-semibold">Optional Details</CardTitle>
 
             <FormField
               control={control}
               name="watermarkFile"
-              render={({ field: { onChange, onBlur, name, value: formFieldValue } }) => ( 
+              render={({ field: { onChange, onBlur, name, value: formFieldValue } }) => (
                 <FormItem>
                   <FormLabel>Custom Watermark (Optional, PNG/JPEG/GIF, &lt;5MB)</FormLabel>
                   <FormControl>
@@ -745,8 +785,8 @@ export function InvoiceForm() {
                     </div>
                   </FormControl>
                   <FormDescription>
-                    {searchParams.get('id') && watermarkPreview && (!formFieldValue || formFieldValue.length === 0) 
-                      ? "Current watermark (from this invoice) will be used unless a new image is uploaded." 
+                    {searchParams.get('id') && watermarkPreview && (!formFieldValue || formFieldValue.length === 0)
+                      ? "Current watermark (from this invoice) will be used unless a new image is uploaded."
                       : "Upload an image for the invoice watermark."}
                   </FormDescription>
                   <FormMessage />
@@ -759,11 +799,11 @@ export function InvoiceForm() {
                 <div className="mt-2">
                   <FormLabel>Watermark Preview</FormLabel>
                   <div className="mt-1 p-2 border rounded-md aspect-video relative w-full max-w-xs bg-muted overflow-hidden">
-                    <Image 
-                        src={watermarkPreview} 
-                        alt="Watermark preview" 
-                        layout="fill" 
-                        objectFit="contain" 
+                    <Image
+                        src={watermarkPreview}
+                        alt="Watermark preview"
+                        layout="fill"
+                        objectFit="contain"
                         data-ai-hint="abstract pattern"
                         style={{ opacity: watchedWatermarkOpacity ?? 0.05 }}
                     />
@@ -811,7 +851,7 @@ export function InvoiceForm() {
                 </FormItem>
               )}
             />
-            
+
             <Button type="submit" disabled={isSubmitting || !initialDataLoaded} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
               {isSubmitting ? "Processing..." : (searchParams.get('id') ? "Update & Preview Invoice" : "Preview Invoice")}
               {!isSubmitting && <PartyPopper className="ml-2 h-5 w-5" />}
@@ -822,5 +862,3 @@ export function InvoiceForm() {
     </Card>
   );
 }
-
-    

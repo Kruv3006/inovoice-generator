@@ -42,12 +42,19 @@
 
     /* Invoice specific variables */
     --invoice-background: hsl(0 0% 100%);
-    --invoice-text: hsl(220 15% 20%);
+    --invoice-text: hsl(220 15% 20%); /* Default font color for invoice */
     --invoice-muted-text: hsl(220 10% 40%);
-    --invoice-primary-color-hsl: 217 91% 55%; /* Base primary color for default theme */
+    --invoice-primary-color-hsl: 217 91% 55%; 
     --invoice-primary-color: hsl(var(--invoice-primary-color-hsl));
     --invoice-border-color: hsl(220 15% 85%);
     --invoice-header-bg: hsl(220 20% 95%);
+
+    /* Default font stack - applied by font-theme-default */
+    --font-family-default: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    /* Serif font stack */
+    --font-family-serif: Georgia, 'Times New Roman', Times, serif;
+    /* Monospace font stack - use existing Geist Mono */
+    --font-family-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
 
   .dark {
@@ -89,14 +96,14 @@
     --invoice-background: hsl(220 15% 15%);
     --invoice-text: hsl(220 15% 92%);
     --invoice-muted-text: hsl(220 10% 60%);
-    --invoice-primary-color-hsl: 217 91% 65%; /* Base primary color for dark theme */
+    --invoice-primary-color-hsl: 217 91% 65%; 
     --invoice-primary-color: hsl(var(--invoice-primary-color-hsl));
     --invoice-border-color: hsl(220 15% 35%);
     --invoice-header-bg: hsl(220 15% 20%);
   }
 
   /* Invoice Color Themes */
-  /* Default theme uses the :root or .dark defined --invoice-primary-color-hsl */
+  .theme-default { /* Uses root/dark variables by default for invoice */ }
 
   .theme-classic-blue {
     --invoice-primary-color-hsl: 210 80% 50%;
@@ -130,6 +137,17 @@
     --invoice-border-color: hsl(340 25% 40%);
   }
 
+  /* Invoice Font Themes */
+  .font-theme-default {
+    font-family: var(--font-family-default);
+  }
+  .font-theme-serif {
+    font-family: var(--font-family-serif);
+  }
+  .font-theme-mono {
+    font-family: var(--font-family-mono);
+  }
+
 }
 
 @layer base {
@@ -138,6 +156,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11"; /* More professional OpenType features for Geist */
+    font-family: var(--font-geist-sans); /* Default body font */
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11"; 
   }
 }

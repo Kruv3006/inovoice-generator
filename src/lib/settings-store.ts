@@ -56,7 +56,16 @@ export const removeClient = (id: string): ClientData[] => {
 export const getSavedItems = (): SavedItemData[] => {
   if (typeof window !== 'undefined') {
     const dataString = localStorage.getItem(SAVED_ITEMS_KEY);
-    return dataString ? JSON.parse(dataString) : [];
+    if (dataString) {
+      const items = JSON.parse(dataString) as SavedItemData[];
+      // Ensure defaultQuantity and defaultUnit are numbers/strings or undefined
+      return items.map(item => ({
+        ...item,
+        defaultQuantity: item.defaultQuantity != null ? Number(item.defaultQuantity) : undefined,
+        defaultUnit: item.defaultUnit != null ? String(item.defaultUnit) : undefined,
+      }));
+    }
+    return [];
   }
   return [];
 };
@@ -67,9 +76,15 @@ export const saveSavedItems = (items: SavedItemData[]): void => {
   }
 };
 
-export const addSavedItem = (description: string, rate: number): SavedItemData[] => {
+export const addSavedItem = (description: string, rate: number, defaultQuantity?: number, defaultUnit?: string): SavedItemData[] => {
   const items = getSavedItems();
-  const newItem = { id: `item_${Date.now()}`, description, rate };
+  const newItem: SavedItemData = { 
+    id: `item_${Date.now()}`, 
+    description, 
+    rate,
+    defaultQuantity: defaultQuantity != null ? Number(defaultQuantity) : undefined,
+    defaultUnit: defaultUnit != null ? String(defaultUnit) : undefined,
+  };
   const updatedItems = [...items, newItem];
   saveSavedItems(updatedItems);
   return updatedItems;

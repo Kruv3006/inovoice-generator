@@ -21,6 +21,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     customerName,
     invoiceNumber,
     invoiceDate,
+    dueDate, // New
     items,
     subTotal, 
     globalDiscountType,
@@ -31,10 +32,12 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     watermarkDataUrl,
     watermarkOpacity,
     themeColor = 'default',
+    fontTheme = 'default', // New
   } = data;
 
   const defaultDisplayDate = new Date();
   const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : defaultDisplayDate;
+  const parsedDueDate = dueDate && isValid(parseISO(dueDate)) ? parseISO(dueDate) : null;
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
 
   let globalDiscountAmount = 0;
@@ -46,45 +49,48 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     }
   }
 
+  const fontThemeClass = `font-theme-${fontTheme}`;
+
 
   return (
     <div
       className={cn(
         "bg-[var(--invoice-background)] text-[var(--invoice-text)] font-sans shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white",
-        `theme-${themeColor}`
+        `theme-${themeColor}`,
+        fontThemeClass // Apply font theme class
       )}
       style={{
         width: '100%',
         border: '1px solid var(--invoice-border-color)',
         borderRadius: '0.5rem',
         overflow: 'hidden',
-        position: 'relative'
+        position: 'relative' // Needed for z-index layering of watermark
       }}
     >
-      {/* Watermark Layer */}
+      {/* Watermark Layer: Positioned behind the content */}
       {watermarkDataUrl && (
         <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
-          style={{ zIndex: 0 }}
+          style={{ zIndex: 0 }} 
         >
           <img
             src={watermarkDataUrl}
             alt="Watermark"
             style={{
-              maxWidth: '80%',
-              maxHeight: '70%',
+              maxWidth: '80%', // Adjusted for better visibility
+              maxHeight: '70%', // Adjusted for better visibility
               objectFit: 'contain',
-              opacity: displayWatermarkOpacity,
+              opacity: displayWatermarkOpacity, // Opacity applied directly to the image
             }}
             data-ai-hint="abstract pattern"
           />
         </div>
       )}
 
-      {/* Content Layer */}
+      {/* Content Layer: Positioned on top of the watermark */}
       <div
-        className="relative p-6 sm:p-8 md:p-10"
-        style={{ zIndex: 1 }}
+        className="relative p-6 sm:p-8 md:p-10" // Ensure content is relatively positioned for z-index
+        style={{ zIndex: 1 }} 
       >
         <header className="flex flex-col sm:flex-row justify-between items-start pb-6 mb-6 border-b border-[var(--invoice-border-color)]">
           <div className="flex items-center gap-4 mb-4 sm:mb-0">
@@ -105,6 +111,11 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
             <p className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">
               <span className="font-medium text-[var(--invoice-text)] print:text-black">Date:</span> {format(parsedInvoiceDate, "MMMM d, yyyy")}
             </p>
+            {parsedDueDate && (
+                 <p className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">
+                    <span className="font-medium text-[var(--invoice-text)] print:text-black">Due Date:</span> {format(parsedDueDate, "MMMM d, yyyy")}
+                </p>
+            )}
           </div>
         </header>
 
@@ -120,8 +131,9 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
             <table className="w-full table-auto">
               <thead className="bg-[var(--invoice-header-bg)] print:bg-gray-100">
                 <tr>
-                  <th className="p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600 w-2/5 sm:w-[45%]">Description</th>
+                  <th className="p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600 w-2/5 sm:w-[40%]">Description</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Qty/Days</th>
+                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Unit</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Rate (₹)</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Disc (%)</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Amount (₹)</th>
@@ -157,6 +169,9 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                         {displayQuantity}
                       </td>
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700">
+                        {item.unit || '-'}
+                      </td>
+                      <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700">
                         {formatCurrency(itemRate)}
                       </td>
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700">
@@ -169,7 +184,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                   )})
                 ) : (
                   <tr className="bg-[var(--invoice-background)] print:bg-white">
-                    <td colSpan={5} className="p-3 text-center text-[var(--invoice-muted-text)] print:text-gray-500">
+                    <td colSpan={6} className="p-3 text-center text-[var(--invoice-muted-text)] print:text-gray-500">
                       No items listed.
                     </td>
                   </tr>

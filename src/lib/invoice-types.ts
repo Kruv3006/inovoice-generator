@@ -13,6 +13,7 @@ export const lineItemSchema = z.object({
     z.number({ invalid_type_error: "Quantity must be a number.", required_error: "Quantity is required." })
      .min(0, { message: "Quantity must be non-negative." })
   ),
+  unit: z.string().optional(), // New: Unit for line item
   rate: z.preprocess(
     (val) => {
       const strVal = String(val).replace(/[^0-9.]+/g, "");
@@ -61,6 +62,7 @@ export const invoiceFormSchema = z.object({
     .optional(),
 
   invoiceDate: z.date({ required_error: "Invoice date is required." }),
+  dueDate: z.date().optional(), // New: Optional due date
   items: z.array(lineItemSchema).min(1, "At least one item is required."),
 
   globalDiscountType: z.enum(['percentage', 'fixed']).optional().default('percentage'),
@@ -84,6 +86,7 @@ export const invoiceFormSchema = z.object({
   invoiceNotes: z.string().optional(),
   termsAndConditions: z.string().optional(),
   themeColor: z.string().optional().default('default'),
+  fontTheme: z.string().optional().default('default'), // New: Font theme
 });
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
@@ -92,21 +95,24 @@ export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEn
   itemStartDate?: string;
   itemEndDate?: string;
   discount?: number;
+  unit?: string; // New: Unit for stored line item
 }
-export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'watermarkOpacity' | 'invoiceNotes' | 'termsAndConditions' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor'> {
+export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'dueDate' | 'watermarkOpacity' | 'invoiceNotes' | 'termsAndConditions' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor' | 'fontTheme'> {
   id: string;
   invoiceDate: string;
+  dueDate?: string; // New: Stored due date
   companyLogoDataUrl?: string | null;
   watermarkDataUrl?: string | null;
   watermarkOpacity: number;
   invoiceNotes?: string;
   termsAndConditions?: string;
   items: StoredLineItem[];
-  subTotal: number; // Sum of line items before global discount
+  subTotal: number;
   globalDiscountType?: 'percentage' | 'fixed';
   globalDiscountValue?: number;
-  totalFee: number; // Final total after global discount
+  totalFee: number;
   themeColor?: string;
+  fontTheme?: string; // New: Stored font theme
 }
 
 // Settings Page Types
@@ -126,4 +132,6 @@ export interface SavedItemData {
   id: string;
   description: string;
   rate: number;
+  defaultQuantity?: number; // New: Default quantity for saved item
+  defaultUnit?: string;     // New: Default unit for saved item
 }

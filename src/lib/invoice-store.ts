@@ -9,8 +9,10 @@ export const saveInvoiceData = (invoiceId: string, data: StoredInvoiceData): voi
     const dataToStore: StoredInvoiceData = {
       ...data,
       invoiceDate: data.invoiceDate,
+      dueDate: data.dueDate, // Save due date
       items: data.items.map(item => ({
         ...item,
+        unit: item.unit || '', // Save unit
         itemStartDate: item.itemStartDate ? item.itemStartDate : undefined,
         itemEndDate: item.itemEndDate ? item.itemEndDate : undefined,
         discount: Number(item.discount) || 0,
@@ -21,6 +23,7 @@ export const saveInvoiceData = (invoiceId: string, data: StoredInvoiceData): voi
       subTotal: data.subTotal,
       totalFee: data.totalFee,
       themeColor: data.themeColor || 'default',
+      fontTheme: data.fontTheme || 'default', // Save font theme
       invoiceNotes: data.invoiceNotes,
       termsAndConditions: data.termsAndConditions,
     };
@@ -36,9 +39,13 @@ export const getInvoiceData = (invoiceId: string): StoredInvoiceData | null => {
     }
     const parsedData = JSON.parse(dataString) as StoredInvoiceData;
 
+    // Ensure dueDate is correctly parsed or undefined
+    parsedData.dueDate = parsedData.dueDate && isValid(parseISO(parsedData.dueDate)) ? parsedData.dueDate : undefined;
+
     if (parsedData.items && Array.isArray(parsedData.items)) {
       parsedData.items = parsedData.items.map(item => ({
         ...item,
+        unit: item.unit || '', // Retrieve unit
         itemStartDate: item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? item.itemStartDate : undefined,
         itemEndDate: item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? item.itemEndDate : undefined,
         quantity: Number(item.quantity) || 0,
@@ -46,7 +53,7 @@ export const getInvoiceData = (invoiceId: string): StoredInvoiceData | null => {
         discount: Number(item.discount) || 0,
       }));
     } else {
-      parsedData.items = [{ description: "Default Item", quantity: 1, rate: 0, discount: 0 }];
+      parsedData.items = [{ description: "Default Item", quantity: 1, rate: 0, discount: 0, unit: "" }];
     }
 
     parsedData.subTotal = Number(parsedData.subTotal) || 0;
@@ -55,6 +62,7 @@ export const getInvoiceData = (invoiceId: string): StoredInvoiceData | null => {
     parsedData.totalFee = Number(parsedData.totalFee) || 0;
     parsedData.watermarkOpacity = typeof parsedData.watermarkOpacity === 'number' ? parsedData.watermarkOpacity : 0.05;
     parsedData.themeColor = parsedData.themeColor || 'default';
+    parsedData.fontTheme = parsedData.fontTheme || 'default'; // Retrieve font theme
     parsedData.invoiceNotes = parsedData.invoiceNotes || '';
     parsedData.termsAndConditions = parsedData.termsAndConditions || '';
 
@@ -79,11 +87,10 @@ export const getAllInvoiceIds = (): string[] => {
       ids.push(key.replace(INVOICE_STORAGE_KEY_PREFIX, ''));
     }
   }
-  // Sort by date, assuming invoiceId is time-based like 'inv_timestamp'
   return ids.sort((a, b) => {
     const timeA = parseInt(a.split('_')[1] || '0');
     const timeB = parseInt(b.split('_')[1] || '0');
-    return timeB - timeA; // Sort descending (newest first)
+    return timeB - timeA; 
   });
 };
 

@@ -24,12 +24,13 @@ const simulateDownload = (filename: string, dataUrlOrContent: string, mimeType: 
 
 const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   const {
-    companyName, customerName, invoiceNumber, invoiceDate,
+    companyName, customerName, invoiceNumber, invoiceDate, dueDate,
     items, subTotal, globalDiscountType, globalDiscountValue, totalFee, invoiceNotes, termsAndConditions,
-    companyLogoDataUrl, watermarkDataUrl, watermarkOpacity, themeColor = 'default'
+    companyLogoDataUrl, watermarkDataUrl, watermarkOpacity, themeColor = 'default', fontTheme = 'default'
   } = data;
 
   const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : new Date();
+  const parsedDueDate = dueDate && isValid(parseISO(dueDate)) ? parseISO(dueDate) : null;
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
 
   const fCurrency = (val?: number) => val != null ? `₹${val.toFixed(2)}` : '₹0.00';
@@ -38,7 +39,6 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     ? `<img src="${companyLogoDataUrl}" style="max-height: 70px; max-width: 180px; margin-bottom: 10px; object-fit: contain;" alt="Company Logo"/>`
     : '';
 
-  // Define theme colors directly here for DOC simplicity
   let primaryColorDoc = '#1D4ED8'; 
   let headerBgColorDoc = '#F3F4F6';
   let borderColorDoc = '#E5E7EB';
@@ -58,8 +58,14 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     headerBgColorDoc = '#FEF2F2';
     borderColorDoc = '#FECACA';
   }
-
   const invoiceBgColor = '#FFFFFF';
+
+  let fontFamilyDoc = 'Arial, sans-serif';
+  if (fontTheme === 'serif') {
+    fontFamilyDoc = 'Georgia, Times New Roman, Times, serif';
+  } else if (fontTheme === 'mono') {
+    fontFamilyDoc = 'Courier New, Courier, monospace';
+  }
 
 
   let itemsHtml = '';
@@ -83,6 +89,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
         <tr style="background-color: ${invoiceBgColor};">
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; color: ${textColorDoc};">${item.description}${dateRangeHtml}</td>
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${displayQuantity}</td>
+          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${item.unit || '-'}</td>
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${fCurrency(itemRate)}</td>
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${itemDiscount > 0 ? `${itemDiscount}%` : '-'}</td>
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${textColorDoc};">${fCurrency(discountedAmount)}</td>
@@ -90,7 +97,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
       `;
     });
   } else {
-    itemsHtml = `<tr><td colspan="5" style="text-align:center; padding: 20px; border: 1px solid ${borderColorDoc}; color: ${mutedTextColorDoc};">No items listed.</td></tr>`;
+    itemsHtml = `<tr><td colspan="6" style="text-align:center; padding: 20px; border: 1px solid ${borderColorDoc}; color: ${mutedTextColorDoc};">No items listed.</td></tr>`;
   }
   
   let globalDiscountHtml = '';
@@ -105,7 +112,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     }
     globalDiscountHtml = `
       <tr>
-        <td colspan="4" style="padding: 8px; text-align: right; font-weight: normal; color: ${mutedTextColorDoc}; border-top: 1px solid ${borderColorDoc};">
+        <td colspan="5" style="padding: 8px; text-align: right; font-weight: normal; color: ${mutedTextColorDoc}; border-top: 1px solid ${borderColorDoc};">
           ${discountLabel}:
         </td>
         <td style="padding: 8px; text-align: right; font-weight: normal; color: ${mutedTextColorDoc}; border-top: 1px solid ${borderColorDoc};">
@@ -121,7 +128,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
         <meta charset="UTF-8">
         <title>Invoice ${invoiceNumber}</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 0; color: ${textColorDoc}; font-size: 10pt; background-color: #f9fafb; }
+          body { font-family: ${fontFamilyDoc}; margin: 0; color: ${textColorDoc}; font-size: 10pt; background-color: #f9fafb; }
           .invoice-container { max-width: 800px; margin: 20px auto; padding: 30px; border: 1px solid ${borderColorDoc}; background-color: ${invoiceBgColor}; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
           .watermark-container-doc { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0; }
           .content-wrapper { position:relative; z-index:1; }
@@ -144,13 +151,15 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
           .items-table-doc th { padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt;}
           .items-table-doc .description-col { width: 40%; }
           .items-table-doc .qty-col { width: 10%; text-align: right;}
+          .items-table-doc .unit-col { width: 10%; text-align: right;}
           .items-table-doc .rate-col { width: 15%; text-align: right; }
           .items-table-doc .discount-col { width: 10%; text-align: right; }
-          .items-table-doc .amount-col { width: 25%; text-align: right; }
+          .items-table-doc .amount-col { width: 15%; text-align: right; }
 
-          .totals-summary-table { width: 40%; margin-left: auto; margin-bottom: 25px; font-size: 10pt; }
+
+          .totals-summary-table { width: 45%; margin-left: auto; margin-bottom: 25px; font-size: 10pt; } /* Adjusted width */
           .totals-summary-table td { padding: 8px; }
-          .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColorDoc}; background-color: ${primaryColorDoc}1A; /* Approx 10% opacity */ padding: 10px 12px; border-radius: 4px; }
+          .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColorDoc}; background-color: ${primaryColorDoc}1A; padding: 10px 12px; border-radius: 4px; }
           .grand-total-line td:first-child { color: ${primaryColorDoc}; }
           .grand-total-line td:last-child { color: ${primaryColorDoc}; }
 
@@ -158,7 +167,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
           .notes-section { margin-top: 25px; padding-top:15px; border-top: 1px solid ${borderColorDoc}; font-size: 9pt; color: ${mutedTextColorDoc}; }
           .notes-section h4 { font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0; }
           
-          .terms-section { margin-top: 20px; padding-top:10px; border-top: 1px solid ${borderColorDoc}; font-size: 7pt; color: ${mutedTextColorDoc}; } /* Finer text for T&C */
+          .terms-section { margin-top: 20px; padding-top:10px; border-top: 1px solid ${borderColorDoc}; font-size: 7pt; color: ${mutedTextColorDoc}; }
           .terms-section h4 { font-size: 8pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:0; }
 
 
@@ -167,14 +176,12 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
       </head>
       <body>
         <div class="invoice-container">
-          <!-- Watermark Layer -->
           ${watermarkDataUrl ? `
           <div class="watermark-container-doc">
             <img src="${watermarkDataUrl}" style="max-width: 80%; max-height: 70%; object-fit: contain; opacity: ${displayWatermarkOpacity};" alt="Watermark"/>
           </div>
           ` : ''}
 
-          <!-- Content Layer -->
           <div class="content-wrapper">
             <header class="header-section">
               <div class="header-left">
@@ -185,6 +192,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
                 <div class="invoice-title-doc">INVOICE</div>
                 <div><strong>Invoice No:</strong> ${invoiceNumber}</div>
                 <div><strong>Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</div>
+                ${parsedDueDate ? `<div><strong>Due Date:</strong> ${format(parsedDueDate, "MMMM d, yyyy")}</div>` : ''}
               </div>
             </header>
 
@@ -200,6 +208,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
                 <tr>
                   <th class="description-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: left;">Description</th>
                   <th class="qty-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Qty / Days</th>
+                  <th class="unit-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Unit</th>
                   <th class="rate-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Rate (₹)</th>
                   <th class="discount-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Disc (%)</th>
                   <th class="amount-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Amount (₹)</th>
@@ -213,7 +222,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
             <table class="totals-summary-table">
                 <tbody>
                     <tr>
-                        <td colspan="4" style="padding: 8px; text-align: right; font-weight: bold; color: ${mutedTextColorDoc}; border-top: 2px solid ${borderColorDoc};">
+                        <td colspan="5" style="padding: 8px; text-align: right; font-weight: bold; color: ${mutedTextColorDoc}; border-top: 2px solid ${borderColorDoc};">
                             SUBTOTAL:
                         </td>
                         <td style="padding: 8px; text-align: right; font-weight: bold; color: ${textColorDoc}; border-top: 2px solid ${borderColorDoc};">
@@ -222,7 +231,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
                     </tr>
                     ${globalDiscountHtml}
                     <tr class="grand-total-line">
-                         <td colspan="4" style="padding: 10px 12px; text-align: right; font-weight: bold; font-size: 14pt; color: ${primaryColorDoc};">
+                         <td colspan="5" style="padding: 10px 12px; text-align: right; font-weight: bold; font-size: 14pt; color: ${primaryColorDoc};">
                             TOTAL:
                         </td>
                         <td style="padding: 10px 12px; text-align: right; font-weight: bold; font-size: 14pt; color: ${primaryColorDoc};">
@@ -269,34 +278,34 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
       backgroundColor: elementToCapture.style.backgroundColor,
   };
   elementToCapture.style.opacity = '1';
-  elementToCapture.style.position = 'fixed'; // Use fixed to ensure it's in viewport if off-screen
-  elementToCapture.style.left = '0px'; // Position at top-left for capture
+  elementToCapture.style.position = 'fixed'; 
+  elementToCapture.style.left = '0px'; 
   elementToCapture.style.top = '0px';
   elementToCapture.style.zIndex = '10000'; 
   
   const isDarkTheme = document.documentElement.classList.contains('dark');
-  let themeClass = `theme-${data.themeColor || 'default'}`;
-  let invoiceBgVarName = '--invoice-background';
-  if(isDarkTheme) {
-     themeClass = `.dark .${themeClass}`; 
-  }
-  const hadThemeClass = elementToCapture.classList.contains(`theme-${data.themeColor || 'default'}`);
-  if (!hadThemeClass) elementToCapture.classList.add(`theme-${data.themeColor || 'default'}`);
+  let themeColorClass = `theme-${data.themeColor || 'default'}`;
+  let fontThemeClass = `font-theme-${data.fontTheme || 'default'}`;
+  
+  const hadThemeColorClass = elementToCapture.classList.contains(themeColorClass.split(" .")[1] || themeColorClass);
+  const hadFontThemeClass = elementToCapture.classList.contains(fontThemeClass);
+
+  if (!hadThemeColorClass) elementToCapture.classList.add(themeColorClass.split(" .")[1] || themeColorClass);
+  if (!hadFontThemeClass) elementToCapture.classList.add(fontThemeClass);
+
 
   const computedStyle = getComputedStyle(elementToCapture);
-  let docInvoiceBg = computedStyle.getPropertyValue(invoiceBgVarName).trim();
+  let docInvoiceBg = computedStyle.getPropertyValue('--invoice-background').trim();
   
   if (!docInvoiceBg) { 
     docInvoiceBg = isDarkTheme ? 'hsl(220, 15%, 15%)' : 'hsl(0, 0%, 100%)';
   }
   elementToCapture.style.backgroundColor = docInvoiceBg;
-  if (!hadThemeClass) elementToCapture.classList.remove(`theme-${data.themeColor || 'default'}`);
 
 
   await new Promise(resolve => setTimeout(resolve, 300)); 
 
   try {
-    console.log("Attempting html2canvas capture for PDF...");
     const canvas = await html2canvas(elementToCapture, {
       scale: 2, 
       useCORS: true,
@@ -315,10 +324,11 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
     elementToCapture.style.top = originalStyle.top;
     elementToCapture.style.zIndex = originalStyle.zIndex;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
+    if (!hadThemeColorClass) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
+    if (!hadFontThemeClass) elementToCapture.classList.remove(fontThemeClass);
 
 
     if (canvas.width === 0 || canvas.height === 0) {
-        console.error("html2canvas returned an empty canvas for PDF.");
         toast({ variant: "destructive", title: "PDF Error", description: "Canvas capture failed (empty canvas)." });
         throw new Error("Canvas capture failed for PDF (empty canvas)");
     }
@@ -343,12 +353,13 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
     elementToCapture.style.top = originalStyle.top;
     elementToCapture.style.zIndex = originalStyle.zIndex;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
+    if (!hadThemeColorClass) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
+    if (!hadFontThemeClass) elementToCapture.classList.remove(fontThemeClass);
     throw error; 
   }
 };
 
 export const generateDoc = async (data: StoredInvoiceData): Promise<void> => {
-  console.log("Generating DOC for:", data.invoiceNumber);
   const htmlContent = getInvoiceHtmlForDoc(data);
   const content = `
     <!DOCTYPE html>
@@ -390,28 +401,27 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   elementToCapture.style.zIndex = '10000';
   
   const isDarkTheme = document.documentElement.classList.contains('dark');
-  let themeClass = `theme-${data.themeColor || 'default'}`;
-  let invoiceBgVarName = '--invoice-background';
-   if(isDarkTheme) {
-     themeClass = `.dark .${themeClass}`;
-  }
-  const hadThemeClass = elementToCapture.classList.contains(`theme-${data.themeColor || 'default'}`);
-  if (!hadThemeClass) elementToCapture.classList.add(`theme-${data.themeColor || 'default'}`);
+  let themeColorClass = `theme-${data.themeColor || 'default'}`;
+  let fontThemeClass = `font-theme-${data.fontTheme || 'default'}`;
+
+  const hadThemeColorClass = elementToCapture.classList.contains(themeColorClass.split(" .")[1] || themeColorClass);
+  const hadFontThemeClass = elementToCapture.classList.contains(fontThemeClass);
+
+  if (!hadThemeColorClass) elementToCapture.classList.add(themeColorClass.split(" .")[1] || themeColorClass);
+  if (!hadFontThemeClass) elementToCapture.classList.add(fontThemeClass);
   
   const computedStyle = getComputedStyle(elementToCapture);
-  let docInvoiceBg = computedStyle.getPropertyValue(invoiceBgVarName).trim();
+  let docInvoiceBg = computedStyle.getPropertyValue('--invoice-background').trim();
 
   if (!docInvoiceBg) {
     docInvoiceBg = isDarkTheme ? 'hsl(220, 15%, 15%)' : 'hsl(0, 0%, 100%)';
   }
   elementToCapture.style.backgroundColor = docInvoiceBg;
-  if (!hadThemeClass) elementToCapture.classList.remove(`theme-${data.themeColor || 'default'}`);
 
 
   await new Promise(resolve => setTimeout(resolve, 300));
 
   try {
-    console.log("Attempting html2canvas capture for JPEG...");
     const canvas = await html2canvas(elementToCapture, {
         scale: 1.5, 
         useCORS: true,
@@ -430,10 +440,11 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
     elementToCapture.style.top = originalStyle.top;
     elementToCapture.style.zIndex = originalStyle.zIndex;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
+    if (!hadThemeColorClass) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
+    if (!hadFontThemeClass) elementToCapture.classList.remove(fontThemeClass);
 
 
     if (canvas.width === 0 || canvas.height === 0) {
-        console.error("html2canvas returned an empty canvas for JPEG.");
         toast({ variant: "destructive", title: "JPEG Error", description: "Canvas capture failed (empty canvas)." });
         throw new Error("Canvas capture failed for JPEG (empty canvas)");
     }
@@ -450,6 +461,8 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
     elementToCapture.style.top = originalStyle.top;
     elementToCapture.style.zIndex = originalStyle.zIndex;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
+    if (!hadThemeColorClass) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
+    if (!hadFontThemeClass) elementToCapture.classList.remove(fontThemeClass);
     throw error;
   }
 };

@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, parseISO, isValid } from 'date-fns';
-import { Eye, Edit, Download, Trash2, AlertTriangle, Loader2, ListChecks, FilePlus2, Search } from 'lucide-react';
+import { Eye, Edit, Download, Trash2, AlertTriangle, Loader2, ListChecks, FilePlus2, Search, Copy } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import type { StoredInvoiceData } from '@/lib/invoice-types';
-import { getAllInvoices, removeInvoiceData } from '@/lib/invoice-store';
+import { getAllInvoices, removeInvoiceData, getInvoiceData, saveInvoiceData } from '@/lib/invoice-store';
 
 export default function InvoiceList() {
   const [allInvoices, setAllInvoices] = useState<StoredInvoiceData[]>([]);
@@ -63,6 +63,18 @@ export default function InvoiceList() {
     toast({ title: "Invoice Deleted", description: "The invoice has been removed successfully.", variant: "default" });
   };
 
+  const handleDuplicate = (invoiceIdToDuplicate: string) => {
+    const sourceInvoice = getInvoiceData(invoiceIdToDuplicate);
+    if (!sourceInvoice) {
+      toast({ title: "Duplication Error", description: "Could not find the original invoice to duplicate.", variant: "destructive" });
+      return;
+    }
+    // No need to create a new StoredInvoiceData object here;
+    // The InvoiceForm will handle the creation of a new ID and modified invoice number
+    // when it loads with the `duplicate` query parameter.
+    router.push(`/invoice/details?duplicate=${invoiceIdToDuplicate}`);
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[300px]">
@@ -77,7 +89,7 @@ export default function InvoiceList() {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
   };
   
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
     if (!dateString || !isValid(parseISO(dateString))) return 'N/A';
     return format(parseISO(dateString), "MMM d, yyyy");
   }
@@ -108,7 +120,7 @@ export default function InvoiceList() {
             </CardTitle>
             <CardDescription className="text-muted-foreground max-w-sm mx-auto">
               {searchTerm 
-                ? "Try adjusting your search term." 
+                ? "Try adjusting your search term or clear the search." 
                 : "It looks like you haven't created any invoices. Get started by creating your first one."
               }
             </CardDescription>
@@ -130,62 +142,67 @@ export default function InvoiceList() {
                 <CardDescription>A list of your recent invoices.</CardDescription>
             </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="whitespace-nowrap">Invoice #</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="whitespace-nowrap">Date</TableHead>
-                  <TableHead className="text-right whitespace-nowrap min-w-[100px]">Amount</TableHead>
-                  <TableHead className="text-center min-w-[160px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInvoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-medium whitespace-nowrap">{invoice.invoiceNumber}</TableCell>
-                    <TableCell>{invoice.customerName}</TableCell>
-                    <TableCell className="whitespace-nowrap">{formatDate(invoice.invoiceDate)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatCurrency(invoice.totalFee)}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex justify-center items-center gap-1 sm:gap-2">
-                        <Button variant="ghost" size="icon" asChild title="Preview Invoice">
-                          <Link href={`/invoice/preview/${invoice.id}`}><Eye className="h-4 w-4" /></Link>
-                        </Button>
-                        <Button variant="ghost" size="icon" asChild title="Edit Invoice">
-                          <Link href={`/invoice/details?id=${invoice.id}`}><Edit className="h-4 w-4" /></Link>
-                        </Button>
-                        <Button variant="ghost" size="icon" asChild title="Download Invoice">
-                           <Link href={`/invoice/download/${invoice.id}`}><Download className="h-4 w-4" /></Link>
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" title="Delete Invoice" className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the invoice
-                                <span className="font-semibold"> {invoice.invoiceNumber}</span>.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(invoice.id)} className="bg-destructive hover:bg-destructive/90">
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Invoice #</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead className="whitespace-nowrap">Date</TableHead>
+                    <TableHead className="text-right whitespace-nowrap min-w-[100px]">Amount</TableHead>
+                    <TableHead className="text-center min-w-[200px]">Actions</TableHead> {/* Increased min-width for more buttons */}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredInvoices.map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium whitespace-nowrap">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>{invoice.customerName}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatDate(invoice.invoiceDate)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{formatCurrency(invoice.totalFee)}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex justify-center items-center gap-1 sm:gap-2 flex-wrap">
+                          <Button variant="ghost" size="icon" asChild title="Preview Invoice">
+                            <Link href={`/invoice/preview/${invoice.id}`}><Eye className="h-4 w-4" /></Link>
+                          </Button>
+                          <Button variant="ghost" size="icon" asChild title="Edit Invoice">
+                            <Link href={`/invoice/details?id=${invoice.id}`}><Edit className="h-4 w-4" /></Link>
+                          </Button>
+                          <Button variant="ghost" size="icon" title="Duplicate Invoice" onClick={() => handleDuplicate(invoice.id)}>
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" asChild title="Download Options">
+                            <Link href={`/invoice/download/${invoice.id}`}><Download className="h-4 w-4" /></Link>
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" title="Delete Invoice" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the invoice
+                                  <span className="font-semibold"> {invoice.invoiceNumber}</span>.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(invoice.id)} className="bg-destructive hover:bg-destructive/90">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

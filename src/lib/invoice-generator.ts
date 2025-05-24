@@ -44,7 +44,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
        </div>`
     : '';
 
-  const primaryColor = 'hsl(var(--invoice-primary-color, 217, 91%, 60%))'; // Using HSL string for consistency
+  const primaryColor = 'hsl(var(--invoice-primary-color, 217, 91%, 60%))';
   const textColor = 'hsl(var(--invoice-text, 220, 15%, 25%))';
   const mutedTextColor = 'hsl(var(--invoice-muted-text, 220, 10%, 45%))';
   const borderColor = 'hsl(var(--invoice-border-color, 220, 15%, 88%))';
@@ -100,7 +100,6 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
 
           .client-info-section { display: table; width: 100%; margin-bottom: 25px; }
           .client-info-left { display: table-cell; vertical-align: top; width: 50%; font-size: 9.5pt; }
-          /* .client-info-right removed as global service dates are gone */
           .client-info-section h3 { font-size: 9pt; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; margin-bottom: 4px; margin-top:0; }
           .client-info-section p { margin: 0 0 3px 0; color: ${textColor}; }
           
@@ -113,7 +112,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
           .items-table-doc .amount-col { width: 20%; text-align: right; }
           
           .totals-section { text-align: right; margin-top: 20px; margin-bottom: 25px; font-size: 10pt; }
-          .totals-section .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColor}; background-color: hsla(var(--invoice-primary-color-hsl, 217, 91%, 60%), 0.1); padding: 8px; margin-top:8px; border-radius: 4px;} /* Adjusted background for HSL */
+          .totals-section .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColor}; background-color: hsla(var(--invoice-primary-color-hsl, 217, 91%, 60%), 0.1); padding: 8px; margin-top:8px; border-radius: 4px;}
           
           .notes-section { margin-top: 25px; padding-top:15px; border-top: 1px solid ${borderColor}; font-size: 9pt; color: ${mutedTextColor}; }
           .notes-section h4 { font-size: 9pt; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; margin-bottom: 4px; margin-top:0; }
@@ -309,7 +308,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
 
     const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9); 
     simulateDownload(`invoice_${data.invoiceNumber}.jpeg`, jpegDataUrl, 'image/jpeg', true);
-  } catch (error)_ {
+  } catch (error) {
     console.error("Error generating JPEG with html2canvas:", error);
     toast({ variant: "destructive", title: "JPEG Generation Error", description: "Could not generate JPEG. Check console." });
     throw error;

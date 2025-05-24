@@ -3,12 +3,11 @@
 
 import type { StoredInvoiceData } from "@/lib/invoice-types";
 import { format, parseISO, isValid, differenceInCalendarDays } from "date-fns";
-import Image from "next/image"; // Keep for company logo for now
+import Image from "next/image"; // Keep for company logo
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
-  watermarkDataUrl?: string | null; // Explicitly pass watermark URL
-  // watermarkOpacity is now part of data
+  // watermarkDataUrl and watermarkOpacity are now part of data
 }
 
 const formatCurrency = (amount?: number) => {
@@ -26,8 +25,8 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     items,
     totalFee,
     invoiceNotes,
-    watermarkDataUrl, // Get from data
-    watermarkOpacity, // Get from data
+    watermarkDataUrl,
+    watermarkOpacity,
   } = data;
 
   const defaultDisplayDate = new Date();
@@ -37,30 +36,24 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
 
   return (
     <div className="bg-[var(--invoice-background)] text-[var(--invoice-text)] font-sans shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white"
-         style={{ width: '100%', border: '1px solid var(--invoice-border-color)', borderRadius: '0.5rem', overflow: 'hidden', position: 'relative' }}> {/* Added position relative */}
+         style={{ width: '100%', border: '1px solid var(--invoice-border-color)', borderRadius: '0.5rem', overflow: 'hidden', position: 'relative' }}>
       
       {watermarkDataUrl && (
-        <div
-          className="absolute inset-0 flex items-center justify-center pointer-events-none"
-          style={{ 
-            zIndex: 0,
-            opacity: displayWatermarkOpacity,
+        <img
+          src={watermarkDataUrl}
+          alt="Watermark"
+          className="absolute inset-0 m-auto pointer-events-none" // Centering with m-auto
+          style={{
+            width: 'auto', // Allow natural width based on height constraint
+            height: 'auto', // Allow natural height based on width constraint
+            maxWidth: '80%', // Max width relative to parent
+            maxHeight: '60%', // Max height relative to parent
+            objectFit: 'contain',
+            zIndex: 0, // Watermark behind content
+            opacity: displayWatermarkOpacity, // Apply opacity directly here
           }}
           data-ai-hint="abstract pattern"
-        >
-          {/* Use standard img tag for better html2canvas compatibility */}
-          <img 
-            src={watermarkDataUrl}
-            alt="Watermark"
-            style={{
-              width: '80%', 
-              height: 'auto',
-              maxWidth: '600px', 
-              maxHeight: '80%',
-              objectFit: 'contain',
-            }}
-          />
-        </div>
+        />
       )}
 
       <div className="relative p-6 sm:p-8 md:p-10" style={{ zIndex: 1 }}> {/* Ensure content is above watermark */}
@@ -68,7 +61,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
           <div className="flex items-center gap-4 mb-4 sm:mb-0">
             {companyLogoDataUrl && (
               <div className="relative w-20 h-20 sm:w-24 sm:h-24 print:w-16 print:h-16 shrink-0" data-ai-hint="company brand">
-                <Image src={companyLogoDataUrl} alt={`${companyName || 'Company'} Logo`} layout="fill" objectFit="contain" />
+                <Image src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} layout="fill" objectFit="contain" />
               </div>
             )}
             <div>
@@ -109,11 +102,13 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                   items.map((item, index) => {
                     const itemStartDate = item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? parseISO(item.itemStartDate) : null;
                     const itemEndDate = item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? parseISO(item.itemEndDate) : null;
-                    let displayQuantity = item.quantity;
+                    let displayQuantity = Number(item.quantity) || 0;
                     
                     if (itemStartDate && itemEndDate && itemEndDate >= itemStartDate) {
                         displayQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
                     }
+
+                    const itemRate = Number(item.rate) || 0;
 
                     return (
                     <tr key={item.id || index} className="bg-[var(--invoice-background)] hover:bg-[var(--invoice-header-bg)]/50 print:bg-white">
@@ -129,10 +124,10 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                         {displayQuantity}
                       </td>
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700">
-                        {formatCurrency(item.rate)}
+                        {formatCurrency(itemRate)}
                       </td>
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-black">
-                        {formatCurrency(displayQuantity * item.rate)}
+                        {formatCurrency(displayQuantity * itemRate)}
                       </td>
                     </tr>
                   )})
@@ -171,3 +166,4 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     </div>
   );
 };
+

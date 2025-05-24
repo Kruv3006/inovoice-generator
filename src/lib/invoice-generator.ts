@@ -39,18 +39,17 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     : '';
   
   const watermarkHtml = watermarkDataUrl 
-    ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: ${displayWatermarkOpacity}; pointer-events: none; z-index: 0; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
-         <img src="${watermarkDataUrl}" style="max-width: 70%; max-height: 70%; object-fit: contain;" alt="Watermark"/>
+    ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 0; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
+         <img src="${watermarkDataUrl}" style="max-width: 70%; max-height: 70%; object-fit: contain; opacity: ${displayWatermarkOpacity};" alt="Watermark"/>
        </div>`
     : '';
 
-  // Attempt to use CSS variables for DOC, though Word's support is limited. Fallbacks are crucial.
-  const primaryColor = 'hsl(var(--invoice-primary-color, 217, 91%, 60%))'; // Fallback: #1D4ED8
-  const textColor = 'hsl(var(--invoice-text, 220, 15%, 25%))'; // Fallback: #334155
-  const mutedTextColor = 'hsl(var(--invoice-muted-text, 220, 10%, 45%))'; // Fallback: #64748B
-  const borderColor = 'hsl(var(--invoice-border-color, 220, 15%, 88%))'; // Fallback: #E0E7FF
-  const headerBgColor = 'hsl(var(--invoice-header-bg, 220, 20%, 97%))'; // Fallback: #F8FAFC
-  const invoiceBgColor = 'hsl(var(--invoice-background, 0, 0%, 100%))'; // Fallback: #FFFFFF
+  const primaryColor = 'hsl(var(--invoice-primary-color, 217, 91%, 60%))'; 
+  const textColor = 'hsl(var(--invoice-text, 220, 15%, 25%))'; 
+  const mutedTextColor = 'hsl(var(--invoice-muted-text, 220, 10%, 45%))'; 
+  const borderColor = 'hsl(var(--invoice-border-color, 220, 15%, 88%))'; 
+  const headerBgColor = 'hsl(var(--invoice-header-bg, 220, 20%, 97%))'; 
+  const invoiceBgColor = 'hsl(var(--invoice-background, 0, 0%, 100%))';
 
 
   let itemsHtml = '';
@@ -58,20 +57,21 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     items.forEach(item => {
       const itemStartDate = item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? parseISO(item.itemStartDate) : null;
       const itemEndDate = item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? parseISO(item.itemEndDate) : null;
-      let displayQuantity = item.quantity;
+      let displayQuantity = Number(item.quantity) || 0;
       let dateRangeHtml = '';
 
       if (itemStartDate && itemEndDate && itemEndDate >= itemStartDate) {
           displayQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
           dateRangeHtml = `<div style="font-size: 8pt; color: ${mutedTextColor}; margin-top: 3px;">(${format(itemStartDate, "MMM d, yyyy")} - ${format(itemEndDate, "MMM d, yyyy")})</div>`;
       }
+      const itemRate = Number(item.rate) || 0;
 
       itemsHtml += `
         <tr style="background-color: ${invoiceBgColor};">
           <td style="padding: 10px; border: 1px solid ${borderColor}; vertical-align: top; color: ${textColor};">${item.description}${dateRangeHtml}</td>
           <td style="padding: 10px; border: 1px solid ${borderColor}; vertical-align: top; text-align: right; color: ${mutedTextColor};">${displayQuantity}</td>
-          <td style="padding: 10px; border: 1px solid ${borderColor}; vertical-align: top; text-align: right; color: ${mutedTextColor};">${fCurrency(item.rate)}</td>
-          <td style="padding: 10px; border: 1px solid ${borderColor}; vertical-align: top; text-align: right; color: ${textColor};">${fCurrency(displayQuantity * item.rate)}</td>
+          <td style="padding: 10px; border: 1px solid ${borderColor}; vertical-align: top; text-align: right; color: ${mutedTextColor};">${fCurrency(itemRate)}</td>
+          <td style="padding: 10px; border: 1px solid ${borderColor}; vertical-align: top; text-align: right; color: ${textColor};">${fCurrency(displayQuantity * itemRate)}</td>
         </tr>
       `;
     });
@@ -188,7 +188,6 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
       throw new Error("Capture element (PDF) has no dimensions.");
   }
   
-  // Make element visible for capture
   const originalStyle = {
       opacity: elementToCapture.style.opacity,
       position: elementToCapture.style.position,
@@ -206,7 +205,7 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
   elementToCapture.style.backgroundColor = `hsl(${docInvoiceBg})`;
 
 
-  await new Promise(resolve => setTimeout(resolve, 300)); // Short delay for rendering
+  await new Promise(resolve => setTimeout(resolve, 300)); 
 
   try {
     const canvas = await html2canvas(elementToCapture, {
@@ -221,7 +220,6 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
       removeContainer: true, 
     });
 
-    // Restore original styles
     elementToCapture.style.opacity = originalStyle.opacity; 
     elementToCapture.style.position = originalStyle.position;
     elementToCapture.style.left = originalStyle.left;
@@ -250,7 +248,6 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
     console.error("Error generating PDF with html2canvas:", error);
     toast({ variant: "destructive", title: "PDF Generation Error", description: "Could not generate PDF. Check console." });
     
-    // Restore original styles even on error
     elementToCapture.style.opacity = originalStyle.opacity; 
     elementToCapture.style.position = originalStyle.position;
     elementToCapture.style.left = originalStyle.left;
@@ -290,7 +287,6 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
       throw new Error("Capture element (JPEG) has no dimensions.");
   }
   
-  // Make element visible for capture
   const originalStyle = {
       opacity: elementToCapture.style.opacity,
       position: elementToCapture.style.position,
@@ -308,14 +304,14 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   elementToCapture.style.backgroundColor = `hsl(${docInvoiceBg})`;
 
 
-  await new Promise(resolve => setTimeout(resolve, 300)); // Short delay for rendering
+  await new Promise(resolve => setTimeout(resolve, 300)); 
 
   try {
     const canvas = await html2canvas(elementToCapture, {
         scale: 1.5, 
         useCORS: true,
         logging: true,
-        backgroundColor: `hsl(${docInvoiceBg})`, // Explicitly set for JPEG
+        backgroundColor: `hsl(${docInvoiceBg})`, 
         scrollX: -window.scrollX,
         scrollY: -window.scrollY,
         windowWidth: elementToCapture.scrollWidth,
@@ -323,7 +319,6 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
         removeContainer: true,
     });
 
-    // Restore original styles
     elementToCapture.style.opacity = originalStyle.opacity; 
     elementToCapture.style.position = originalStyle.position;
     elementToCapture.style.left = originalStyle.left;
@@ -344,13 +339,13 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
     console.error("Error generating JPEG with html2canvas:", error);
     toast({ variant: "destructive", title: "JPEG Generation Error", description: "Could not generate JPEG. Check console." });
     
-    // Restore original styles even on error
     elementToCapture.style.opacity = originalStyle.opacity; 
     elementToCapture.style.position = originalStyle.position;
     elementToCapture.style.left = originalStyle.left;
     elementToCapture.style.top = originalStyle.top;
     elementToCapture.style.zIndex = originalStyle.zIndex;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
-    throw error;
+    // throw error; // Removed throw to prevent unhandled rejection if toast is sufficient
   }
 };
+

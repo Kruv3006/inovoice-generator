@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -34,7 +35,6 @@ export default function InvoicePreview() {
       }
       setIsLoading(false);
     } else {
-      // Should not happen if route is matched correctly, but good fallback
       toast({
           title: "Invalid Access",
           description: "No invoice ID provided for preview. Redirecting.",
@@ -56,20 +56,22 @@ export default function InvoicePreview() {
 
   if (!invoiceData) {
     return (
-      <Card className="m-auto mt-10 max-w-lg text-center shadow-xl">
-        <CardHeader>
-          <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
-          <CardTitle>Invoice Data Not Found</CardTitle>
-          <CardDescription>
-            We couldn't retrieve the details for this invoice. It might have been cleared or the link is invalid.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={() => router.push('/invoice/details')}>
-            <Edit className="mr-2 h-4 w-4" /> Create a New Invoice
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="container mx-auto px-4 py-8">
+        <Card className="m-auto mt-10 max-w-lg text-center shadow-xl">
+          <CardHeader>
+            <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
+            <CardTitle>Invoice Data Not Found</CardTitle>
+            <CardDescription>
+              We couldn't retrieve the details for this invoice. It might have been cleared or the link is invalid.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push('/invoice/details')}>
+              <Edit className="mr-2 h-4 w-4" /> Create a New Invoice
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -77,27 +79,25 @@ export default function InvoicePreview() {
     <div className="py-8">
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <h1 className="text-3xl font-bold text-primary">Invoice Preview</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-primary">Invoice Preview</h1>
           <div className="flex gap-2 flex-wrap justify-center">
-            <Button onClick={() => router.push(`/invoice/details?id=${invoiceId}`)} variant="outline">
+            <Button onClick={() => router.push(`/invoice/details?id=${invoiceId}`)} variant="outline" className="bg-card hover:bg-accent/80">
               <Edit className="mr-2 h-4 w-4" /> Edit Invoice
             </Button>
-             <Button onClick={() => router.push('/')} variant="outline">
+             <Button onClick={() => router.push('/')} variant="outline" className="bg-card hover:bg-accent/80">
               <Home className="mr-2 h-4 w-4" /> Go Home
             </Button>
           </div>
         </div>
 
-        <Card className="shadow-xl mb-8 overflow-hidden">
-          <CardContent className="p-0">
-            <div className="bg-background">
-              {/* Ensure invoiceData is passed correctly, especially watermarkDataUrl */}
-              <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Invoice Template Wrapper for consistent styling and scaling */}
+        <div className="mx-auto w-full max-w-4xl"> 
+          <div className="transform scale-[0.9] sm:scale-[1] origin-top"> {/* Adjust scale for smaller screens if needed, or remove scale */}
+             <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />
+          </div>
+        </div>
         
-        <div className="flex justify-end">
+        <div className="flex justify-center md:justify-end mt-8">
             <Button 
                 onClick={() => router.push(`/invoice/download/${invoiceId}`)} 
                 size="lg"

@@ -15,7 +15,7 @@
     --primary-foreground: 0 0% 100%; /* White text on Blue */
     --secondary: 220 15% 90%; /* Lighter gray for secondary elements */
     --secondary-foreground: 220 10% 30%;
-    --muted: 220 15% 85%;
+    --muted: 220 15% 92%; /* Slightly lighter muted for subtle backgrounds */
     --muted-foreground: 220 10% 45%;
     --accent: 30 95% 58%; /* Vibrant Orange */
     --accent-foreground: 0 0% 100%; /* White text on Orange */
@@ -39,6 +39,14 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Invoice specific variables */
+    --invoice-background: 0 0% 100%;
+    --invoice-text: 220 15% 20%;
+    --invoice-muted-text: 220 10% 40%;
+    --invoice-primary-color: 217 91% 55%;
+    --invoice-border-color: 220 15% 85%;
+    --invoice-header-bg: 220 20% 95%;
   }
   .dark {
     --background: 220 15% 12%; /* Darker blue-gray background */
@@ -51,7 +59,7 @@
     --primary-foreground: 0 0% 100%; 
     --secondary: 220 15% 25%; /* Darker gray for secondary elements */
     --secondary-foreground: 220 15% 85%;
-    --muted: 220 15% 30%;
+    --muted: 220 15% 22%; /* Darker muted for subtle backgrounds */
     --muted-foreground: 220 10% 65%;
     --accent: 30 90% 60%; /* Keep accent orange vibrant */
     --accent-foreground: 0 0% 10%; 
@@ -74,6 +82,14 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Invoice specific variables - Dark theme */
+    --invoice-background: 220 15% 15%;
+    --invoice-text: 220 15% 92%;
+    --invoice-muted-text: 220 10% 60%;
+    --invoice-primary-color: 217 91% 65%;
+    --invoice-border-color: 220 15% 35%;
+    --invoice-header-bg: 220 15% 20%;
   }
 }
 

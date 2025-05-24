@@ -11,7 +11,7 @@ import type { StoredInvoiceData } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { generatePdf, generateDoc, generateJpeg } from '@/lib/invoice-generator';
-import { format, parseISO } from 'date-fns'; // Added missing imports
+import { format, parseISO } from 'date-fns';
 
 export default function InvoiceDownloadPage() {
   const router = useRouter();
@@ -57,23 +57,23 @@ export default function InvoiceDownloadPage() {
       toast({ title: "Error", description: "Invoice data not available for generation.", variant: "destructive" });
       return;
     }
-    // For PDF and JPEG, elementToCapture is crucial. For DOC, it's not directly used in the same way.
-    if ((formatName === 'PDF' || formatName === 'JPEG') && !invoiceTemplateRef.current) {
-        toast({ title: "Error", description: "Invoice template element not ready for generation.", variant: "destructive" });
-        return;
+    
+    if ((formatName === 'PDF' || formatName === 'JPEG')) {
+        if (!invoiceTemplateRef.current) {
+             toast({ title: "Error", description: "Invoice template element not ready for generation.", variant: "destructive" });
+             return;
+        }
+        // Ensure the hidden template is styled to be 'visible' for html2canvas
+        // These styles are applied directly before capture in invoice-generator.ts
     }
+
 
     setIsGenerating(true);
     toast({ title: `Generating ${formatName}...`, description: "Please wait." });
     try {
-      // Pass companyLogoDataUrl to generator if available, along with watermark.
-      // The generator functions themselves decide how to use these based on their internal logic.
-      // For PDF/JPEG, the templateRef already has these rendered if they exist.
-      // For DOC, the generator function's HTML builder needs them.
       if (formatName === 'PDF' || formatName === 'JPEG') {
         await generator(invoiceData, invoiceData.watermarkDataUrl || undefined, invoiceTemplateRef.current);
       } else { 
-        // DOC generator takes watermark directly, and its HTML builder will use companyLogoDataUrl from invoiceData
         await generator(invoiceData, invoiceData.watermarkDataUrl || undefined);
       }
       toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
@@ -114,35 +114,36 @@ export default function InvoiceDownloadPage() {
   }
 
   return (
-    <div className="py-8">
+    <div className="py-8 bg-muted/40 dark:bg-muted/20 min-h-[calc(100vh-4rem)]">
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <h1 className="text-3xl font-bold text-primary">Download Your Invoice</h1>
           <div className="flex gap-2 flex-wrap justify-center">
-             <Button onClick={() => router.push(`/invoice/preview/${invoiceId}`)} variant="outline">
+             <Button onClick={() => router.push(`/invoice/preview/${invoiceId}`)} variant="outline" className="bg-card hover:bg-accent/80">
               <Eye className="mr-2 h-4 w-4" /> Back to Preview
             </Button>
-            <Button onClick={() => router.push(`/invoice/details?id=${invoiceId}`)} variant="outline">
+            <Button onClick={() => router.push(`/invoice/details?id=${invoiceId}`)} variant="outline" className="bg-card hover:bg-accent/80">
               <Edit className="mr-2 h-4 w-4" /> Edit Invoice
             </Button>
-             <Button onClick={() => router.push('/')} variant="outline">
+             <Button onClick={() => router.push('/')} variant="outline" className="bg-card hover:bg-accent/80">
               <Home className="mr-2 h-4 w-4" /> Go Home
             </Button>
           </div>
         </div>
         
-        {/* Hidden invoice template for html2canvas capture. Ensure it's fully rendered and styled. */}
+        {/* Hidden invoice template for html2canvas capture. Crucial for PDF/JPEG. */}
+        {/* Styling ensures it's off-screen but rendered with full dimensions for capture. */}
         <div 
-          className="fixed top-0 left-[-9999px] opacity-100 z-[1] bg-transparent print:hidden"
+          className="fixed top-0 left-[-9999px] opacity-100 z-[-1] print:hidden"
+          aria-hidden="true" 
         > 
-            <div ref={invoiceTemplateRef} className="bg-card print:bg-white" style={{ width: '800px' }}>
-              {/* Pass companyLogoDataUrl here as well */}
+            <div ref={invoiceTemplateRef} className="bg-transparent print:bg-white" style={{ width: '800px', padding: '0', margin: '0' }}> {/* Ensure this width matches desired output */}
               {invoiceData && <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />}
             </div>
         </div>
 
 
-        <Card className="shadow-lg rounded-lg">
+        <Card className="shadow-xl rounded-lg">
           <CardHeader>
             <CardTitle className="text-xl">Choose Download Format</CardTitle>
             <CardDescription>Select your preferred format to download invoice <span className="font-semibold">{invoiceData.invoiceNumber}</span>.</CardDescription>

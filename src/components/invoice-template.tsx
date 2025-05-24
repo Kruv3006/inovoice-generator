@@ -3,6 +3,7 @@
 
 import type { StoredInvoiceData } from "@/lib/invoice-types";
 import { format, parseISO, isValid, differenceInCalendarDays } from "date-fns";
+import { cn } from "@/lib/utils"; // Added this import
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
@@ -214,3 +215,4 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     </div>
   );
 };
+

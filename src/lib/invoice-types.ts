@@ -26,7 +26,7 @@ export const lineItemSchema = z.object({
     (val) => {
       const strVal = String(val).replace(/[^0-9.]+/g, "");
       const num = parseFloat(strVal);
-      return isNaN(num) || num < 0 ? 0 : (num > 100 ? 100 : num); // Allow 0, default to 0, max 100
+      return isNaN(num) || num < 0 ? 0 : (num > 100 ? 100 : num);
     },
     z.number({ invalid_type_error: "Discount must be a number."})
      .min(0, { message: "Discount must be non-negative." })
@@ -63,6 +63,16 @@ export const invoiceFormSchema = z.object({
   invoiceDate: z.date({ required_error: "Invoice date is required." }),
   items: z.array(lineItemSchema).min(1, "At least one item is required."),
 
+  globalDiscountType: z.enum(['percentage', 'fixed']).optional().default('percentage'),
+  globalDiscountValue: z.preprocess(
+    (val) => {
+      const strVal = String(val).replace(/[^0-9.]+/g, "");
+      const num = parseFloat(strVal);
+      return isNaN(num) || num < 0 ? 0 : num;
+    },
+    z.number().min(0, "Discount value must be non-negative.").optional().default(0)
+  ),
+
   watermarkFile: z.custom<FileList>((val) => val === undefined || (val instanceof FileList && val.length > 0), "Please upload a file or ensure no file is selected")
     .refine((files) => files === undefined || !files || files.length === 0 || files[0].size <= 5 * 1024 * 1024, `Max file size is 5MB.`)
     .refine(
@@ -72,6 +82,7 @@ export const invoiceFormSchema = z.object({
     .optional(),
   watermarkOpacity: z.number().min(0).max(1).optional().default(0.05),
   invoiceNotes: z.string().optional(),
+  themeColor: z.string().optional().default('default'),
 });
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
@@ -79,9 +90,9 @@ export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
 export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEndDate' | 'discount'> {
   itemStartDate?: string;
   itemEndDate?: string;
-  discount?: number; // Ensure discount is here
+  discount?: number;
 }
-export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'watermarkOpacity' | 'invoiceNotes'> {
+export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'watermarkOpacity' | 'invoiceNotes' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor'> {
   id: string;
   invoiceDate: string;
   companyLogoDataUrl?: string | null;
@@ -89,7 +100,11 @@ export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyL
   watermarkOpacity: number;
   invoiceNotes?: string;
   items: StoredLineItem[];
-  totalFee: number;
+  subTotal: number; // Sum of line items before global discount
+  globalDiscountType?: 'percentage' | 'fixed';
+  globalDiscountValue?: number;
+  totalFee: number; // Final total after global discount
+  themeColor?: string;
 }
 
 // Settings Page Types
@@ -108,5 +123,4 @@ export interface SavedItemData {
   id: string;
   description: string;
   rate: number;
-  // Note: discount is not part of saved items for now, can be added if needed
 }

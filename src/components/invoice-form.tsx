@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, User, ListCollapse, Percent } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, MinusCircle } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -38,6 +38,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { InvoiceFormSchemaType, StoredInvoiceData, LineItem, StoredLineItem, ClientData, SavedItemData, CompanyProfileData } from "@/lib/invoice-types";
@@ -74,8 +75,7 @@ export function InvoiceForm() {
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
-  const [calculatedTotalFee, setCalculatedTotalFee] = useState<number>(0);
-
+  
   const [clients, setClients] = useState<ClientData[]>([]);
   const [savedItems, setSavedItems] = useState<SavedItemData[]>([]);
 
@@ -97,10 +97,13 @@ export function InvoiceForm() {
     companyName: "",
     invoiceDate: new Date(),
     items: [defaultItem],
+    globalDiscountType: 'percentage',
+    globalDiscountValue: 0,
     invoiceNotes: "",
     companyLogoFile: undefined,
     watermarkFile: undefined,
     watermarkOpacity: 0.05,
+    themeColor: 'default',
   };
 
   const form = useForm<InvoiceFormSchemaType>({
@@ -118,6 +121,11 @@ export function InvoiceForm() {
 
   const watchedItems = watch("items");
   const watchedWatermarkOpacity = watch("watermarkOpacity");
+  const watchedGlobalDiscountType = watch("globalDiscountType");
+  const watchedGlobalDiscountValue = watch("globalDiscountValue");
+
+  const [calculatedSubTotal, setCalculatedSubTotal] = useState<number>(0);
+  const [calculatedTotalFee, setCalculatedTotalFee] = useState<number>(0);
 
   useEffect(() => {
     setClients(getClients());
@@ -125,8 +133,8 @@ export function InvoiceForm() {
   }, []);
 
   useEffect(() => {
+    let subTotal = 0;
     if (watchedItems) {
-      let total = 0;
       watchedItems.forEach((item) => {
         let quantity = Number(item.quantity) || 0;
         const rate = Number(item.rate) || 0;
@@ -137,11 +145,27 @@ export function InvoiceForm() {
           quantity = days;
         }
         const itemSubtotal = quantity * rate;
-        total += itemSubtotal * (1 - discount / 100);
+        subTotal += itemSubtotal * (1 - discount / 100);
       });
-      setCalculatedTotalFee(total);
     }
-  }, [watchedItems]);
+    setCalculatedSubTotal(subTotal);
+
+    let finalTotal = subTotal;
+    const discountValue = Number(watchedGlobalDiscountValue) || 0;
+
+    if (watchedGlobalDiscountType === 'percentage') {
+      if (discountValue > 0 && discountValue <= 100) {
+        finalTotal = subTotal * (1 - discountValue / 100);
+      }
+    } else if (watchedGlobalDiscountType === 'fixed') {
+      if (discountValue > 0) {
+        finalTotal = Math.max(0, subTotal - discountValue);
+      }
+    }
+    setCalculatedTotalFee(finalTotal);
+
+  }, [watchedItems, watchedGlobalDiscountType, watchedGlobalDiscountValue]);
+
 
   useEffect(() => {
     const invoiceIdToEdit = searchParams.get('id');
@@ -177,6 +201,9 @@ export function InvoiceForm() {
           watermarkFile: undefined,
           watermarkOpacity: data.watermarkOpacity ?? baseFormValues.watermarkOpacity,
           invoiceNotes: data.invoiceNotes ?? baseFormValues.invoiceNotes,
+          globalDiscountType: data.globalDiscountType ?? baseFormValues.globalDiscountType,
+          globalDiscountValue: data.globalDiscountValue ?? baseFormValues.globalDiscountValue,
+          themeColor: data.themeColor ?? baseFormValues.themeColor,
         };
         reset(formData);
 
@@ -194,7 +221,7 @@ export function InvoiceForm() {
       setWatermarkPreview(null);
       setInitialDataLoaded(true);
     }
-  }, [searchParams, reset, toast, initialDataLoaded, defaultItem]);
+  }, [searchParams, reset, toast, initialDataLoaded, defaultFormValues]); // Added defaultFormValues to dep array
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -280,9 +307,6 @@ export function InvoiceForm() {
     setIsSubmitting(true);
     try {
       const invoiceIdToEdit = searchParams.get('id');
-      // const existingInvoiceData = invoiceIdToEdit ? getInvoiceData(invoiceIdToEdit) : null;
-      // const companyProfile = getCompanyProfile();
-
       const invoiceId = invoiceIdToEdit || `inv_${Date.now()}`;
 
       let companyLogoDataUrlToStore: string | null = companyLogoPreview;
@@ -309,13 +333,22 @@ export function InvoiceForm() {
         };
       });
 
-      const totalFee = itemsToStore.reduce((sum, item) => {
+      const subTotal = itemsToStore.reduce((sum, item) => {
         const quantity = Number(item.quantity) || 0;
         const rate = Number(item.rate) || 0;
         const discount = Number(item.discount) || 0;
         const itemSubtotal = quantity * rate;
         return sum + (itemSubtotal * (1 - discount / 100));
       }, 0);
+
+      let totalFee = subTotal;
+      const discountValue = Number(data.globalDiscountValue) || 0;
+      if (data.globalDiscountType === 'percentage' && discountValue > 0 && discountValue <= 100) {
+        totalFee = subTotal * (1 - discountValue / 100);
+      } else if (data.globalDiscountType === 'fixed' && discountValue > 0) {
+        totalFee = Math.max(0, subTotal - discountValue);
+      }
+      
 
       const storedData: StoredInvoiceData = {
         id: invoiceId,
@@ -325,10 +358,14 @@ export function InvoiceForm() {
         companyName: data.companyName,
         companyLogoDataUrl: companyLogoDataUrlToStore,
         items: itemsToStore,
+        subTotal: subTotal,
+        globalDiscountType: data.globalDiscountType,
+        globalDiscountValue: data.globalDiscountValue,
         totalFee: totalFee,
         invoiceNotes: data.invoiceNotes,
         watermarkDataUrl: watermarkDataUrlToStore,
         watermarkOpacity: data.watermarkOpacity ?? 0.05,
+        themeColor: data.themeColor ?? 'default',
       };
 
       saveInvoiceData(invoiceId, storedData);
@@ -357,11 +394,8 @@ export function InvoiceForm() {
     if (selectedSavedItem) {
       setValue(`items.${itemIndex}.description`, selectedSavedItem.description);
       setValue(`items.${itemIndex}.rate`, selectedSavedItem.rate);
-      // Discount is not part of saved items schema for now
-      // setValue(`items.${itemIndex}.discount`, selectedSavedItem.discount || 0);
       trigger(`items.${itemIndex}.description`);
       trigger(`items.${itemIndex}.rate`);
-      // trigger(`items.${itemIndex}.discount`);
     }
   };
 
@@ -725,7 +759,7 @@ export function InvoiceForm() {
                           </FormItem>
                         )}
                       />
-                       <div className="text-sm text-muted-foreground whitespace-nowrap pb-2"> {/* Adjusted padding for alignment */}
+                       <div className="text-sm text-muted-foreground whitespace-nowrap pb-2">
                             Amount: ₹{itemAmount}
                        </div>
                     </div>
@@ -749,13 +783,123 @@ export function InvoiceForm() {
             </div>
 
             <Separator className="my-6" />
-
-            <div className="text-right">
-                <h3 className="text-xl font-semibold">Total Amount: <span className="text-primary">₹{calculatedTotalFee.toFixed(2)}</span></h3>
+            
+            <div>
+                <FormLabel className="text-xl font-semibold">Global Discount</FormLabel>
+                 <FormDescription className="mb-4">Apply a discount to the subtotal of all items.</FormDescription>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start mt-4">
+                    <FormField
+                        control={control}
+                        name="globalDiscountType"
+                        render={({ field }) => (
+                            <FormItem className="space-y-3 md:col-span-1">
+                                <FormLabel>Discount Type</FormLabel>
+                                <FormControl>
+                                    <RadioGroup
+                                        onValueChange={field.onChange}
+                                        defaultValue={field.value}
+                                        className="flex flex-col space-y-1"
+                                    >
+                                        <FormItem className="flex items-center space-x-3 space-y-0">
+                                            <FormControl>
+                                                <RadioGroupItem value="percentage" />
+                                            </FormControl>
+                                            <FormLabel className="font-normal">Percentage (%)</FormLabel>
+                                        </FormItem>
+                                        <FormItem className="flex items-center space-x-3 space-y-0">
+                                            <FormControl>
+                                                <RadioGroupItem value="fixed" />
+                                            </FormControl>
+                                            <FormLabel className="font-normal">Fixed Amount (₹)</FormLabel>
+                                        </FormItem>
+                                    </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={control}
+                        name="globalDiscountValue"
+                        render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                                <FormLabel>Discount Value</FormLabel>
+                                <FormControl>
+                                     <div className="relative">
+                                         {watch("globalDiscountType") === 'percentage' ? 
+                                            <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /> :
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                                         }
+                                        <Input
+                                            type="number"
+                                            placeholder="0"
+                                            {...field}
+                                            value={field.value === undefined || field.value === null ? '' : String(field.value)}
+                                             onChange={e => {
+                                                const val = parseFloat(e.target.value);
+                                                let finalVal = isNaN(val) ? 0 : (val < 0 ? 0 : val);
+                                                if (watch("globalDiscountType") === 'percentage' && finalVal > 100) {
+                                                    finalVal = 100;
+                                                }
+                                                field.onChange(finalVal);
+                                            }}
+                                            className="pl-8"
+                                        />
+                                    </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
             </div>
 
+            <div className="text-right space-y-1">
+                <h3 className="text-lg text-muted-foreground">Subtotal: <span className="font-semibold">₹{calculatedSubTotal.toFixed(2)}</span></h3>
+                { (Number(watchedGlobalDiscountValue) || 0) > 0 &&
+                  <h3 className="text-lg text-muted-foreground">
+                    Discount: 
+                    <span className="font-semibold">
+                       -₹{
+                         watchedGlobalDiscountType === 'percentage' 
+                           ? (calculatedSubTotal * (Number(watchedGlobalDiscountValue) || 0) / 100).toFixed(2)
+                           : (Number(watchedGlobalDiscountValue) || 0).toFixed(2)
+                       }
+                    </span>
+                  </h3>
+                }
+                <h3 className="text-2xl font-bold">Total Amount: <span className="text-primary">₹{calculatedTotalFee.toFixed(2)}</span></h3>
+            </div>
+
+
             <Separator />
-            <CardTitle className="text-xl font-semibold">Optional Details</CardTitle>
+            <CardTitle className="text-xl font-semibold">Optional Details & Appearance</CardTitle>
+
+            <FormField
+              control={form.control}
+              name="themeColor"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center"><Palette className="mr-2 h-4 w-4"/> Invoice Theme Color</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a theme" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="default">Default</SelectItem>
+                      <SelectItem value="classic-blue">Classic Blue</SelectItem>
+                      <SelectItem value="emerald-green">Emerald Green</SelectItem>
+                      <SelectItem value="crimson-red">Crimson Red</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Choose a color theme for your invoice.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
 
             <FormField
               control={control}
@@ -799,14 +943,19 @@ export function InvoiceForm() {
                 <div className="mt-2">
                   <FormLabel>Watermark Preview</FormLabel>
                   <div className="mt-1 p-2 border rounded-md aspect-video relative w-full max-w-xs bg-muted overflow-hidden">
-                    <Image
-                        src={watermarkPreview}
-                        alt="Watermark preview"
-                        layout="fill"
-                        objectFit="contain"
-                        data-ai-hint="abstract pattern"
-                        style={{ opacity: watchedWatermarkOpacity ?? 0.05 }}
-                    />
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <img
+                            src={watermarkPreview}
+                            alt="Watermark preview"
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                objectFit: 'contain',
+                                opacity: watchedWatermarkOpacity ?? 0.05,
+                            }}
+                            data-ai-hint="abstract pattern"
+                        />
+                    </div>
                   </div>
                 </div>
                 <FormField

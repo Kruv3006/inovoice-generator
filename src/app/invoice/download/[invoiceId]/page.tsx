@@ -5,7 +5,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Edit, Loader2, AlertTriangle, Home, Eye } from 'lucide-react';
+import { Download, Edit, Loader2, AlertTriangle, Home, Eye, Mail, Share2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { StoredInvoiceData } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
@@ -68,14 +68,10 @@ export default function InvoiceDownloadPage() {
     setIsGenerating(true);
     toast({ title: `Generating ${formatName}...`, description: "Please wait." });
     try {
-      // For PDF/JPEG, the second argument to generator is not used for watermark URL,
-      // as the template component handles rendering it with opacity from invoiceData.
-      // The generator function for PDF/JPEG will use elementToCapture which contains the rendered template.
       if (formatName === 'PDF' || formatName === 'JPEG') {
         await generator(invoiceData, undefined, invoiceTemplateRef.current);
       } else { 
-        // For DOC, watermarkDataUrl is still relevant if the getInvoiceHtmlForDoc uses it.
-        await generator(invoiceData); // DOC doesn't need element, uses invoiceData directly
+        await generator(invoiceData);
       }
       toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
     } catch (e) {
@@ -85,6 +81,65 @@ export default function InvoiceDownloadPage() {
       setIsGenerating(false);
     }
   };
+  
+  const handleEmailInvoice = () => {
+    if (!invoiceData) return;
+    const subject = encodeURIComponent(`Invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}`);
+    const body = encodeURIComponent(
+      `Hello ${invoiceData.customerName || 'Client'},\n\nPlease find attached invoice ${invoiceData.invoiceNumber}.\n\nThank you for your business!\n\nBest regards,\n${invoiceData.companyName || 'Your Company'}\n\n(Please download the invoice and attach it to this email.)`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    toast({
+      title: "Email Client Opened",
+      description: "Please attach the downloaded invoice to your email.",
+    });
+  };
+
+  const handleShareInvoice = async () => {
+    if (!invoiceData || !invoiceTemplateRef.current) {
+        toast({ title: "Error", description: "Invoice data or template not ready for sharing.", variant: "destructive" });
+        return;
+    }
+
+    if (navigator.share) {
+        setIsGenerating(true);
+        toast({ title: "Preparing PDF for sharing..." });
+        try {
+            // Generate PDF as a blob to share
+            const canvas = await html2canvas(invoiceTemplateRef.current, { scale: 2, useCORS: true, backgroundColor: null });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'l' : 'p', unit: 'px', format: [canvas.width, canvas.height], compress: true });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            const pdfBlob = pdf.output('blob');
+            const pdfFile = new File([pdfBlob], `invoice_${invoiceData.invoiceNumber}.pdf`, { type: 'application/pdf' });
+
+            if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                await navigator.share({
+                    title: `Invoice ${invoiceData.invoiceNumber}`,
+                    text: `Here is invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}.`,
+                    files: [pdfFile],
+                });
+                toast({ title: "Shared successfully!" });
+            } else {
+                 // Fallback for when files cannot be shared, share text/link
+                await navigator.share({
+                    title: `Invoice ${invoiceData.invoiceNumber}`,
+                    text: `View invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}. Please download separately.`,
+                    url: window.location.href, // Shares link to current page
+                });
+                toast({ title: "Shared link/text successfully!" });
+            }
+        } catch (error) {
+            console.error('Error sharing invoice:', error);
+            toast({ variant: "destructive", title: "Share Error", description: "Could not share the invoice. Try downloading manually." });
+        } finally {
+            setIsGenerating(false);
+        }
+    } else {
+        toast({ variant: "default", title: "Share Not Supported", description: "Please download the invoice and share it manually." });
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -123,7 +178,7 @@ export default function InvoiceDownloadPage() {
     <div className="py-8 bg-muted/40 dark:bg-muted/20 min-h-[calc(100vh-4rem)]">
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <h1 className="text-3xl font-bold text-primary">Download Your Invoice</h1>
+          <h1 className="text-3xl font-bold text-primary">Download & Share Invoice</h1>
           <div className="flex gap-2 flex-wrap justify-center">
              <Button onClick={() => router.push(`/invoice/preview/${invoiceId}`)} variant="outline" className="bg-card hover:bg-accent/80">
               <Eye className="mr-2 h-4 w-4" /> Back to Preview
@@ -137,13 +192,11 @@ export default function InvoiceDownloadPage() {
           </div>
         </div>
         
-        {/* This hidden div is for html2canvas to capture the styled template */}
         <div 
-          className="fixed top-0 left-[-9999px] opacity-100 z-[-1] print:hidden" // opacity ensures it's "rendered" by browser
+          className="fixed top-0 left-[-9999px] opacity-100 z-[-1] print:hidden"
           aria-hidden="true" 
         > 
             <div ref={invoiceTemplateRef} className="bg-transparent print:bg-white" style={{ width: '800px', padding: '0', margin: '0' }}>
-              {/* Pass invoiceData directly, template will use watermarkDataUrl and watermarkOpacity from it */}
               {invoiceData && <InvoiceTemplate data={invoiceData} />}
             </div>
         </div>
@@ -151,10 +204,10 @@ export default function InvoiceDownloadPage() {
 
         <Card className="shadow-xl rounded-lg">
           <CardHeader>
-            <CardTitle className="text-xl">Choose Download Format</CardTitle>
-            <CardDescription>Select your preferred format to download invoice <span className="font-semibold">{invoiceData.invoiceNumber}</span>.</CardDescription>
+            <CardTitle className="text-xl">Choose Format & Action</CardTitle>
+            <CardDescription>Select your preferred format to download invoice <span className="font-semibold">{invoiceData.invoiceNumber}</span>, or choose a share option.</CardDescription>
           </CardHeader>
-          <CardFooter className="flex flex-col sm:flex-row gap-3 pt-2">
+          <CardFooter className="flex flex-col sm:flex-row flex-wrap gap-3 pt-2">
             <Button 
               onClick={() => handleGenerate(generatePdf, 'PDF')} 
               disabled={isGenerating} 
@@ -178,6 +231,22 @@ export default function InvoiceDownloadPage() {
             >
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Download JPEG
+            </Button>
+            <Button 
+              onClick={handleEmailInvoice} 
+              disabled={isGenerating}
+              variant="outline"
+              className="w-full sm:w-auto shadow-md"
+            >
+              <Mail className="mr-2 h-4 w-4" /> Email Invoice
+            </Button>
+             <Button 
+              onClick={handleShareInvoice} 
+              disabled={isGenerating}
+              variant="outline"
+              className="w-full sm:w-auto shadow-md"
+            >
+              <Share2 className="mr-2 h-4 w-4" /> Share Invoice
             </Button>
           </CardFooter>
         </Card>

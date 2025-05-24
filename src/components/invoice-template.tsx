@@ -21,19 +21,36 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     invoiceNumber,
     invoiceDate,
     items,
-    totalFee,
+    subTotal, // Use subTotal
+    globalDiscountType,
+    globalDiscountValue,
+    totalFee, // Final totalFee
     invoiceNotes,
     watermarkDataUrl,
     watermarkOpacity,
+    themeColor = 'default',
   } = data;
 
   const defaultDisplayDate = new Date();
   const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : defaultDisplayDate;
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
 
+  let globalDiscountAmount = 0;
+  if (globalDiscountValue && globalDiscountValue > 0 && subTotal) {
+    if (globalDiscountType === 'percentage') {
+      globalDiscountAmount = subTotal * (globalDiscountValue / 100);
+    } else {
+      globalDiscountAmount = globalDiscountValue;
+    }
+  }
+
+
   return (
     <div
-      className="bg-[var(--invoice-background)] text-[var(--invoice-text)] font-sans shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white"
+      className={cn(
+        "bg-[var(--invoice-background)] text-[var(--invoice-text)] font-sans shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white",
+        `theme-${themeColor}`
+      )}
       style={{
         width: '100%',
         border: '1px solid var(--invoice-border-color)',
@@ -44,7 +61,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     >
       {/* Watermark Layer */}
       {watermarkDataUrl && (
-        <div
+         <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
           style={{ zIndex: 0 }}
         >
@@ -162,6 +179,20 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
 
         <section className="flex justify-end mb-8">
           <div className="w-full sm:w-1/2 md:w-2/5 lg:w-1/3 space-y-2">
+             <div className="flex justify-between items-center py-2 px-3 border-b border-[var(--invoice-border-color)]">
+              <span className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">SUBTOTAL:</span>
+              <span className="text-sm font-medium text-[var(--invoice-text)] print:text-black">{formatCurrency(subTotal)}</span>
+            </div>
+            {globalDiscountAmount > 0 && (
+              <div className="flex justify-between items-center py-2 px-3 border-b border-[var(--invoice-border-color)]">
+                <span className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">
+                  DISCOUNT 
+                  {globalDiscountType === 'percentage' && globalDiscountValue ? ` (${globalDiscountValue}%)` : ''}
+                  :
+                </span>
+                <span className="text-sm font-medium text-[var(--invoice-text)] print:text-black">- {formatCurrency(globalDiscountAmount)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center py-3 bg-[var(--invoice-primary-color)]/10 dark:bg-[var(--invoice-primary-color)]/20 px-3 rounded-md">
               <span className="text-lg font-bold text-[var(--invoice-primary-color)] print:text-black">TOTAL:</span>
               <span className="text-lg font-bold text-[var(--invoice-primary-color)] print:text-black">{formatCurrency(totalFee)}</span>

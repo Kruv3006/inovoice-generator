@@ -42,20 +42,20 @@ export default function RootLayout({
         <header className="sticky top-0 z-50 w-full border-b bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <div className="container flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
             <Link href="/" className="flex items-center gap-2 group">
-              <FileText className="h-6 w-6 text-primary group-hover:text-primary/90 transition-colors" />
-              <h1 className="text-xl font-semibold tracking-tight group-hover:text-primary/90 transition-colors">InvoiceCraft</h1>
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover:text-primary/90 transition-colors" />
+              <h1 className="text-lg sm:text-xl font-semibold tracking-tight group-hover:text-primary/90 transition-colors">InvoiceCraft</h1>
             </Link>
-            <nav className="flex items-center gap-2">
+            <nav className="flex items-center gap-1">
               <Link href="/invoices" passHref>
-                <Button variant="ghost">
-                  <ListChecks />
-                  Invoices
+                <Button variant="ghost" className="px-2 py-1 h-auto sm:px-3 sm:py-2 sm:h-10 text-sm">
+                  <ListChecks className="h-4 w-4 mr-0 sm:mr-1" />
+                  <span className="hidden sm:inline">Invoices</span>
                 </Button>
               </Link>
               <Link href="/settings" passHref>
-                 <Button variant="ghost">
-                   <Settings />
-                   Settings
+                 <Button variant="ghost" className="px-2 py-1 h-auto sm:px-3 sm:py-2 sm:h-10 text-sm">
+                   <Settings className="h-4 w-4 mr-0 sm:mr-1" />
+                   <span className="hidden sm:inline">Settings</span>
                  </Button>
               </Link>
               <ThemeToggleButton />

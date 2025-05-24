@@ -74,7 +74,6 @@ export function SettingsForm() {
   const newSavedItemForm = useForm<NewSavedItemFormValues>({ resolver: zodResolver(newSavedItemSchema) });
 
   useEffect(() => {
-    // Load existing settings
     const profile = getCompanyProfile();
     if (profile) {
       companyProfileForm.reset({
@@ -90,9 +89,8 @@ export function SettingsForm() {
   }, [companyProfileForm]);
 
   const handleCompanyProfileSubmit = async (data: CompanyProfileFormValues) => {
-    let logoDataUrl = companyLogoPreview; // Start with existing preview
+    let logoDataUrl = companyLogoPreview; 
     
-    // Check if a new file is actually selected in the form data
     const newLogoFile = companyProfileForm.getValues("companyLogoFile");
 
     if (newLogoFile && newLogoFile.length > 0) {
@@ -107,19 +105,15 @@ export function SettingsForm() {
       }
       logoDataUrl = await fileToDataUrl(file);
       if (logoDataUrl) {
-        setCompanyLogoPreview(logoDataUrl); // Update preview if conversion successful
+        setCompanyLogoPreview(logoDataUrl); 
       } else {
-        // If conversion fails, keep the old logoDataUrl if it exists, otherwise null
         logoDataUrl = getCompanyProfile()?.companyLogoDataUrl || null; 
-        setCompanyLogoPreview(logoDataUrl); // Revert preview
+        setCompanyLogoPreview(logoDataUrl); 
         toast({ variant: "destructive", title: "Logo Upload Failed", description: "Could not process the logo file." });
       }
     } else if (data.companyLogoFile === undefined && companyLogoPreview) {
-      // This case means no new file was selected, so we keep the existing companyLogoPreview
-      // which should already be the correct data URL from the profile or previous upload.
       logoDataUrl = companyLogoPreview;
     } else if (!companyLogoPreview && data.companyLogoFile === undefined) {
-        // No new file chosen, and no existing preview (e.g. user wants to remove logo)
         logoDataUrl = null;
     }
 
@@ -164,20 +158,17 @@ export function SettingsForm() {
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
       if (file.size > 2 * 1024 * 1024 || !['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
-        // Error will be handled on submit, clear preview if invalid to avoid confusion
-        // setCompanyLogoPreview(getCompanyProfile()?.companyLogoDataUrl || null); 
         return;
       }
       fileToDataUrl(file).then(dataUrl => {
         if (dataUrl) setCompanyLogoPreview(dataUrl);
       });
-    } else if (!watchedCompanyLogoFile) { // No file selected in input
-        // If file input is cleared, check if a profile logo exists and show it
+    } else if (!watchedCompanyLogoFile) { 
         const profile = getCompanyProfile();
         if (profile?.companyLogoDataUrl) {
             setCompanyLogoPreview(profile.companyLogoDataUrl);
         } else {
-            setCompanyLogoPreview(null); // No profile logo, clear preview
+            setCompanyLogoPreview(null); 
         }
     }
   }, [watchedCompanyLogoFile]);
@@ -211,7 +202,7 @@ export function SettingsForm() {
                   {...companyProfileForm.register("companyLogoFile")}
                 />
                 {companyProfileForm.getValues("companyLogoFile")?.[0]?.name && (
-                  <span className="text-sm text-muted-foreground truncate max-w-[200px]">
+                  <span className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">
                     {companyProfileForm.getValues("companyLogoFile")?.[0]?.name}
                   </span>
                 )}
@@ -229,7 +220,7 @@ export function SettingsForm() {
               <Label htmlFor="defaultInvoiceNotes">Default Invoice Notes/Terms</Label>
               <Textarea id="defaultInvoiceNotes" {...companyProfileForm.register("defaultInvoiceNotes")} placeholder="e.g., Payment is due within 30 days. Thank you for your business!" rows={3} />
             </div>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
               <Save className="mr-2 h-4 w-4" /> Save Company Profile
             </Button>
           </form>
@@ -245,13 +236,13 @@ export function SettingsForm() {
           <CardDescription>Save and manage your frequent clients. They will be available in a dropdown when creating invoices.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={newClientForm.handleSubmit(handleAddClient)} className="flex items-end gap-2 mb-6">
-            <div className="flex-grow">
+          <form onSubmit={newClientForm.handleSubmit(handleAddClient)} className="flex flex-col sm:flex-row sm:items-end gap-2 mb-6">
+            <div className="flex-grow w-full sm:w-auto">
               <Label htmlFor="clientNameInput">New Client Name</Label>
               <Input id="clientNameInput" {...newClientForm.register("clientName")} placeholder="e.g., Priya Sharma Consulting" />
               {newClientForm.formState.errors.clientName && <p className="text-sm text-destructive mt-1">{newClientForm.formState.errors.clientName.message}</p>}
             </div>
-            <Button type="submit" variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Add Client</Button>
+            <Button type="submit" variant="outline" className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Client</Button>
           </form>
           {clients.length > 0 ? (
             <ul className="space-y-2">
@@ -294,7 +285,7 @@ export function SettingsForm() {
               <Input id="itemRateInput" type="number" step="0.01" {...newSavedItemForm.register("itemRate")} placeholder="100.00" />
               {newSavedItemForm.formState.errors.itemRate && <p className="text-sm text-destructive mt-1">{newSavedItemForm.formState.errors.itemRate.message}</p>}
             </div>
-            <Button type="submit" variant="outline" className="md:col-start-3"><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
+            <Button type="submit" variant="outline" className="w-full md:w-auto md:col-start-3"><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
           </form>
           {savedItems.length > 0 ? (
             <ul className="space-y-2">
@@ -322,3 +313,5 @@ export function SettingsForm() {
     </div>
   );
 }
+
+    

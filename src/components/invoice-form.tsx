@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, User, ListCollapse } from "lucide-react"; // Added User, ListCollapse
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, User, ListCollapse } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -34,7 +34,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"; // Added Select
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
@@ -43,7 +43,9 @@ import { useToast } from "@/hooks/use-toast";
 import type { InvoiceFormSchemaType, StoredInvoiceData, LineItem, StoredLineItem, ClientData, SavedItemData, CompanyProfileData } from "@/lib/invoice-types";
 import { invoiceFormSchema } from "@/lib/invoice-types";
 import { getInvoiceData, saveInvoiceData } from "@/lib/invoice-store";
-import { getCompanyProfile, getClients, getSavedItems } from "@/lib/settings-store"; // Added settings store imports
+import { getCompanyProfile, getClients, getSavedItems } from "@/lib/settings-store";
+import { Label } from "@/components/ui/label";
+
 
 const fileToDataUrl = (file: File, toastFn: ReturnType<typeof useToast>['toast']): Promise<string | null> => {
   return new Promise((resolve) => {
@@ -94,7 +96,7 @@ export function InvoiceForm() {
     companyName: "",
     invoiceDate: new Date(),
     items: [defaultItem],
-    invoiceNotes: "", // Will be overridden by company profile or existing invoice
+    invoiceNotes: "", 
     companyLogoFile: undefined,
     watermarkFile: undefined,
     watermarkOpacity: 0.05,
@@ -117,7 +119,6 @@ export function InvoiceForm() {
   const watchedWatermarkOpacity = watch("watermarkOpacity");
 
   useEffect(() => {
-    // Load clients and saved items from settings store
     setClients(getClients());
     setSavedItems(getSavedItems());
   }, []);
@@ -164,35 +165,32 @@ export function InvoiceForm() {
         })) || [defaultItem];
 
         const formData: InvoiceFormSchemaType = {
-          ...baseFormValues, // Start with profile defaults
-          ...data, // Override with invoice-specific data
+          ...baseFormValues, 
+          ...data, 
           invoiceDate: data.invoiceDate ? (parseISO(data.invoiceDate) instanceof Date && !isNaN(parseISO(data.invoiceDate).valueOf()) ? parseISO(data.invoiceDate) : new Date()) : new Date(),
           items: formItems.length > 0 ? formItems : [defaultItem],
           companyLogoFile: undefined, 
           watermarkFile: undefined,
           watermarkOpacity: data.watermarkOpacity ?? baseFormValues.watermarkOpacity,
-          invoiceNotes: data.invoiceNotes ?? baseFormValues.invoiceNotes, // Prioritize invoice notes over profile default
+          invoiceNotes: data.invoiceNotes ?? baseFormValues.invoiceNotes,
         };
         reset(formData);
 
         if (data.watermarkDataUrl) setWatermarkPreview(data.watermarkDataUrl);
-        // Company logo preview is already set if profile has one, or if invoice had one (data.companyLogoDataUrl)
         if (data.companyLogoDataUrl) setCompanyLogoPreview(data.companyLogoDataUrl);
         
       } else {
         toast({ title: "Edit Error", description: "Could not load invoice data for editing. Using defaults.", variant: "destructive" });
-        reset(baseFormValues); // Reset to profile defaults or app defaults
-        setWatermarkPreview(null); // Clear watermark if invoice not found
-        // Company logo already handled by profile logic
+        reset(baseFormValues); 
+        setWatermarkPreview(null); 
       }
       setInitialDataLoaded(true);
-    } else if (!invoiceIdToEdit && !initialDataLoaded) {
-      reset(baseFormValues); // Reset to profile defaults or app defaults
+    } else if (!initialDataLoaded) { // Added check for !invoiceIdToEdit here as well
+      reset(baseFormValues); 
       setWatermarkPreview(null);
-      // Company logo already handled by profile logic
       setInitialDataLoaded(true); 
     }
-  }, [searchParams, reset, toast, initialDataLoaded, defaultFormValues, defaultItem]);
+  }, [searchParams, reset, toast, initialDataLoaded, defaultItem]); // Removed defaultFormValues from dep array as it's constant
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -225,7 +223,6 @@ export function InvoiceForm() {
         }
       });
     } else {
-      // No new file selected, maintain existing preview (from invoice or profile)
       const currentLogoFileValue = getValues('companyLogoFile');
       if (!currentLogoFileValue || currentLogoFileValue.length === 0) {
         if (existingData?.companyLogoDataUrl) {
@@ -284,12 +281,10 @@ export function InvoiceForm() {
 
       const invoiceId = existingInvoiceData?.id || `inv_${Date.now()}`;
       
-      let companyLogoDataUrlToStore: string | null = companyLogoPreview; // Preview always holds the latest visual
+      let companyLogoDataUrlToStore: string | null = companyLogoPreview; 
       if (!data.companyLogoFile || data.companyLogoFile.length === 0) {
-        // If no new file is chosen, rely on existing preview (which could be from old invoice or profile)
         companyLogoDataUrlToStore = companyLogoPreview;
       }
-      // if a file was chosen, companyLogoPreview should have been updated by its useEffect
 
       let watermarkDataUrlToStore: string | null = watermarkPreview;
       if (!data.watermarkFile || data.watermarkFile.length === 0) {
@@ -355,8 +350,8 @@ export function InvoiceForm() {
     if (selectedSavedItem) {
       setValue(`items.${itemIndex}.description`, selectedSavedItem.description);
       setValue(`items.${itemIndex}.rate`, selectedSavedItem.rate);
-      trigger(`items.${itemIndex}.description`); // Trigger validation/update
-      trigger(`items.${itemIndex}.rate`);
+      trigger(`items.${itemIndex}.description`); 
+      trigger(`items.${index}.rate`);
     }
   };
 
@@ -386,7 +381,7 @@ export function InvoiceForm() {
                             <Input placeholder="e.g., 00123" {...field} className="pl-8" />
                         </div>
                         </FormControl>
-                        <FormDescription>A unique identifier for this invoice (e.g., INV-001).</FormDescription>
+                        <FormDescription>A unique identifier for this invoice (e.g., INV-001). You can edit this.</FormDescription>
                         <FormMessage />
                     </FormItem>
                     )}
@@ -473,14 +468,14 @@ export function InvoiceForm() {
                             onChange(files && files.length > 0 ? files : undefined); 
                         }}
                       />
-                      {formFieldValue && formFieldValue.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[200px]">{formFieldValue[0].name}</span>}
-                       {companyLogoPreview && (!formFieldValue || formFieldValue.length === 0) && <span className="text-sm text-muted-foreground truncate max-w-[200px]">Current logo active</span>}
+                      {formFieldValue && formFieldValue.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">{formFieldValue[0].name}</span>}
+                       {companyLogoPreview && (!formFieldValue || formFieldValue.length === 0) && <span className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">Current logo active</span>}
                     </div>
                   </FormControl>
                    <FormDescription>
                     {(searchParams.get('id') || getCompanyProfile()?.companyLogoDataUrl) && companyLogoPreview && (!formFieldValue || formFieldValue.length === 0) 
                       ? "Current logo (from profile or this invoice) will be used unless a new image is uploaded." 
-                      : "Upload a logo to display on the invoice. Set a default in Settings."}
+                      : "Upload a logo for the invoice. Set a default in Settings."}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -506,7 +501,7 @@ export function InvoiceForm() {
                   <FormItem>
                     <FormLabel>Customer Name</FormLabel>
                     {clients.length > 0 ? (
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select or type a customer name" />
@@ -556,38 +551,40 @@ export function InvoiceForm() {
 
                   return (
                   <div key={item.id} className="p-4 border rounded-md shadow-sm space-y-4 bg-card">
-                    <div className="flex justify-between items-start">
-                        <div className="flex-grow">
-                            <FormField
-                            control={control}
-                            name={`items.${index}.description`}
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Description</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="e.g., Web Development, Daily Consulting" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                            />
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-x-4 gap-y-2 items-end">
+                      <div className="sm:col-span-4">
+                        <FormField
+                          control={control}
+                          name={`items.${index}.description`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., Web Development, Daily Consulting" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      {savedItems.length > 0 && (
+                        <div className="sm:col-span-1">
+                           <Label htmlFor={`load-item-${index}`} className="text-xs font-medium sm:hidden">Load Item</Label>
+                           <Select onValueChange={(value) => handleSavedItemSelect(value, index)} >
+                            <SelectTrigger className="w-full mt-1 sm:mt-0" id={`load-item-${index}`} aria-label="Select saved item">
+                                <ListCollapse className="h-4 w-4 mr-1 text-muted-foreground flex-shrink-0"/>
+                                <SelectValue placeholder="Load item" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {savedItems.map(si => (
+                                    <SelectItem key={si.id} value={si.id}>{si.description} (₹{si.rate})</SelectItem>
+                                ))}
+                            </SelectContent>
+                           </Select>
                         </div>
-                        {savedItems.length > 0 && (
-                            <div className="ml-2 mt-7">
-                                <Select onValueChange={(value) => handleSavedItemSelect(value, index)}>
-                                    <SelectTrigger className="w-[180px]" aria-label="Select saved item">
-                                        <ListCollapse className="h-4 w-4 mr-1 text-muted-foreground"/>
-                                        <SelectValue placeholder="Load item" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {savedItems.map(si => (
-                                            <SelectItem key={si.id} value={si.id}>{si.description} (₹{si.rate})</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
+                      )}
                     </div>
+
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
@@ -630,7 +627,7 @@ export function InvoiceForm() {
                                 </FormControl>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => itemStartDate && date < itemStartDate} initialFocus />
+                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => itemStartDate ? date < itemStartDate : false} initialFocus />
                               </PopoverContent>
                             </Popover>
                             <FormDescription className="text-xs">Must be on or after start date.</FormDescription>
@@ -639,7 +636,7 @@ export function InvoiceForm() {
                         )}
                       />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                        <FormField
                         control={control}
                         name={`items.${index}.quantity`}
@@ -651,7 +648,7 @@ export function InvoiceForm() {
                                 type="number" 
                                 placeholder="1" 
                                 {...field} 
-                                value={quantityIsCalculated ? calculatedDays : (field.value === undefined || field.value === null ? '' : field.value)}
+                                value={quantityIsCalculated ? calculatedDays : (field.value === undefined || field.value === null ? '' : String(field.value))}
                                 readOnly={quantityIsCalculated}
                                 onChange={e => {
                                   if (!quantityIsCalculated) {
@@ -677,7 +674,7 @@ export function InvoiceForm() {
                                 type="number" 
                                 placeholder="100.00" 
                                 {...field} 
-                                value={field.value === undefined || field.value === null ? '' : field.value}
+                                value={field.value === undefined || field.value === null ? '' : String(field.value)}
                                 onChange={e => {
                                     const val = parseFloat(e.target.value);
                                     field.onChange(isNaN(val) ? 0 : val)
@@ -688,11 +685,9 @@ export function InvoiceForm() {
                           </FormItem>
                         )}
                       />
-                       <div className="flex items-end">
-                        <p className="text-sm text-muted-foreground whitespace-nowrap pt-7">
+                       <div className="text-sm text-muted-foreground whitespace-nowrap pb-2"> {/* Adjusted padding for alignment */}
                             Amount: ₹{itemAmount}
-                        </p>
-                      </div>
+                       </div>
                     </div>
                     {fields.length > 1 && (
                        <Button type="button" variant="destructive" size="sm" onClick={() => remove(index)}>
@@ -745,14 +740,14 @@ export function InvoiceForm() {
                              onChange(files && files.length > 0 ? files : undefined);
                         }}
                       />
-                      {formFieldValue && formFieldValue.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[200px]">{formFieldValue[0].name}</span>}
-                       {watermarkPreview && (!formFieldValue || formFieldValue.length === 0) && <span className="text-sm text-muted-foreground truncate max-w-[200px]">Current watermark active</span>}
+                      {formFieldValue && formFieldValue.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">{formFieldValue[0].name}</span>}
+                       {watermarkPreview && (!formFieldValue || formFieldValue.length === 0) && <span className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">Current watermark active</span>}
                     </div>
                   </FormControl>
                   <FormDescription>
                     {searchParams.get('id') && watermarkPreview && (!formFieldValue || formFieldValue.length === 0) 
                       ? "Current watermark (from this invoice) will be used unless a new image is uploaded." 
-                      : "Upload an image to set as a watermark on the invoice."}
+                      : "Upload an image for the invoice watermark."}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -811,7 +806,7 @@ export function InvoiceForm() {
                   <FormControl>
                     <Textarea placeholder="e.g., Payment terms, project details, thank you note, etc." {...field} rows={3} value={field.value || ''} />
                   </FormControl>
-                   <FormDescription>Any additional notes or terms for the client. You can set default notes in Settings.</FormDescription>
+                   <FormDescription>Any additional notes or terms. You can set default notes in Settings.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -827,3 +822,5 @@ export function InvoiceForm() {
     </Card>
   );
 }
+
+    

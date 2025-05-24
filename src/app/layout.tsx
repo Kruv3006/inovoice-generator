@@ -46,7 +46,7 @@ export default function RootLayout({
               <FileText className="h-7 w-7 text-primary group-hover:text-primary/90 transition-colors" />
               <h1 className="text-2xl font-semibold tracking-tight group-hover:text-primary/90 transition-colors">InvoiceCraft</h1>
             </Link>
-            <nav className="flex items-center gap-2">
+            <nav className="flex items-center gap-4"> {/* Increased gap from 2 to 4 */}
               <Link href="/invoices" passHref>
                 <Button variant="ghost" className="text-muted-foreground hover:text-primary">
                   <ListChecks className="mr-2 h-4 w-4" />

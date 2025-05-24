@@ -2,13 +2,12 @@
 "use client";
 
 import type { StoredInvoiceData } from "@/lib/invoice-types";
-import { format, parseISO, addDays } from "date-fns";
-// Removed Paperclip, will use company logo or fallback
-import Image from "next/image"; // For company logo if provided
+import { format, parseISO } from "date-fns"; // Removed addDays as dueDate is removed
+import Image from "next/image"; 
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
-  watermarkDataUrl?: string | null; // Watermark is still separate
+  watermarkDataUrl?: string | null;
 }
 
 const formatCurrency = (amount?: number) => {
@@ -19,11 +18,11 @@ const formatCurrency = (amount?: number) => {
 export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermarkDataUrl }) => {
   const {
     companyName,
-    companyLogoDataUrl, // New prop for company logo
+    companyLogoDataUrl,
     customerName,
     invoiceNumber,
     invoiceDate, 
-    dueDate,     
+    // dueDate, // Removed    
     startDate,   
     endDate,     
     startTime,
@@ -36,7 +35,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
   const defaultDisplayDate = new Date();
 
   const parsedInvoiceDate = invoiceDate ? (parseISO(invoiceDate) instanceof Date && !isNaN(parseISO(invoiceDate).valueOf()) ? parseISO(invoiceDate) : defaultDisplayDate) : defaultDisplayDate;
-  const parsedDueDate = dueDate ? (parseISO(dueDate) instanceof Date && !isNaN(parseISO(dueDate).valueOf()) ? parseISO(dueDate) : addDays(defaultDisplayDate, 30)) : addDays(defaultDisplayDate, 30);
+  // const parsedDueDate = dueDate ? (parseISO(dueDate) instanceof Date && !isNaN(parseISO(dueDate).valueOf()) ? parseISO(dueDate) : addDays(defaultDisplayDate, 30)) : addDays(defaultDisplayDate, 30); // Removed
   
   const displayServiceStartDate = startDate instanceof Date && !isNaN(startDate.valueOf()) 
                                   ? startDate 
@@ -54,12 +53,12 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
           style={{ zIndex: 0 }}
           data-ai-hint="abstract pattern"
         >
-          <img // Standard img tag for better html2canvas compatibility
+          <img 
             src={watermarkDataUrl}
             alt="Watermark"
             style={{
-              maxWidth: '75%', 
-              maxHeight: '75%',
+              maxWidth: '80%', 
+              maxHeight: '80%',
               objectFit: 'contain',
             }}
           />
@@ -77,18 +76,19 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
             )}
             <div>
               <h1 className="text-3xl font-bold text-primary print:text-black">{companyName || "Your Company"}</h1>
-              {/* Company address removed as per request */}
             </div>
           </div>
           <div className="text-right">
             <h2 className="text-3xl font-semibold uppercase text-gray-700 dark:text-gray-300 print:text-black">Invoice</h2>
-            <p className="text-muted-foreground mt-1 print:text-gray-600"># {invoiceNumber}</p>
+            <p className="text-muted-foreground mt-1 print:text-gray-600">{invoiceNumber}</p> {/* Removed # prefix */}
             <p className="text-sm text-muted-foreground print:text-gray-600">
                 Invoice Date: {format(parsedInvoiceDate, "MMMM d, yyyy")}
             </p>
+            {/* Due Date Removed
             <p className="text-sm text-muted-foreground print:text-gray-600">
                 Due Date: {format(parsedDueDate, "MMMM d, yyyy")}
             </p>
+            */}
           </div>
         </div>
 
@@ -97,7 +97,6 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
           <div>
             <h3 className="font-semibold text-foreground mb-1 print:text-black">Bill To:</h3>
             <p className="font-medium text-primary print:text-black">{customerName}</p>
-            {/* Client address removed as per request */}
           </div>
           <div className="text-right">
             <h3 className="font-semibold text-foreground mb-1 print:text-black">Service Period:</h3>
@@ -146,7 +145,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
               <span className="font-medium text-foreground print:text-black">{formatCurrency(totalFee)}</span>
             </div>
             <div className="flex justify-between py-3 bg-primary/10 dark:bg-primary/20 px-3 rounded-md mt-2 print:bg-gray-100">
-              <span className="text-xl font-bold text-primary print:text-black">Total Due:</span>
+              <span className="text-xl font-bold text-primary print:text-black">Total:</span>
               <span className="text-xl font-bold text-primary print:text-black">{formatCurrency(totalFee)}</span>
             </div>
           </div>
@@ -163,9 +162,12 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground pt-6 border-t border-border print:border-gray-400 print:text-gray-500">
           <p>If you have any questions concerning this invoice, please contact {companyName || "us"}.</p>
-          <p>&copy; {new Date().getFullYear()} {companyName || "Your Company"}. All rights reserved.</p>
+          {/* Copyright line removed
+          <p>&copy; {new Date().getFullYear()} {companyName || "Your Company"}. All rights reserved.</p> 
+          */}
         </div>
       </div>
     </div>
   );
 };
+

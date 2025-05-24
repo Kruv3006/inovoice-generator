@@ -4,9 +4,9 @@ import { format, parse } from 'date-fns';
 
 export const invoiceFormSchema = z.object({
   customerName: z.string().min(1, "Customer name is required").regex(/^[a-zA-Z\s.'-]+$/, "Name must contain only letters, spaces, periods, apostrophes, and hyphens."),
-  companyName: z.string().min(1, "Company name is required."),
+  companyName: z.string().min(1, "Your company name is required."),
   companyLogoFile: z.custom<FileList>((val) => val instanceof FileList && val.length > 0, "Please upload a logo")
-    .refine((files) => files?.[0]?.size <= 2 * 1024 * 1024, `Max file size is 2MB.`) // Smaller limit for logo
+    .refine((files) => files?.[0]?.size <= 2 * 1024 * 1024, `Max file size is 2MB.`)
     .refine(
       (files) => ['image/png', 'image/jpeg', 'image/gif'].includes(files?.[0]?.type),
       ".png, .jpg, .gif files are accepted."
@@ -54,11 +54,9 @@ export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyL
   id: string;
   invoiceNumber: string;
   invoiceDate: string; // ISO string
-  dueDate: string; // ISO string
+  // dueDate: string; // ISO string // Removed dueDate
   companyLogoDataUrl?: string | null;
   watermarkDataUrl?: string | null;
   duration?: { days: number; hours: number };
-  // Note: startDate and endDate from InvoiceFormSchemaType are Date objects.
-  // When serialized to JSON, they become strings.
-  // Deserialization back to Date objects happens in getInvoiceData.
 }
+

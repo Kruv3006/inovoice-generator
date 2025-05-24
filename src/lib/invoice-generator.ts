@@ -26,17 +26,17 @@ const simulateDownload = (filename: string, dataUrlOrContent: string, mimeType: 
 // Function to get HTML content of the invoice for DOC generation
 const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string): string => {
   const {
-    companyName, customerName, invoiceNumber, invoiceDate, dueDate,
+    companyName, customerName, invoiceNumber, invoiceDate, // Removed dueDate
     startDate, startTime, endDate, endTime, duration, totalFee, invoiceNotes,
-    companyLogoDataUrl, // Added companyLogoDataUrl
+    companyLogoDataUrl,
   } = data;
 
   const parsedInvoiceDate = invoiceDate ? (parseISO(invoiceDate) instanceof Date && !isNaN(parseISO(invoiceDate).valueOf()) ? parseISO(invoiceDate) : new Date()) : new Date();
-  const parsedDueDate = dueDate ? (parseISO(dueDate) instanceof Date && !isNaN(parseISO(dueDate).valueOf()) ? parseISO(dueDate) : new Date()) : new Date();
+  // const parsedDueDate = dueDate ? (parseISO(dueDate) instanceof Date && !isNaN(parseISO(dueDate).valueOf()) ? parseISO(dueDate) : new Date()) : new Date(); // Removed
   const parsedServiceStartDate = startDate instanceof Date ? startDate : (startDate ? parseISO(startDate as unknown as string) : new Date());
   const parsedServiceEndDate = endDate instanceof Date ? endDate : (endDate ? parseISO(endDate as unknown as string) : new Date());
 
-  const fCurrency = (val?: number) => val != null ? `₹${val.toFixed(2)}` : '₹0.00'; // Changed to INR
+  const fCurrency = (val?: number) => val != null ? `₹${val.toFixed(2)}` : '₹0.00';
 
   const companyLogoHtml = companyLogoDataUrl
     ? `<img src="${companyLogoDataUrl}" style="max-height: 60px; max-width: 150px; margin-bottom: 10px; object-fit: contain;" alt="Company Logo"/>`
@@ -94,9 +94,11 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
               </div>
               <div class="header-right">
                 <div class="invoice-title">INVOICE</div>
-                <div><strong>Invoice #:</strong> ${invoiceNumber}</div>
+                <div><strong>Invoice:</strong> ${invoiceNumber}</div>
                 <div><strong>Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</div>
+                <!-- Due Date Removed 
                 <div><strong>Due Date:</strong> ${format(parsedDueDate, "MMMM d, yyyy")}</div>
+                -->
               </div>
             </div>
 
@@ -143,7 +145,9 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
             
             <div class="footer">
               <p>If you have any questions concerning this invoice, please contact ${companyName || "us"}.</p>
+              <!-- Copyright line removed 
               <p>&copy; ${new Date().getFullYear()} ${companyName || 'Your Company'}. All rights reserved.</p>
+              -->
             </div>
           </div>
         </div>
@@ -208,7 +212,6 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
 
 export const generateDoc = async (data: StoredInvoiceData, watermarkDataUrl?: string): Promise<void> => {
   console.log("Generating DOC for:", data.invoiceNumber);
-  // Pass companyLogoDataUrl to getInvoiceHtmlForDoc if it's part of StoredInvoiceData and available
   const htmlContent = getInvoiceHtmlForDoc(data, watermarkDataUrl); 
   const content = `
     <!DOCTYPE html>
@@ -264,3 +267,4 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
     throw error;
   }
 };
+

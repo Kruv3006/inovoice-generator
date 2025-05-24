@@ -171,13 +171,23 @@ export function InvoiceForm() {
         }
       });
     } else {
+      // This logic ensures that if we are editing and no new file is selected,
+      // the existing logo preview (from localStorage) is maintained.
+      // If it's a new invoice (no currentInvoiceId), and no file selected, preview should be null.
       if (currentInvoiceId && existingData?.companyLogoDataUrl) {
-        setCompanyLogoPreview(existingData.companyLogoDataUrl);
-      } else if (!currentInvoiceId) {
-        setCompanyLogoPreview(null);
+        // Only set if companyLogoPreview is not already set by a (failed) new upload attempt
+        if (!companyLogoPreview && form.getValues('companyLogoFile') === undefined) {
+            setCompanyLogoPreview(existingData.companyLogoDataUrl);
+        }
+      } else if (!currentInvoiceId) { 
+        // For new invoices, if no file is selected (or cleared), clear the preview.
+        // This also handles the case where a file was selected then removed.
+         if (form.getValues('companyLogoFile') === undefined) {
+            setCompanyLogoPreview(null);
+         }
       }
     }
-  }, [watchedCompanyLogoFile, searchParams, setValue, toast, trigger]);
+  }, [watchedCompanyLogoFile, searchParams, setValue, toast, trigger, form, companyLogoPreview]);
 
   useEffect(() => {
     const currentInvoiceId = searchParams.get('id');
@@ -206,12 +216,16 @@ export function InvoiceForm() {
       });
     } else {
       if (currentInvoiceId && existingData?.watermarkDataUrl) {
-        setWatermarkPreview(existingData.watermarkDataUrl);
+         if (!watermarkPreview && form.getValues('watermarkFile') === undefined) {
+            setWatermarkPreview(existingData.watermarkDataUrl);
+         }
       } else if (!currentInvoiceId) { 
-        setWatermarkPreview(null);
+        if (form.getValues('watermarkFile') === undefined) {
+            setWatermarkPreview(null);
+        }
       }
     }
-  }, [watchedWatermarkFile, searchParams, setValue, toast, trigger]);
+  }, [watchedWatermarkFile, searchParams, setValue, toast, trigger, form, watermarkPreview]);
 
 
   useEffect(() => {
@@ -248,16 +262,16 @@ export function InvoiceForm() {
       const existingInvoiceData = invoiceIdToEdit ? getInvoiceData(invoiceIdToEdit) : null;
 
       const invoiceId = existingInvoiceData?.id || `inv_${Date.now()}`;
-      const invoiceNumber = existingInvoiceData?.invoiceNumber || `INV-${String(Date.now()).slice(-6)}`;
+      const invoiceNumber = existingInvoiceData?.invoiceNumber || `${String(Date.now()).slice(-6)}`; // Removed "INV-" prefix
       
       const currentDate = new Date();
       const invoiceDateToStore = existingInvoiceData?.invoiceDate || currentDate.toISOString();
-      const dueDate = addDays(parseISO(invoiceDateToStore), 30);
+      // const dueDate = addDays(parseISO(invoiceDateToStore), 30); // Due date removed
 
       let companyLogoDataUrlToStore: string | null = null;
       if (data.companyLogoFile && data.companyLogoFile.length > 0) {
-        companyLogoDataUrlToStore = companyLogoPreview;
-         if (!companyLogoDataUrlToStore) {
+        companyLogoDataUrlToStore = companyLogoPreview; // Use preview if available (already validated)
+         if (!companyLogoDataUrlToStore) { // Fallback if preview somehow failed but file is there
             companyLogoDataUrlToStore = await fileToDataUrl(data.companyLogoFile[0], toast);
         }
       } else if (existingInvoiceData?.companyLogoDataUrl) {
@@ -278,7 +292,7 @@ export function InvoiceForm() {
         id: invoiceId,
         invoiceNumber,
         invoiceDate: invoiceDateToStore,
-        dueDate: dueDate.toISOString(),
+        // dueDate: dueDate.toISOString(), // Due date removed
         customerName: data.customerName,
         companyName: data.companyName,
         companyLogoDataUrl: companyLogoDataUrlToStore,
@@ -365,7 +379,8 @@ export function InvoiceForm() {
                         onBlur={onBlur}
                         onChange={(e) => {
                             const files = e.target.files;
-                            onChange(files); 
+                            // Ensure react-hook-form receives the FileList or undefined
+                            onChange(files && files.length > 0 ? files : undefined); 
                         }}
                       />
                       {formFieldValue && formFieldValue.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[200px]">{formFieldValue[0].name}</span>}
@@ -531,7 +546,7 @@ export function InvoiceForm() {
               name="totalFee"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Total Fee (INR)</FormLabel>
+                  <FormLabel>Total Fee (₹)</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -541,6 +556,7 @@ export function InvoiceForm() {
                       value={(field.value === undefined || field.value === null) ? '' : String(field.value)}
                       onChange={e => {
                         const stringValue = e.target.value;
+                        // Allow empty string for clearing, otherwise parse
                         field.onChange(stringValue === '' ? undefined : parseFloat(stringValue));
                       }}
                     />
@@ -570,7 +586,7 @@ export function InvoiceForm() {
                         onBlur={onBlur}
                         onChange={(e) => {
                             const files = e.target.files;
-                            onChange(files); 
+                             onChange(files && files.length > 0 ? files : undefined);
                         }}
                       />
                       {formFieldValue && formFieldValue.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[200px]">{formFieldValue[0].name}</span>}
@@ -620,3 +636,4 @@ export function InvoiceForm() {
     </Card>
   );
 }
+

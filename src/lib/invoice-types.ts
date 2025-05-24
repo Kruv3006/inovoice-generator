@@ -4,6 +4,14 @@ import { format, parse } from 'date-fns';
 
 export const invoiceFormSchema = z.object({
   customerName: z.string().min(1, "Customer name is required").regex(/^[a-zA-Z\s.'-]+$/, "Name must contain only letters, spaces, periods, apostrophes, and hyphens."),
+  companyName: z.string().min(1, "Company name is required."),
+  companyLogoFile: z.custom<FileList>((val) => val instanceof FileList && val.length > 0, "Please upload a logo")
+    .refine((files) => files?.[0]?.size <= 2 * 1024 * 1024, `Max file size is 2MB.`) // Smaller limit for logo
+    .refine(
+      (files) => ['image/png', 'image/jpeg', 'image/gif'].includes(files?.[0]?.type),
+      ".png, .jpg, .gif files are accepted."
+    )
+    .optional(),
   startDate: z.date({ required_error: "Start date is required." }),
   startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Valid 24-hour time (HH:MM) is required."),
   endDate: z.date({ required_error: "End date is required." }),
@@ -25,9 +33,6 @@ export const invoiceFormSchema = z.object({
       ".png, .jpg, .gif files are accepted."
     )
     .optional(),
-  companyName: z.string().min(1, "Your company name is required.").optional().default("Your Company LLC"),
-  companyAddress: z.string().min(1, "Your company address is required.").optional().default("123 Main St, Anytown, USA"),
-  clientAddress: z.string().min(1, "Client address is required.").optional().default("456 Client Ave, Otherville, USA"),
   invoiceNotes: z.string().optional().default("Thank you for your business!"),
 }).refine(data => {
   if (data.startDate && data.startTime && data.endDate && data.endTime) {
@@ -45,11 +50,12 @@ export const invoiceFormSchema = z.object({
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
 
-export interface StoredInvoiceData extends InvoiceFormSchemaType {
+export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile'> {
   id: string;
   invoiceNumber: string;
   invoiceDate: string; // ISO string
   dueDate: string; // ISO string
+  companyLogoDataUrl?: string | null;
   watermarkDataUrl?: string | null;
   duration?: { days: number; hours: number };
   // Note: startDate and endDate from InvoiceFormSchemaType are Date objects.

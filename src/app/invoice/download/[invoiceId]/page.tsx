@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -10,7 +11,7 @@ import type { StoredInvoiceData } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { generatePdf, generateDoc, generateJpeg } from '@/lib/invoice-generator';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns'; // Added missing imports
 
 export default function InvoiceDownloadPage() {
   const router = useRouter();
@@ -50,13 +51,14 @@ export default function InvoiceDownloadPage() {
 
   const handleGenerate = async (
     generator: (data: StoredInvoiceData, watermark?: string, element?: HTMLElement | null) => Promise<void>,
-    formatName: string // Changed 'format' to 'formatName' to avoid conflict with date-fns 'format'
+    formatName: string
   ) => {
     if (!invoiceData) {
       toast({ title: "Error", description: "Invoice data not available for generation.", variant: "destructive" });
       return;
     }
-    if (formatName !== 'DOC' && !invoiceTemplateRef.current) {
+    // For PDF and JPEG, elementToCapture is crucial. For DOC, it's not directly used in the same way.
+    if ((formatName === 'PDF' || formatName === 'JPEG') && !invoiceTemplateRef.current) {
         toast({ title: "Error", description: "Invoice template element not ready for generation.", variant: "destructive" });
         return;
     }
@@ -64,9 +66,14 @@ export default function InvoiceDownloadPage() {
     setIsGenerating(true);
     toast({ title: `Generating ${formatName}...`, description: "Please wait." });
     try {
+      // Pass companyLogoDataUrl to generator if available, along with watermark.
+      // The generator functions themselves decide how to use these based on their internal logic.
+      // For PDF/JPEG, the templateRef already has these rendered if they exist.
+      // For DOC, the generator function's HTML builder needs them.
       if (formatName === 'PDF' || formatName === 'JPEG') {
         await generator(invoiceData, invoiceData.watermarkDataUrl || undefined, invoiceTemplateRef.current);
       } else { 
+        // DOC generator takes watermark directly, and its HTML builder will use companyLogoDataUrl from invoiceData
         await generator(invoiceData, invoiceData.watermarkDataUrl || undefined);
       }
       toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
@@ -128,7 +135,8 @@ export default function InvoiceDownloadPage() {
         <div 
           className="fixed top-0 left-[-9999px] opacity-100 z-[1] bg-transparent print:hidden"
         > 
-            <div ref={invoiceTemplateRef} className="bg-card print:bg-white" style={{ width: '800px' }}> {/* Ensure a fixed width and background for consistent capture */}
+            <div ref={invoiceTemplateRef} className="bg-card print:bg-white" style={{ width: '800px' }}>
+              {/* Pass companyLogoDataUrl here as well */}
               {invoiceData && <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />}
             </div>
         </div>
@@ -173,8 +181,9 @@ export default function InvoiceDownloadPage() {
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p><strong>Invoice Number:</strong> {invoiceData.invoiceNumber}</p>
+            <p><strong>Company:</strong> {invoiceData.companyName}</p>
             <p><strong>Customer:</strong> {invoiceData.customerName}</p>
-            <p><strong>Total Amount:</strong> {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(invoiceData.totalFee || 0)}</p>
+            <p><strong>Total Amount:</strong> {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(invoiceData.totalFee || 0)}</p>
             <p><strong>Invoice Date:</strong> {invoiceData.invoiceDate ? format(parseISO(invoiceData.invoiceDate), "MMMM d, yyyy") : 'N/A'}</p>
           </CardContent>
         </Card>

@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { format, differenceInMilliseconds, isValid, parse, addDays, parseISO } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -46,7 +46,7 @@ const fileToDataUrl = (file: File, toastFn: (options: any) => void): Promise<str
       resolve(reader.result as string);
     };
     reader.onerror = () => {
-      toastFn({ variant: "destructive", title: "File Read Error", description: "Could not read the watermark file." });
+      toastFn({ variant: "destructive", title: "File Read Error", description: "Could not read the file." });
       resolve(null);
     };
     reader.readAsDataURL(file);
@@ -59,16 +59,22 @@ export function InvoiceForm() {
   const searchParams = useSearchParams();
   const [duration, setDuration] = useState<{ days: number; hours: number; error?: string } | null>(null);
   const [watermarkPreview, setWatermarkPreview] = useState<string | null>(null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  
   const watermarkFileRef = useRef<HTMLInputElement | null>(null);
+  const companyLogoFileRef = useRef<HTMLInputElement | null>(null);
 
   const defaultFormValues: Partial<InvoiceFormSchemaType> = {
     customerName: "",
+    companyName: "",
     startTime: "09:00",
     endTime: "17:00",
     totalFee: undefined,
     invoiceNotes: "Thank you for your business! Payment is due within 30 days.",
+    companyLogoFile: undefined,
+    watermarkFile: undefined,
   };
 
   const form = useForm<InvoiceFormSchemaType>({
@@ -82,6 +88,7 @@ export function InvoiceForm() {
   const watchedEndDate = watch("endDate");
   const watchedEndTime = watch("endTime");
   const watchedWatermarkFile = watch("watermarkFile");
+  const watchedCompanyLogoFile = watch("companyLogoFile");
 
   useEffect(() => {
     const invoiceIdToEdit = searchParams.get('id');
@@ -93,14 +100,15 @@ export function InvoiceForm() {
           startDate: data.startDate ? (data.startDate instanceof Date ? data.startDate : parseISO(data.startDate as unknown as string)) : undefined,
           endDate: data.endDate ? (data.endDate instanceof Date ? data.endDate : parseISO(data.endDate as unknown as string)) : undefined,
           totalFee: data.totalFee,
-          watermarkFile: undefined, // User must re-select
+          companyName: data.companyName,
           invoiceNotes: data.invoiceNotes,
+          watermarkFile: undefined, 
+          companyLogoFile: undefined,
         };
         reset(formData);
 
-        if (data.watermarkDataUrl) {
-          setWatermarkPreview(data.watermarkDataUrl);
-        }
+        if (data.watermarkDataUrl) setWatermarkPreview(data.watermarkDataUrl);
+        if (data.companyLogoDataUrl) setCompanyLogoPreview(data.companyLogoDataUrl);
         
         if (formData.startDate && data.startTime && formData.endDate && data.endTime) {
             const startDateObj = formData.startDate;
@@ -123,12 +131,14 @@ export function InvoiceForm() {
         toast({ title: "Edit Error", description: "Could not load invoice data for editing.", variant: "destructive" });
         reset(defaultFormValues);
         setWatermarkPreview(null);
+        setCompanyLogoPreview(null);
         setDuration(null);
       }
       setInitialDataLoaded(true);
     } else if (!invoiceIdToEdit && !initialDataLoaded) {
       reset(defaultFormValues);
       setWatermarkPreview(null);
+      setCompanyLogoPreview(null);
       setDuration(null);
       setInitialDataLoaded(true); 
     }
@@ -139,41 +149,67 @@ export function InvoiceForm() {
     const currentInvoiceId = searchParams.get('id');
     const existingData = currentInvoiceId ? getInvoiceData(currentInvoiceId) : null;
   
+    if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
+      const file = watchedCompanyLogoFile[0];
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit for logo
+        toast({ variant: "destructive", title: "File Too Large", description: "Company logo must be less than 2MB." });
+        setValue('companyLogoFile', undefined, { shouldValidate: true });
+        setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
+        return;
+      }
+      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+        toast({ variant: "destructive", title: "Invalid File Type", description: "Company logo must be PNG, JPEG, or GIF." });
+        setValue('companyLogoFile', undefined, { shouldValidate: true });
+        setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
+        return;
+      }
+      fileToDataUrl(file, toast).then(dataUrl => {
+        setCompanyLogoPreview(dataUrl);
+        if (!dataUrl) {
+            setValue('companyLogoFile', undefined, { shouldValidate: true });
+            setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
+        }
+      });
+    } else {
+      if (currentInvoiceId && existingData?.companyLogoDataUrl) {
+        setCompanyLogoPreview(existingData.companyLogoDataUrl);
+      } else if (!currentInvoiceId) {
+        setCompanyLogoPreview(null);
+      }
+    }
+  }, [watchedCompanyLogoFile, searchParams, setValue, toast, trigger]);
+
+  useEffect(() => {
+    const currentInvoiceId = searchParams.get('id');
+    const existingData = currentInvoiceId ? getInvoiceData(currentInvoiceId) : null;
+  
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
-      
-      // Client-side validation for immediate feedback
       if (file.size > 5 * 1024 * 1024) {
         toast({ variant: "destructive", title: "File Too Large", description: "Watermark image must be less than 5MB." });
-        setValue('watermarkFile', undefined, { shouldValidate: true }); // Clear RHF state and trigger validation
-        // Revert to existing preview if available, else clear
+        setValue('watermarkFile', undefined, { shouldValidate: true }); 
         setWatermarkPreview(existingData?.watermarkDataUrl || null);
         return;
       }
       if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
         toast({ variant: "destructive", title: "Invalid File Type", description: "Watermark must be PNG, JPEG, or GIF." });
-        setValue('watermarkFile', undefined, { shouldValidate: true }); // Clear RHF state
+        setValue('watermarkFile', undefined, { shouldValidate: true });
         setWatermarkPreview(existingData?.watermarkDataUrl || null);
         return;
       }
-  
       fileToDataUrl(file, toast).then(dataUrl => {
-        setWatermarkPreview(dataUrl); // Set new preview if conversion successful
-        if (!dataUrl) { // If conversion failed (e.g., reader.onerror)
-            setValue('watermarkFile', undefined, { shouldValidate: true }); // Also clear from RHF
-            setWatermarkPreview(existingData?.watermarkDataUrl || null); // Revert
+        setWatermarkPreview(dataUrl); 
+        if (!dataUrl) { 
+            setValue('watermarkFile', undefined, { shouldValidate: true }); 
+            setWatermarkPreview(existingData?.watermarkDataUrl || null);
         }
       });
     } else {
-      // No new file is selected/field is cleared.
-      // If editing and an existing watermarkDataUrl exists, ensure preview reflects it.
-      // Otherwise (new form, or file explicitly removed on a new form), clear preview.
       if (currentInvoiceId && existingData?.watermarkDataUrl) {
         setWatermarkPreview(existingData.watermarkDataUrl);
-      } else if (!currentInvoiceId) { // New form and no file selected
+      } else if (!currentInvoiceId) { 
         setWatermarkPreview(null);
       }
-      // If file input was cleared during an edit, existingData.watermarkDataUrl handles reversion.
     }
   }, [watchedWatermarkFile, searchParams, setValue, toast, trigger]);
 
@@ -218,32 +254,42 @@ export function InvoiceForm() {
       const invoiceDateToStore = existingInvoiceData?.invoiceDate || currentDate.toISOString();
       const dueDate = addDays(parseISO(invoiceDateToStore), 30);
 
+      let companyLogoDataUrlToStore: string | null = null;
+      if (data.companyLogoFile && data.companyLogoFile.length > 0) {
+        companyLogoDataUrlToStore = companyLogoPreview;
+         if (!companyLogoDataUrlToStore) {
+            companyLogoDataUrlToStore = await fileToDataUrl(data.companyLogoFile[0], toast);
+        }
+      } else if (existingInvoiceData?.companyLogoDataUrl) {
+        companyLogoDataUrlToStore = existingInvoiceData.companyLogoDataUrl;
+      }
 
       let watermarkDataUrlToStore: string | null = null;
       if (data.watermarkFile && data.watermarkFile.length > 0) { 
-        // A new file was successfully submitted (passed schema validation)
-        // The preview should already reflect this from the useEffect hook
-        watermarkDataUrlToStore = watermarkPreview; // Use the successfully generated preview
-        if (!watermarkDataUrlToStore) { // Fallback if preview generation failed but file somehow submitted
+        watermarkDataUrlToStore = watermarkPreview; 
+        if (!watermarkDataUrlToStore) { 
             watermarkDataUrlToStore = await fileToDataUrl(data.watermarkFile[0], toast);
         }
       } else if (existingInvoiceData?.watermarkDataUrl) {
-        // No new file is uploaded during edit, retain existing watermark if form field is empty
         watermarkDataUrlToStore = existingInvoiceData.watermarkDataUrl;
       }
-      // If watermarkPreview is null (cleared or never set) and no existing data, it stays null.
       
       const storedData: StoredInvoiceData = {
-        ...data,
         id: invoiceId,
         invoiceNumber,
         invoiceDate: invoiceDateToStore,
         dueDate: dueDate.toISOString(),
+        customerName: data.customerName,
+        companyName: data.companyName,
+        companyLogoDataUrl: companyLogoDataUrlToStore,
+        startDate: data.startDate,
+        startTime: data.startTime,
+        endDate: data.endDate,
+        endTime: data.endTime,
+        totalFee: data.totalFee,
+        invoiceNotes: data.invoiceNotes,
         watermarkDataUrl: watermarkDataUrlToStore,
         duration: duration && !duration.error ? {days: duration.days, hours: duration.hours} : undefined,
-        companyName: data.companyName || invoiceFormSchema.shape.companyName.default(),
-        companyAddress: data.companyAddress || invoiceFormSchema.shape.companyAddress.default(),
-        clientAddress: data.clientAddress || invoiceFormSchema.shape.clientAddress.default(),
       };
 
       saveInvoiceData(invoiceId, storedData);
@@ -285,6 +331,66 @@ export function InvoiceForm() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <FormField
+                control={form.control}
+                name="companyName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Company Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Acme Innovations Pvt. Ltd." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+            <FormField
+              control={control}
+              name="companyLogoFile"
+              render={({ field: { onChange, onBlur, name, value: formFieldValue } }) => ( 
+                <FormItem>
+                  <FormLabel>Company Logo (Optional, PNG/JPEG/GIF, &lt;2MB)</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-2">
+                       <Button type="button" variant="outline" onClick={() => companyLogoFileRef.current?.click()}>
+                        <Building className="mr-2 h-4 w-4" /> {companyLogoPreview ? "Change Logo" : "Upload Logo"}
+                      </Button>
+                      <Input
+                        type="file"
+                        accept="image/png, image/jpeg, image/gif"
+                        className="hidden"
+                        ref={companyLogoFileRef} 
+                        name={name}
+                        onBlur={onBlur}
+                        onChange={(e) => {
+                            const files = e.target.files;
+                            onChange(files); 
+                        }}
+                      />
+                      {formFieldValue && formFieldValue.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[200px]">{formFieldValue[0].name}</span>}
+                       {companyLogoPreview && (!formFieldValue || formFieldValue.length === 0) && <span className="text-sm text-muted-foreground truncate max-w-[200px]">Current logo active</span>}
+                    </div>
+                  </FormControl>
+                   <FormDescription>
+                    {searchParams.get('id') && companyLogoPreview && (!formFieldValue || formFieldValue.length === 0) 
+                      ? "Current logo will be used unless a new image is uploaded." 
+                      : "Upload a logo to display on the invoice."}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {companyLogoPreview && (
+              <div className="mt-2">
+                <FormLabel>Logo Preview</FormLabel>
+                <div className="mt-1 p-2 border rounded-md aspect-square relative w-24 h-24 bg-muted overflow-hidden">
+                  <Image src={companyLogoPreview} alt="Company logo preview" layout="fill" objectFit="contain" data-ai-hint="company logo"/>
+                </div>
+              </div>
+            )}
+
              <FormField
                 control={form.control}
                 name="customerName"
@@ -292,7 +398,7 @@ export function InvoiceForm() {
                   <FormItem>
                     <FormLabel>Customer Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., John Doe" {...field} />
+                      <Input placeholder="e.g., Priya Sharma" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -425,12 +531,12 @@ export function InvoiceForm() {
               name="totalFee"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Total Fee (e.g., USD)</FormLabel>
+                  <FormLabel>Total Fee (INR)</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
                       step="0.01"
-                      placeholder="e.g., 150.00"
+                      placeholder="e.g., ₹ 15000.00"
                       {...field}
                       value={(field.value === undefined || field.value === null) ? '' : String(field.value)}
                       onChange={e => {
@@ -453,7 +559,7 @@ export function InvoiceForm() {
                   <FormControl>
                     <div className="flex items-center gap-2">
                        <Button type="button" variant="outline" onClick={() => watermarkFileRef.current?.click()}>
-                        <ImageUp className="mr-2 h-4 w-4" /> {watermarkPreview ? "Change Image" : "Upload Image"}
+                        <ImageUp className="mr-2 h-4 w-4" /> {watermarkPreview ? "Change Watermark" : "Upload Watermark"}
                       </Button>
                       <Input
                         type="file"
@@ -464,8 +570,7 @@ export function InvoiceForm() {
                         onBlur={onBlur}
                         onChange={(e) => {
                             const files = e.target.files;
-                            onChange(files); // Update RHF state with the FileList
-                            // Preview logic is handled by the useEffect watching `watchedWatermarkFile` (which is `formFieldValue`)
+                            onChange(files); 
                         }}
                       />
                       {formFieldValue && formFieldValue.length > 0 && <span className="text-sm text-muted-foreground truncate max-w-[200px]">{formFieldValue[0].name}</span>}
@@ -486,7 +591,7 @@ export function InvoiceForm() {
               <div className="mt-2">
                 <FormLabel>Watermark Preview</FormLabel>
                 <div className="mt-1 p-2 border rounded-md aspect-video relative w-full max-w-xs bg-muted overflow-hidden">
-                  <Image src={watermarkPreview} alt="Watermark preview" layout="fill" objectFit="contain" data-ai-hint="logo design"/>
+                  <Image src={watermarkPreview} alt="Watermark preview" layout="fill" objectFit="contain" data-ai-hint="design pattern"/>
                 </div>
               </div>
             )}
@@ -515,4 +620,3 @@ export function InvoiceForm() {
     </Card>
   );
 }
-

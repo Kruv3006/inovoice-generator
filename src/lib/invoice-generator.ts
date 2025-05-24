@@ -3,7 +3,7 @@ import type { StoredInvoiceData } from './invoice-types';
 import { format, parseISO } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { toast } from '@/hooks/use-toast'; // Assuming useToast can be imported like this
+import { toast } from '@/hooks/use-toast'; 
 
 // Helper function to simulate file download
 const simulateDownload = (filename: string, dataUrlOrContent: string, mimeType: string, isDataUrl: boolean = false) => {
@@ -28,7 +28,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
   const {
     companyName, customerName, invoiceNumber, invoiceDate, dueDate,
     startDate, startTime, endDate, endTime, duration, totalFee, invoiceNotes,
-    companyAddress, clientAddress
+    companyLogoDataUrl, // Added companyLogoDataUrl
   } = data;
 
   const parsedInvoiceDate = invoiceDate ? (parseISO(invoiceDate) instanceof Date && !isNaN(parseISO(invoiceDate).valueOf()) ? parseISO(invoiceDate) : new Date()) : new Date();
@@ -36,9 +36,12 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
   const parsedServiceStartDate = startDate instanceof Date ? startDate : (startDate ? parseISO(startDate as unknown as string) : new Date());
   const parsedServiceEndDate = endDate instanceof Date ? endDate : (endDate ? parseISO(endDate as unknown as string) : new Date());
 
-  const formatAddressHtml = (address: string | undefined) => address?.split(',').map(part => part.trim()).join('<br/>') || 'N/A';
-  const fCurrency = (val?: number) => val != null ? `$${val.toFixed(2)}` : '$0.00';
+  const fCurrency = (val?: number) => val != null ? `₹${val.toFixed(2)}` : '₹0.00'; // Changed to INR
 
+  const companyLogoHtml = companyLogoDataUrl
+    ? `<img src="${companyLogoDataUrl}" style="max-height: 60px; max-width: 150px; margin-bottom: 10px; object-fit: contain;" alt="Company Logo"/>`
+    : '';
+  
   const watermarkHtml = watermarkDataUrl 
     ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.05; pointer-events: none; z-index: 0; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
          <img src="${watermarkDataUrl}" style="max-width: 60%; max-height: 60%; object-fit: contain;" alt="Watermark"/>
@@ -58,26 +61,26 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
           .header { display: table; width: 100%; margin-bottom: 20px; padding-bottom:10px; border-bottom: 1px solid #eee; }
           .header-left { display: table-cell; vertical-align: top; }
           .header-right { display: table-cell; vertical-align: top; text-align: right; }
-          .company-name { font-size: 22px; font-weight: bold; color: #2563eb; margin-bottom: 2px; } /* Tailwind primary blue */
-          .company-address { font-size: 9pt; color: #555; line-height: 1.4; }
-          .invoice-title { font-size: 26px; font-weight: bold; margin-bottom: 0px; color: #4b5563; } /* Tailwind gray-600 */
+          .company-logo { margin-bottom: 5px; }
+          .company-name { font-size: 22px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+          .invoice-title { font-size: 26px; font-weight: bold; margin-bottom: 0px; color: #4b5563; }
           .info { display: table; width: 100%; margin-bottom: 25px; }
           .info-left, .info-right { display: table-cell; vertical-align: top; width: 50%; }
           .info-right { text-align: right; }
           .info div { margin-bottom: 3px; font-size:9.5pt; }
-          .info strong { font-weight: 600; color: #1f2937; } /* Tailwind gray-800 */
+          .info strong { font-weight: 600; color: #1f2937; }
           .items-table { width: 100%; line-height: inherit; text-align: left; border-collapse: collapse; margin-bottom: 25px; }
-          .items-table th, .items-table td { padding: 10px; border: 1px solid #e5e7eb; } /* Tailwind gray-200 */
-          .items-table th { background-color: #f3f4f6; font-weight: bold; color: #374151; } /* Tailwind gray-100, gray-700 */
+          .items-table th, .items-table td { padding: 10px; border: 1px solid #e5e7eb; }
+          .items-table th { background-color: #f3f4f6; font-weight: bold; color: #374151; }
           .items-table .description { width: 60%; }
           .items-table .duration-col, .items-table .amount-col { text-align: right; }
           .totals { text-align: right; margin-top: 20px; margin-bottom: 25px; }
           .totals div { margin-bottom: 6px; font-size: 10pt; }
           .totals strong {color: #1f2937;}
-          .totals .grand-total { font-weight: bold; font-size: 15pt; color: #1d4ed8; border-top: 2px solid #eee; padding-top: 8px; margin-top:8px;} /* Tailwind blue-700 */
+          .totals .grand-total { font-weight: bold; font-size: 15pt; color: #1d4ed8; border-top: 2px solid #eee; padding-top: 8px; margin-top:8px;}
           .notes { margin-top: 25px; padding-top:15px; border-top: 1px solid #eee; font-size: 9pt; color: #4b5563; }
           .notes strong {color: #1f2937;}
-          .footer { text-align: center; font-size: 8pt; color: #9ca3af; margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; } /* Tailwind gray-400 */
+          .footer { text-align: center; font-size: 8pt; color: #9ca3af; margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; }
         </style>
       </head>
       <body>
@@ -86,8 +89,8 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
           <div class="content-wrapper">
             <div class="header">
               <div class="header-left">
-                <div class="company-name">${companyName || 'Your Company LLC'}</div>
-                <div class="company-address">${formatAddressHtml(companyAddress)}</div>
+                ${companyLogoHtml ? `<div class="company-logo">${companyLogoHtml}</div>` : ''}
+                <div class="company-name">${companyName || 'Your Company'}</div>
               </div>
               <div class="header-right">
                 <div class="invoice-title">INVOICE</div>
@@ -101,7 +104,11 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
               <div class="info-left">
                 <strong>Bill To:</strong><br/>
                 ${customerName}<br/>
-                <div class="company-address">${formatAddressHtml(clientAddress)}</div>
+              </div>
+              <div class="info-right">
+                <strong>Service Period:</strong><br/>
+                Start: ${format(parsedServiceStartDate, "MMM d, yyyy")} ${startTime}<br/>
+                End: ${format(parsedServiceEndDate, "MMM d, yyyy")} ${endTime}
               </div>
             </div>
 
@@ -118,8 +125,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
                   <td class="description">
                     Service Rendered<br/>
                     <small style="font-size:8pt; color:#6b7280;">
-                      From ${format(parsedServiceStartDate, "MMM d, yyyy")} ${startTime} 
-                      to ${format(parsedServiceEndDate, "MMM d, yyyy")} ${endTime}
+                      Service period details above.
                     </small>
                   </td>
                   <td class="duration-col">${duration ? `${duration.days}d ${duration.hours}h` : "N/A"}</td>
@@ -137,7 +143,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
             
             <div class="footer">
               <p>If you have any questions concerning this invoice, please contact ${companyName || "us"}.</p>
-              <p>&copy; ${new Date().getFullYear()} ${companyName || 'Your Company LLC'}. All rights reserved.</p>
+              <p>&copy; ${new Date().getFullYear()} ${companyName || 'Your Company'}. All rights reserved.</p>
             </div>
           </div>
         </div>
@@ -161,7 +167,6 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
       throw new Error("Capture element (PDF) has no dimensions.");
   }
   
-  // Short delay to allow browser rendering
   await new Promise(resolve => setTimeout(resolve, 200));
 
   try {
@@ -169,8 +174,8 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
       scale: 2, 
       useCORS: true,
       logging: true,
-      backgroundColor: null, // Allows template background to show; InvoiceTemplate has bg-card
-      scrollX: -window.scrollX, // Ensure capture starts from the top-left of the element
+      backgroundColor: null, 
+      scrollX: -window.scrollX, 
       scrollY: -window.scrollY,
       windowWidth: elementToCapture.scrollWidth,
       windowHeight: elementToCapture.scrollHeight,
@@ -186,11 +191,10 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
     const pdfWidth = canvas.width;
     const pdfHeight = canvas.height;
     
-    // Use A4-like aspect ratio for page splitting if content is too long, otherwise fit to content
     const pdf = new jsPDF({
       orientation: pdfWidth > pdfHeight ? 'l' : 'p',
       unit: 'px',
-      format: [pdfWidth, pdfHeight] // Fit to captured content size by default
+      format: [pdfWidth, pdfHeight] 
     });
     
     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
@@ -204,7 +208,8 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
 
 export const generateDoc = async (data: StoredInvoiceData, watermarkDataUrl?: string): Promise<void> => {
   console.log("Generating DOC for:", data.invoiceNumber);
-  const htmlContent = getInvoiceHtmlForDoc(data, watermarkDataUrl);
+  // Pass companyLogoDataUrl to getInvoiceHtmlForDoc if it's part of StoredInvoiceData and available
+  const htmlContent = getInvoiceHtmlForDoc(data, watermarkDataUrl); 
   const content = `
     <!DOCTYPE html>
     <html xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -214,7 +219,7 @@ export const generateDoc = async (data: StoredInvoiceData, watermarkDataUrl?: st
     </head>
     <body>${htmlContent}</body></html>`;
   
-  simulateDownload(`invoice_${data.invoiceNumber}.doc`, content, 'application/vnd.ms-word'); // More standard MIME type
+  simulateDownload(`invoice_${data.invoiceNumber}.doc`, content, 'application/vnd.ms-word');
 };
 
 export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: string, elementToCapture?: HTMLElement | null): Promise<void> => {
@@ -231,7 +236,6 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
       throw new Error("Capture element (JPEG) has no dimensions.");
   }
 
-  // Short delay to allow browser rendering
   await new Promise(resolve => setTimeout(resolve, 200));
 
   try {
@@ -239,7 +243,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
         scale: 1.5, 
         useCORS: true,
         logging: true,
-        backgroundColor: '#ffffff', // JPEGs need a solid background
+        backgroundColor: '#ffffff', 
         scrollX: -window.scrollX,
         scrollY: -window.scrollY,
         windowWidth: elementToCapture.scrollWidth,

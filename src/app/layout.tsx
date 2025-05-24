@@ -41,24 +41,24 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-background`}>
         <header className="sticky top-0 z-50 w-full border-b bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <div className="container flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-            <Link href="/" className="flex items-center gap-3 group">
-              <FileText className="h-7 w-7 text-primary group-hover:text-primary/90 transition-colors" />
+            <Link href="/" className="flex items-center gap-2 group">
+              <FileText className="h-6 w-6 text-primary group-hover:text-primary/90 transition-colors" />
               <h1 className="text-xl font-semibold tracking-tight group-hover:text-primary/90 transition-colors">InvoiceCraft</h1>
             </Link>
             <nav className="flex items-center gap-2">
               <Link href="/invoices" passHref>
-                <Button variant="outline">
+                <Button variant="ghost">
                   <ListChecks />
                   Invoices
                 </Button>
               </Link>
               <Link href="/settings" passHref>
-                 <Button variant="outline">
+                 <Button variant="ghost">
                    <Settings />
                    Settings
                  </Button>
               </Link>
-              <ThemeToggleButton /> {/* This is already variant="outline" size="icon" */}
+              <ThemeToggleButton />
             </nav>
           </div>
         </header>

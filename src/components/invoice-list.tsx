@@ -101,65 +101,65 @@ export default function InvoiceList() {
             <CardDescription>A list of your recent invoices.</CardDescription>
         </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">Invoice #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead className="w-[120px]">Date</TableHead>
-                <TableHead className="w-[150px] text-right">Amount</TableHead>
-                <TableHead className="w-[220px] text-center">Actions</TableHead>
+        {/* The div wrapper with overflow-x-auto is handled by the Table component from components/ui/table.tsx */}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="whitespace-nowrap">Invoice #</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead className="whitespace-nowrap">Date</TableHead>
+              <TableHead className="text-right whitespace-nowrap min-w-[100px]">Amount</TableHead>
+              <TableHead className="text-center min-w-[160px]">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {invoices.map((invoice) => (
+              <TableRow key={invoice.id}>
+                <TableCell className="font-medium whitespace-nowrap">{invoice.invoiceNumber}</TableCell>
+                <TableCell>{invoice.customerName}</TableCell>
+                <TableCell className="whitespace-nowrap">{formatDate(invoice.invoiceDate)}</TableCell>
+                <TableCell className="text-right whitespace-nowrap">{formatCurrency(invoice.totalFee)}</TableCell>
+                <TableCell className="text-center">
+                  <div className="flex justify-center items-center gap-1 sm:gap-2">
+                    <Button variant="ghost" size="icon" asChild title="Preview Invoice">
+                      <Link href={`/invoice/preview/${invoice.id}`}><Eye className="h-4 w-4" /></Link>
+                    </Button>
+                    <Button variant="ghost" size="icon" asChild title="Edit Invoice">
+                      <Link href={`/invoice/details?id=${invoice.id}`}><Edit className="h-4 w-4" /></Link>
+                    </Button>
+                    <Button variant="ghost" size="icon" asChild title="Download Invoice">
+                       <Link href={`/invoice/download/${invoice.id}`}><Download className="h-4 w-4" /></Link>
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" title="Delete Invoice" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the invoice
+                            <span className="font-semibold"> {invoice.invoiceNumber}</span>.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(invoice.id)} className="bg-destructive hover:bg-destructive/90">
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                  <TableCell>{invoice.customerName}</TableCell>
-                  <TableCell>{formatDate(invoice.invoiceDate)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(invoice.totalFee)}</TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex justify-center items-center gap-1 sm:gap-2">
-                      <Button variant="ghost" size="icon" asChild title="Preview Invoice">
-                        <Link href={`/invoice/preview/${invoice.id}`}><Eye className="h-4 w-4" /></Link>
-                      </Button>
-                      <Button variant="ghost" size="icon" asChild title="Edit Invoice">
-                        <Link href={`/invoice/details?id=${invoice.id}`}><Edit className="h-4 w-4" /></Link>
-                      </Button>
-                      <Button variant="ghost" size="icon" asChild title="Download Invoice">
-                         <Link href={`/invoice/download/${invoice.id}`}><Download className="h-4 w-4" /></Link>
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" title="Delete Invoice" className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the invoice
-                              <span className="font-semibold"> {invoice.invoiceNumber}</span>.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(invoice.id)} className="bg-destructive hover:bg-destructive/90">
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
 }
+

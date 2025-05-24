@@ -4,8 +4,8 @@
 import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { format, differenceInMilliseconds, isValid, parse, addDays, parseISO } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building } from "lucide-react";
+import { format, differenceInMilliseconds, isValid, parse, parseISO } from "date-fns";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash } from "lucide-react"; // Added Hash
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -67,6 +67,7 @@ export function InvoiceForm() {
   const companyLogoFileRef = useRef<HTMLInputElement | null>(null);
 
   const defaultFormValues: Partial<InvoiceFormSchemaType> = {
+    invoiceNumber: String(Date.now()).slice(-6), // Default generated invoice number
     customerName: "",
     companyName: "",
     startTime: "09:00",
@@ -97,6 +98,7 @@ export function InvoiceForm() {
       if (data) {
         const formData: Partial<InvoiceFormSchemaType> = {
           ...data,
+          invoiceNumber: data.invoiceNumber, // Ensure invoiceNumber is loaded
           startDate: data.startDate ? (data.startDate instanceof Date ? data.startDate : parseISO(data.startDate as unknown as string)) : undefined,
           endDate: data.endDate ? (data.endDate instanceof Date ? data.endDate : parseISO(data.endDate as unknown as string)) : undefined,
           totalFee: data.totalFee,
@@ -171,17 +173,11 @@ export function InvoiceForm() {
         }
       });
     } else {
-      // This logic ensures that if we are editing and no new file is selected,
-      // the existing logo preview (from localStorage) is maintained.
-      // If it's a new invoice (no currentInvoiceId), and no file selected, preview should be null.
       if (currentInvoiceId && existingData?.companyLogoDataUrl) {
-        // Only set if companyLogoPreview is not already set by a (failed) new upload attempt
         if (!companyLogoPreview && form.getValues('companyLogoFile') === undefined) {
             setCompanyLogoPreview(existingData.companyLogoDataUrl);
         }
       } else if (!currentInvoiceId) { 
-        // For new invoices, if no file is selected (or cleared), clear the preview.
-        // This also handles the case where a file was selected then removed.
          if (form.getValues('companyLogoFile') === undefined) {
             setCompanyLogoPreview(null);
          }
@@ -262,16 +258,16 @@ export function InvoiceForm() {
       const existingInvoiceData = invoiceIdToEdit ? getInvoiceData(invoiceIdToEdit) : null;
 
       const invoiceId = existingInvoiceData?.id || `inv_${Date.now()}`;
-      const invoiceNumber = existingInvoiceData?.invoiceNumber || `${String(Date.now()).slice(-6)}`; // Removed "INV-" prefix
+      // Invoice number now comes directly from the form data
+      const invoiceNumber = data.invoiceNumber; 
       
       const currentDate = new Date();
       const invoiceDateToStore = existingInvoiceData?.invoiceDate || currentDate.toISOString();
-      // const dueDate = addDays(parseISO(invoiceDateToStore), 30); // Due date removed
 
       let companyLogoDataUrlToStore: string | null = null;
       if (data.companyLogoFile && data.companyLogoFile.length > 0) {
-        companyLogoDataUrlToStore = companyLogoPreview; // Use preview if available (already validated)
-         if (!companyLogoDataUrlToStore) { // Fallback if preview somehow failed but file is there
+        companyLogoDataUrlToStore = companyLogoPreview; 
+         if (!companyLogoDataUrlToStore) { 
             companyLogoDataUrlToStore = await fileToDataUrl(data.companyLogoFile[0], toast);
         }
       } else if (existingInvoiceData?.companyLogoDataUrl) {
@@ -290,9 +286,8 @@ export function InvoiceForm() {
       
       const storedData: StoredInvoiceData = {
         id: invoiceId,
-        invoiceNumber,
+        invoiceNumber, // Use invoiceNumber from form data
         invoiceDate: invoiceDateToStore,
-        // dueDate: dueDate.toISOString(), // Due date removed
         customerName: data.customerName,
         companyName: data.companyName,
         companyLogoDataUrl: companyLogoDataUrlToStore,
@@ -345,19 +340,38 @@ export function InvoiceForm() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <FormField
-                control={form.control}
-                name="companyName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Company Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Acme Innovations Pvt. Ltd." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                    control={form.control}
+                    name="invoiceNumber"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Invoice Number</FormLabel>
+                        <FormControl>
+                        <div className="relative">
+                            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="e.g., 123456" {...field} className="pl-8" />
+                        </div>
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="companyName"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Your Company Name</FormLabel>
+                        <FormControl>
+                        <Input placeholder="e.g., Acme Innovations Pvt. Ltd." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+            </div>
 
             <FormField
               control={control}
@@ -379,7 +393,6 @@ export function InvoiceForm() {
                         onBlur={onBlur}
                         onChange={(e) => {
                             const files = e.target.files;
-                            // Ensure react-hook-form receives the FileList or undefined
                             onChange(files && files.length > 0 ? files : undefined); 
                         }}
                       />
@@ -556,7 +569,6 @@ export function InvoiceForm() {
                       value={(field.value === undefined || field.value === null) ? '' : String(field.value)}
                       onChange={e => {
                         const stringValue = e.target.value;
-                        // Allow empty string for clearing, otherwise parse
                         field.onChange(stringValue === '' ? undefined : parseFloat(stringValue));
                       }}
                     />
@@ -636,4 +648,3 @@ export function InvoiceForm() {
     </Card>
   );
 }
-

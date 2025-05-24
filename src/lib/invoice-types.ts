@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { format, parse } from 'date-fns';
 
 export const invoiceFormSchema = z.object({
+  invoiceNumber: z.string().min(1, "Invoice number is required."), // Added
   customerName: z.string().min(1, "Customer name is required").regex(/^[a-zA-Z\s.'-]+$/, "Name must contain only letters, spaces, periods, apostrophes, and hyphens."),
   companyName: z.string().min(1, "Your company name is required."),
   companyLogoFile: z.custom<FileList>((val) => val instanceof FileList && val.length > 0, "Please upload a logo")
@@ -33,7 +34,7 @@ export const invoiceFormSchema = z.object({
       ".png, .jpg, .gif files are accepted."
     )
     .optional(),
-  invoiceNotes: z.string().optional().default("Thank you for your business!"),
+  invoiceNotes: z.string().optional().default("Thank you for your business! Payment is due within 30 days."),
 }).refine(data => {
   if (data.startDate && data.startTime && data.endDate && data.endTime) {
     const startFullDateString = `${format(data.startDate, "yyyy-MM-dd")} ${data.startTime}`;
@@ -50,13 +51,11 @@ export const invoiceFormSchema = z.object({
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
 
+// StoredInvoiceData now directly uses InvoiceFormSchemaType's invoiceNumber
 export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile'> {
   id: string;
-  invoiceNumber: string;
   invoiceDate: string; // ISO string
-  // dueDate: string; // ISO string // Removed dueDate
   companyLogoDataUrl?: string | null;
   watermarkDataUrl?: string | null;
   duration?: { days: number; hours: number };
 }
-

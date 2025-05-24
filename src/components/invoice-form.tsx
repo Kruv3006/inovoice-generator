@@ -221,7 +221,7 @@ export function InvoiceForm() {
       setWatermarkPreview(null);
       setInitialDataLoaded(true);
     }
-  }, [searchParams, reset, toast, initialDataLoaded, defaultFormValues]); // Added defaultFormValues to dep array
+  }, [searchParams, reset, toast, initialDataLoaded, defaultFormValues]);
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -545,7 +545,7 @@ export function InvoiceForm() {
                   <FormItem>
                     <FormLabel>Customer Name</FormLabel>
                     {clients.length > 0 ? (
-                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select or type a customer name" />
@@ -881,7 +881,10 @@ export function InvoiceForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center"><Palette className="mr-2 h-4 w-4"/> Invoice Theme Color</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a theme" />
@@ -1011,3 +1014,5 @@ export function InvoiceForm() {
     </Card>
   );
 }
+
+    

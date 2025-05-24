@@ -1,8 +1,8 @@
+
 "use client";
 
 import type { StoredInvoiceData } from "@/lib/invoice-types";
 import { format, parseISO, addDays } from "date-fns";
-// import Image from "next/image"; // Switched to standard img for html2canvas
 import { Paperclip } from "lucide-react"; 
 
 interface InvoiceTemplateProps {
@@ -35,7 +35,6 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
 
   const defaultDisplayDate = new Date();
 
-  // Ensure dates from data are valid Date objects before formatting
   const parsedInvoiceDate = invoiceDate ? (parseISO(invoiceDate) instanceof Date && !isNaN(parseISO(invoiceDate).valueOf()) ? parseISO(invoiceDate) : defaultDisplayDate) : defaultDisplayDate;
   const parsedDueDate = dueDate ? (parseISO(dueDate) instanceof Date && !isNaN(parseISO(dueDate).valueOf()) ? parseISO(dueDate) : addDays(defaultDisplayDate, 30)) : addDays(defaultDisplayDate, 30);
   
@@ -52,32 +51,32 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
   };
 
   return (
-    <div className="bg-card p-8 md:p-12 shadow-lg rounded-lg border border-border text-card-foreground font-sans relative min-w-[800px] max-w-4xl mx-auto print:shadow-none print:border-none">
+    <div className="bg-card p-8 md:p-12 shadow-lg rounded-lg border border-border text-card-foreground font-sans relative min-w-[800px] max-w-4xl mx-auto print:shadow-none print:border-none print:bg-white">
       {/* Watermark */}
       {watermarkDataUrl && (
         <div
-          className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none print:opacity-5"
-          data-ai-hint="company logo"
+          className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none print:opacity-[0.03]" // Reduced opacity further for print
+          style={{ zIndex: 0 }} // Ensure it's behind content
+          data-ai-hint="company logo" 
         >
-          {/* Using standard img tag for better html2canvas compatibility */}
           <img
             src={watermarkDataUrl}
             alt="Watermark"
             style={{
-              maxWidth: '60%', 
-              maxHeight: '60%',
+              maxWidth: '70%', // Slightly larger
+              maxHeight: '70%',
               objectFit: 'contain',
             }}
           />
         </div>
       )}
 
-      <div className="relative z-10">
+      <div className="relative" style={{ zIndex: 1 }}> {/* Content wrapper to be above watermark */}
         {/* Header */}
-        <div className="flex justify-between items-start mb-10 pb-4 border-b border-border">
+        <div className="flex justify-between items-start mb-10 pb-4 border-b border-border print:border-gray-300">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <Paperclip className="h-10 w-10 text-primary print:text-black" /> {/* Placeholder logo */}
+              <Paperclip className="h-10 w-10 text-primary print:text-black" />
               <h1 className="text-4xl font-bold text-primary print:text-black">{companyName || "Your Company LLC"}</h1>
             </div>
             <div className="text-sm text-muted-foreground print:text-gray-600">
@@ -129,7 +128,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
                     From {format(displayServiceStartDate, "MMM d, yyyy")} {startTime} to {format(displayServiceEndDate, "MMM d, yyyy")} {endTime}
                   </p>
                 </td>
-                <td className="p-3 text-right align-top text-muted-foreground border border-border print:border-gray-400 print:text-black">
+                <td className="p-3 text-right align-top text-muted-foreground border border-border print:border-gray-400 print:text-gray-700">
                   {duration ? `${duration.days}d ${duration.hours}h` : "N/A"}
                 </td>
                 <td className="p-3 text-right align-top text-foreground border border-border print:border-gray-400 print:text-black">{formatCurrency(totalFee)}</td>
@@ -145,7 +144,6 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
               <span className="font-medium text-muted-foreground print:text-gray-600">Subtotal:</span>
               <span className="font-medium text-foreground print:text-black">{formatCurrency(totalFee)}</span>
             </div>
-            {/* Taxes and Discounts can be added here similarly if needed */}
             <div className="flex justify-between py-3 bg-primary/10 dark:bg-primary/20 px-3 rounded-md mt-2 print:bg-gray-100">
               <span className="text-xl font-bold text-primary print:text-black">Total Due:</span>
               <span className="text-xl font-bold text-primary print:text-black">{formatCurrency(totalFee)}</span>
@@ -170,3 +168,4 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
     </div>
   );
 };
+

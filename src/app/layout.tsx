@@ -49,13 +49,13 @@ export default function RootLayout({
             <nav className="flex items-center gap-4"> {/* Increased gap from 2 to 4 */}
               <Link href="/invoices" passHref>
                 <Button variant="ghost" className="text-muted-foreground hover:text-primary">
-                  <ListChecks className="mr-2 h-4 w-4" />
+                  <ListChecks className="h-4 w-4" />
                   Invoices
                 </Button>
               </Link>
               <Link href="/settings" passHref>
                  <Button variant="ghost" className="text-muted-foreground hover:text-primary">
-                   <Settings className="mr-2 h-4 w-4" />
+                   <Settings className="h-4 w-4" />
                    Settings
                  </Button>
               </Link>

@@ -41,13 +41,13 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Invoice specific variables */
-    --invoice-background: 0 0% 100%;
-    --invoice-text: 220 15% 20%;
-    --invoice-muted-text: 220 10% 40%;
+    --invoice-background: hsl(0 0% 100%);
+    --invoice-text: hsl(220 15% 20%);
+    --invoice-muted-text: hsl(220 10% 40%);
     --invoice-primary-color-hsl: 217 91% 55%; /* Base primary color for default theme */
     --invoice-primary-color: hsl(var(--invoice-primary-color-hsl));
-    --invoice-border-color: 220 15% 85%;
-    --invoice-header-bg: 220 20% 95%;
+    --invoice-border-color: hsl(220 15% 85%);
+    --invoice-header-bg: hsl(220 20% 95%);
   }
 
   .dark {
@@ -86,48 +86,48 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Invoice specific variables - Dark theme */
-    --invoice-background: 220 15% 15%;
-    --invoice-text: 220 15% 92%;
-    --invoice-muted-text: 220 10% 60%;
+    --invoice-background: hsl(220 15% 15%);
+    --invoice-text: hsl(220 15% 92%);
+    --invoice-muted-text: hsl(220 10% 60%);
     --invoice-primary-color-hsl: 217 91% 65%; /* Base primary color for dark theme */
     --invoice-primary-color: hsl(var(--invoice-primary-color-hsl));
-    --invoice-border-color: 220 15% 35%;
-    --invoice-header-bg: 220 15% 20%;
+    --invoice-border-color: hsl(220 15% 35%);
+    --invoice-header-bg: hsl(220 15% 20%);
   }
 
   /* Invoice Color Themes */
   /* Default theme uses the :root or .dark defined --invoice-primary-color-hsl */
 
   .theme-classic-blue {
-    --invoice-primary-color-hsl: 210 80% 50%; /* A classic, slightly deeper blue */
-    --invoice-header-bg: 210 50% 96%;
-    --invoice-border-color: 210 30% 80%;
+    --invoice-primary-color-hsl: 210 80% 50%;
+    --invoice-header-bg: hsl(210 50% 96%);
+    --invoice-border-color: hsl(210 30% 80%);
   }
   .dark .theme-classic-blue {
     --invoice-primary-color-hsl: 210 75% 60%;
-    --invoice-header-bg: 210 30% 22%;
-    --invoice-border-color: 210 25% 38%;
+    --invoice-header-bg: hsl(210 30% 22%);
+    --invoice-border-color: hsl(210 25% 38%);
   }
 
   .theme-emerald-green {
-    --invoice-primary-color-hsl: 145 63% 40%; /* Emerald Green */
-    --invoice-header-bg: 145 40% 95%;
-    --invoice-border-color: 145 30% 80%;
+    --invoice-primary-color-hsl: 145 63% 40%;
+    --invoice-header-bg: hsl(145 40% 95%);
+    --invoice-border-color: hsl(145 30% 80%);
   }
   .dark .theme-emerald-green {
     --invoice-primary-color-hsl: 145 55% 55%;
-    --invoice-header-bg: 145 30% 20%;
-    --invoice-border-color: 145 25% 35%;
+    --invoice-header-bg: hsl(145 30% 20%);
+    --invoice-border-color: hsl(145 25% 35%);
   }
    .theme-crimson-red {
-    --invoice-primary-color-hsl: 340 70% 45%; /* Crimson Red */
-    --invoice-header-bg: 340 50% 96%;
-    --invoice-border-color: 340 40% 85%;
+    --invoice-primary-color-hsl: 340 70% 45%;
+    --invoice-header-bg: hsl(340 50% 96%);
+    --invoice-border-color: hsl(340 40% 85%);
   }
   .dark .theme-crimson-red {
     --invoice-primary-color-hsl: 340 65% 60%;
-    --invoice-header-bg: 340 30% 20%;
-    --invoice-border-color: 340 25% 40%;
+    --invoice-header-bg: hsl(340 30% 20%);
+    --invoice-border-color: hsl(340 25% 40%);
   }
 
 }

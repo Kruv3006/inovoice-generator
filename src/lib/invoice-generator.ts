@@ -1,6 +1,6 @@
 
-import type { StoredInvoiceData, LineItem } from './invoice-types';
-import { format, parseISO } from 'date-fns';
+import type { StoredInvoiceData, StoredLineItem } from './invoice-types';
+import { format, parseISO, isValid, differenceInCalendarDays } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { toast } from '@/hooks/use-toast'; 
@@ -23,18 +23,15 @@ const simulateDownload = (filename: string, dataUrlOrContent: string, mimeType: 
   }
 };
 
-// Function to get HTML content of the invoice for DOC generation
 const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string): string => {
   const {
     companyName, customerName, invoiceNumber, invoiceDate,
-    startDate, startTime, endDate, endTime, items, totalFee, invoiceNotes,
+    items, totalFee, invoiceNotes,
     companyLogoDataUrl,
   } = data;
 
-  const parsedInvoiceDate = invoiceDate ? (parseISO(invoiceDate) instanceof Date && !isNaN(parseISO(invoiceDate).valueOf()) ? parseISO(invoiceDate) : new Date()) : new Date();
-  const parsedServiceStartDate = startDate instanceof Date ? startDate : (startDate ? parseISO(startDate as unknown as string) : new Date());
-  const parsedServiceEndDate = endDate instanceof Date ? endDate : (endDate ? parseISO(endDate as unknown as string) : new Date());
-
+  const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : new Date();
+  
   const fCurrency = (val?: number) => val != null ? `₹${val.toFixed(2)}` : '₹0.00';
 
   const companyLogoHtml = companyLogoDataUrl
@@ -47,22 +44,33 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
        </div>`
     : '';
 
-  const primaryColor = 'hsl(var(--invoice-primary-color, #2563eb))';
-  const textColor = 'hsl(var(--invoice-text, #1f2937))';
-  const mutedTextColor = 'hsl(var(--invoice-muted-text, #6b7280))';
-  const borderColor = 'hsl(var(--invoice-border-color, #e5e7eb))';
-  const headerBgColor = 'hsl(var(--invoice-header-bg, #f3f4f6))';
-  const invoiceBgColor = 'hsl(var(--invoice-background, #ffffff))';
+  const primaryColor = 'hsl(var(--invoice-primary-color, 217, 91%, 60%))'; // Using HSL string for consistency
+  const textColor = 'hsl(var(--invoice-text, 220, 15%, 25%))';
+  const mutedTextColor = 'hsl(var(--invoice-muted-text, 220, 10%, 45%))';
+  const borderColor = 'hsl(var(--invoice-border-color, 220, 15%, 88%))';
+  const headerBgColor = 'hsl(var(--invoice-header-bg, 220, 20%, 97%))';
+  const invoiceBgColor = 'hsl(var(--invoice-background, 0, 0%, 100%))';
+
 
   let itemsHtml = '';
   if (items && items.length > 0) {
     items.forEach(item => {
+      const itemStartDate = item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? parseISO(item.itemStartDate) : null;
+      const itemEndDate = item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? parseISO(item.itemEndDate) : null;
+      let displayQuantity = item.quantity;
+      let dateRangeHtml = '';
+
+      if (itemStartDate && itemEndDate && itemEndDate >= itemStartDate) {
+          displayQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
+          dateRangeHtml = `<div style="font-size: 8pt; color: ${mutedTextColor}; margin-top: 3px;">(${format(itemStartDate, "MMM d, yyyy")} - ${format(itemEndDate, "MMM d, yyyy")})</div>`;
+      }
+
       itemsHtml += `
         <tr>
-          <td class="description-col">${item.description}</td>
-          <td class="qty-col">${item.quantity}</td>
+          <td class="description-col">${item.description}${dateRangeHtml}</td>
+          <td class="qty-col">${displayQuantity}</td>
           <td class="rate-col">${fCurrency(item.rate)}</td>
-          <td class="amount-col">${fCurrency(item.quantity * item.rate)}</td>
+          <td class="amount-col">${fCurrency(displayQuantity * item.rate)}</td>
         </tr>
       `;
     });
@@ -91,11 +99,10 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
           .invoice-details-doc strong { color: ${textColor}; }
 
           .client-info-section { display: table; width: 100%; margin-bottom: 25px; }
-          .client-info-left, .client-info-right { display: table-cell; vertical-align: top; width: 50%; font-size: 9.5pt; }
-          .client-info-right { text-align: right; }
+          .client-info-left { display: table-cell; vertical-align: top; width: 50%; font-size: 9.5pt; }
+          /* .client-info-right removed as global service dates are gone */
           .client-info-section h3 { font-size: 9pt; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; margin-bottom: 4px; margin-top:0; }
           .client-info-section p { margin: 0 0 3px 0; color: ${textColor}; }
-          .client-info-section p strong { font-weight: 600; }
           
           .items-table-doc { width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 25px; font-size: 9.5pt; }
           .items-table-doc th, .items-table-doc td { padding: 10px; border: 1px solid ${borderColor}; }
@@ -106,10 +113,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
           .items-table-doc .amount-col { width: 20%; text-align: right; }
           
           .totals-section { text-align: right; margin-top: 20px; margin-bottom: 25px; font-size: 10pt; }
-          .totals-section div { margin-bottom: 6px; }
-          .totals-section strong {color: ${textColor};}
-          /* .totals-section .subtotal-line { padding-bottom: 5px; border-bottom: 1px dashed ${borderColor}; } */
-          .totals-section .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColor}; background-color: rgba(37, 99, 235, 0.05); padding: 8px; margin-top:8px; border-radius: 4px;}
+          .totals-section .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColor}; background-color: hsla(var(--invoice-primary-color-hsl, 217, 91%, 60%), 0.1); padding: 8px; margin-top:8px; border-radius: 4px;} /* Adjusted background for HSL */
           
           .notes-section { margin-top: 25px; padding-top:15px; border-top: 1px solid ${borderColor}; font-size: 9pt; color: ${mutedTextColor}; }
           .notes-section h4 { font-size: 9pt; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; margin-bottom: 4px; margin-top:0; }
@@ -138,19 +142,14 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
                 <h3>Bill To</h3>
                 <p>${customerName}</p>
               </div>
-              <div class="client-info-right">
-                <h3>Service Period</h3>
-                <p><strong>Start:</strong> ${format(parsedServiceStartDate, "MMM d, yyyy")} ${startTime}</p>
-                <p><strong>End:</strong> ${format(parsedServiceEndDate, "MMM d, yyyy")} ${endTime}</p>
-              </div>
             </div>
 
             <table class="items-table-doc">
               <thead>
                 <tr>
                   <th class="description-col">Description</th>
-                  <th class="qty-col">Qty</th>
-                  <th class="rate-col">Rate</th>
+                  <th class="qty-col">Qty / Days</th>
+                  <th class="rate-col">Rate / Per Day</th>
                   <th class="amount-col">Amount</th>
                 </tr>
               </thead>
@@ -167,7 +166,6 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
             
             <div class="footer-section">
               <p>Thank you for your business!</p>
-              <p>If you have any questions concerning this invoice, please contact ${companyName || "us"}.</p>
             </div>
           </div>
         </div>
@@ -196,8 +194,8 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
   elementToCapture.style.left = '0px'; 
   elementToCapture.style.top = '0px';
   elementToCapture.style.zIndex = '10000'; 
-  const docInvoiceBg = getComputedStyle(document.documentElement).getPropertyValue('--invoice-background').trim();
-  elementToCapture.style.backgroundColor = docInvoiceBg || 'white';
+  const docInvoiceBg = getComputedStyle(document.documentElement).getPropertyValue('--invoice-background').trim() || 'white';
+  elementToCapture.style.backgroundColor = `hsl(${docInvoiceBg})`;
 
 
   await new Promise(resolve => setTimeout(resolve, 300)); 
@@ -278,8 +276,8 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
   elementToCapture.style.left = '0px';
   elementToCapture.style.top = '0px';
   elementToCapture.style.zIndex = '10000';
-  const docInvoiceBg = getComputedStyle(document.documentElement).getPropertyValue('--invoice-background').trim();
-  elementToCapture.style.backgroundColor = docInvoiceBg || 'white';
+  const docInvoiceBg = getComputedStyle(document.documentElement).getPropertyValue('--invoice-background').trim() || 'white';
+  elementToCapture.style.backgroundColor = `hsl(${docInvoiceBg})`;
 
 
   await new Promise(resolve => setTimeout(resolve, 300)); 
@@ -289,7 +287,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
         scale: 1.5, 
         useCORS: true,
         logging: true,
-        backgroundColor: '#ffffff', 
+        backgroundColor: `hsl(${docInvoiceBg})`, // Explicitly set for JPEG
         scrollX: -window.scrollX,
         scrollY: -window.scrollY,
         windowWidth: elementToCapture.scrollWidth,
@@ -311,7 +309,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
 
     const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9); 
     simulateDownload(`invoice_${data.invoiceNumber}.jpeg`, jpegDataUrl, 'image/jpeg', true);
-  } catch (error) {
+  } catch (error)_ {
     console.error("Error generating JPEG with html2canvas:", error);
     toast({ variant: "destructive", title: "JPEG Generation Error", description: "Could not generate JPEG. Check console." });
     throw error;

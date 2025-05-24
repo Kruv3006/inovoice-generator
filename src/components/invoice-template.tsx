@@ -1,8 +1,8 @@
 
 "use client";
 
-import type { StoredInvoiceData, LineItem } from "@/lib/invoice-types";
-import { format, parseISO } from "date-fns";
+import type { StoredInvoiceData, StoredLineItem } from "@/lib/invoice-types";
+import { format, parseISO, isValid, differenceInCalendarDays } from "date-fns";
 import Image from "next/image";
 
 interface InvoiceTemplateProps {
@@ -22,25 +22,13 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
     customerName,
     invoiceNumber,
     invoiceDate,
-    startDate,
-    endDate,
-    startTime,
-    endTime,
     items,
-    totalFee, // This now comes from StoredInvoiceData
+    totalFee,
     invoiceNotes,
   } = data;
 
   const defaultDisplayDate = new Date();
-
-  const parsedInvoiceDate = invoiceDate ? (parseISO(invoiceDate) instanceof Date && !isNaN(parseISO(invoiceDate).valueOf()) ? parseISO(invoiceDate) : defaultDisplayDate) : defaultDisplayDate;
-  
-  const displayServiceStartDate = startDate instanceof Date && !isNaN(startDate.valueOf()) 
-                                  ? startDate 
-                                  : (startDate ? (parseISO(startDate as unknown as string) instanceof Date && !isNaN(parseISO(startDate as unknown as string).valueOf()) ? parseISO(startDate as unknown as string) : defaultDisplayDate) : defaultDisplayDate);
-  const displayServiceEndDate = endDate instanceof Date && !isNaN(endDate.valueOf()) 
-                                ? endDate 
-                                : (endDate ? (parseISO(endDate as unknown as string) instanceof Date && !isNaN(parseISO(endDate as unknown as string).valueOf()) ? parseISO(endDate as unknown as string) : defaultDisplayDate) : defaultDisplayDate);
+  const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : defaultDisplayDate;
 
   return (
     <div className="bg-[var(--invoice-background)] text-[var(--invoice-text)] font-sans shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white"
@@ -94,15 +82,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
             <h3 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">BILL TO</h3>
             <p className="text-lg font-medium text-[var(--invoice-text)] print:text-black">{customerName || "Client Name"}</p>
           </div>
-          <div className="sm:text-right">
-            <h3 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">SERVICE PERIOD</h3>
-            <p className="text-sm text-[var(--invoice-text)] print:text-gray-700">
-              <span className="font-medium">Start:</span> {format(displayServiceStartDate, "MMM d, yyyy")} {startTime}
-            </p>
-            <p className="text-sm text-[var(--invoice-text)] print:text-gray-700">
-              <span className="font-medium">End:</span> {format(displayServiceEndDate, "MMM d, yyyy")} {endTime}
-            </p>
-          </div>
+          {/* Global service period removed */}
         </section>
 
         <section className="mb-8">
@@ -111,29 +91,43 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
               <thead className="bg-[var(--invoice-header-bg)] print:bg-gray-100">
                 <tr>
                   <th className="p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600 w-2/5 sm:w-3/5">Description</th>
-                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Qty</th>
-                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Rate</th>
+                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Qty / Days</th>
+                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Rate / Per Day</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--invoice-border-color)]">
                 {items && items.length > 0 ? (
-                  items.map((item, index) => (
+                  items.map((item, index) => {
+                    const itemStartDate = item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? parseISO(item.itemStartDate) : null;
+                    const itemEndDate = item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? parseISO(item.itemEndDate) : null;
+                    let displayQuantity = item.quantity;
+                    
+                    if (itemStartDate && itemEndDate && itemEndDate >= itemStartDate) {
+                        displayQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
+                    }
+
+                    return (
                     <tr key={item.id || index} className="bg-[var(--invoice-background)] hover:bg-[var(--invoice-header-bg)]/50 print:bg-white">
                       <td className="p-3 align-top text-[var(--invoice-text)] print:text-black">
                         {item.description}
+                        {itemStartDate && itemEndDate && (
+                          <div className="text-xs text-[var(--invoice-muted-text)] print:text-gray-500 mt-1">
+                            ({format(itemStartDate, "MMM d, yyyy")} - {format(itemEndDate, "MMM d, yyyy")})
+                          </div>
+                        )}
                       </td>
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700">
-                        {item.quantity}
+                        {displayQuantity}
                       </td>
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700">
                         {formatCurrency(item.rate)}
                       </td>
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-black">
-                        {formatCurrency(item.quantity * item.rate)}
+                        {formatCurrency(displayQuantity * item.rate)}
                       </td>
                     </tr>
-                  ))
+                  )})
                 ) : (
                   <tr className="bg-[var(--invoice-background)] print:bg-white">
                     <td colSpan={4} className="p-3 text-center text-[var(--invoice-muted-text)] print:text-gray-500">
@@ -148,11 +142,6 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
         
         <section className="flex justify-end mb-8">
           <div className="w-full sm:w-1/2 md:w-2/5 lg:w-1/3 space-y-2">
-             {/* Subtotal can be shown if there are other charges like tax, discount in future. For now, totalFee is the final amount. */}
-            {/* <div className="flex justify-between py-2 border-b border-dashed border-[var(--invoice-border-color)]">
-              <span className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">Subtotal:</span>
-              <span className="text-sm font-medium text-[var(--invoice-text)] print:text-black">{formatCurrency(totalFee)}</span>
-            </div> */}
             <div className="flex justify-between items-center py-3 bg-[var(--invoice-primary-color)]/10 dark:bg-[var(--invoice-primary-color)]/20 px-3 rounded-md">
               <span className="text-lg font-bold text-[var(--invoice-primary-color)] print:text-black">TOTAL:</span>
               <span className="text-lg font-bold text-[var(--invoice-primary-color)] print:text-black">{formatCurrency(totalFee)}</span>
@@ -169,7 +158,6 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
 
         <footer className="text-center text-xs text-[var(--invoice-muted-text)] pt-6 border-t border-[var(--invoice-border-color)] print:text-gray-500">
           <p>Thank you for your business!</p>
-          <p>If you have any questions concerning this invoice, please contact: {companyName || "Your Company Name"}.</p>
         </footer>
       </div>
     </div>

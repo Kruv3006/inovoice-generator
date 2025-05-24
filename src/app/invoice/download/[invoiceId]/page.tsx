@@ -11,7 +11,7 @@ import type { StoredInvoiceData } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { generatePdf, generateDoc, generateJpeg } from '@/lib/invoice-generator';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 
 export default function InvoiceDownloadPage() {
   const router = useRouter();
@@ -110,8 +110,8 @@ export default function InvoiceDownloadPage() {
     );
   }
   
-  const invoiceDateForDisplay = invoiceData.invoiceDate 
-    ? (parseISO(invoiceData.invoiceDate) instanceof Date && !isNaN(parseISO(invoiceData.invoiceDate).valueOf()) ? parseISO(invoiceData.invoiceDate) : new Date()) 
+  const mainInvoiceDateForDisplay = invoiceData.invoiceDate && isValid(parseISO(invoiceData.invoiceDate)) 
+    ? parseISO(invoiceData.invoiceDate) 
     : new Date();
 
 
@@ -185,7 +185,7 @@ export default function InvoiceDownloadPage() {
             <p><strong>Company:</strong> {invoiceData.companyName}</p>
             <p><strong>Customer:</strong> {invoiceData.customerName}</p>
             <p><strong>Total Amount:</strong> {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(invoiceData.totalFee || 0)}</p>
-            <p><strong>Invoice Date:</strong> {format(invoiceDateForDisplay, "MMMM d, yyyy")}</p>
+            <p><strong>Invoice Date:</strong> {format(mainInvoiceDateForDisplay, "MMMM d, yyyy")}</p>
           </CardContent>
         </Card>
 

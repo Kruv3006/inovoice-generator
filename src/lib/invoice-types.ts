@@ -1,13 +1,13 @@
 
 import { z } from 'zod';
-import { format, parse } from 'date-fns';
+import { format, parse, differenceInCalendarDays, isValid } from 'date-fns';
 
 export const lineItemSchema = z.object({
   id: z.string().optional(), // For react-hook-form key attribute
   description: z.string().min(1, "Description is required."),
   quantity: z.preprocess(
     (val) => {
-      const strVal = String(val).replace(/[^0-9.]+/g, ""); // Allow decimals
+      const strVal = String(val).replace(/[^0-9.]+/g, "");
       const num = parseFloat(strVal);
       return isNaN(num) ? undefined : num;
     },
@@ -16,14 +16,24 @@ export const lineItemSchema = z.object({
   ),
   rate: z.preprocess(
     (val) => {
-      const strVal = String(val).replace(/[^0-9.]+/g, ""); // Allow decimals
+      const strVal = String(val).replace(/[^0-9.]+/g, "");
       const num = parseFloat(strVal);
       return isNaN(num) ? undefined : num;
     },
     z.number({ invalid_type_error: "Rate must be a number.", required_error: "Rate is required." })
      .positive({ message: "Rate must be positive." })
   ),
-  // Amount will be calculated: quantity * rate
+  itemStartDate: z.date().optional(),
+  itemEndDate: z.date().optional(),
+}).refine(data => {
+  // If both item dates are provided, end date must be after or same as start date
+  if (data.itemStartDate && data.itemEndDate) {
+    return data.itemEndDate >= data.itemStartDate;
+  }
+  return true;
+}, {
+  message: "Item end date must be on or after item start date.",
+  path: ["itemEndDate"],
 });
 
 export type LineItem = z.infer<typeof lineItemSchema>;
@@ -39,11 +49,8 @@ export const invoiceFormSchema = z.object({
       ".png, .jpg, .gif files are accepted."
     )
     .optional(),
-  startDate: z.date({ required_error: "Start date is required." }),
-  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Valid 24-hour time (HH:MM) is required."),
-  endDate: z.date({ required_error: "End date is required." }),
-  endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Valid 24-hour time (HH:MM) is required."),
   
+  invoiceDate: z.date({ required_error: "Invoice date is required." }),
   items: z.array(lineItemSchema).min(1, "At least one item is required."),
 
   watermarkFile: z.custom<FileList>((val) => val instanceof FileList && val.length > 0, "Please upload a file")
@@ -54,27 +61,21 @@ export const invoiceFormSchema = z.object({
     )
     .optional(),
   invoiceNotes: z.string().optional().default("Thank you for your business! Payment is due within 30 days."),
-}).refine(data => {
-  if (data.startDate && data.startTime && data.endDate && data.endTime) {
-    const startFullDateString = `${format(data.startDate, "yyyy-MM-dd")} ${data.startTime}`;
-    const endFullDateString = `${format(data.endDate, "yyyy-MM-dd")} ${data.endTime}`;
-    const startFullDate = parse(startFullDateString, 'yyyy-MM-dd HH:mm', new Date());
-    const endFullDate = parse(endFullDateString, 'yyyy-MM-dd HH:mm', new Date());
-    return endFullDate > startFullDate;
-  }
-  return true;
-}, {
-  message: "End date & time must be after start date & time.",
-  path: ["endDate"],
 });
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
 
-export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items'> {
+// StoredInvoiceData will store dates as ISO strings for localStorage compatibility
+// but they will be converted back to Date objects when read by getInvoiceData
+export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEndDate'> {
+  itemStartDate?: string; // ISO string
+  itemEndDate?: string; // ISO string
+}
+export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate'> {
   id: string;
-  invoiceDate: string; // ISO string
+  invoiceDate: string; // ISO string for main invoice date
   companyLogoDataUrl?: string | null;
   watermarkDataUrl?: string | null;
-  items: LineItem[];
+  items: StoredLineItem[];
   totalFee: number; // Calculated total fee
 }

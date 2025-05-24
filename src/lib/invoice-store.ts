@@ -1,12 +1,22 @@
 
-import type { StoredInvoiceData, LineItem } from './invoice-types';
-import { parseISO } from 'date-fns';
+import type { StoredInvoiceData, StoredLineItem } from './invoice-types';
+import { parseISO, isValid } from 'date-fns';
 
 const INVOICE_STORAGE_KEY_PREFIX = 'invoiceData_';
 
 export const saveInvoiceData = (invoiceId: string, data: StoredInvoiceData): void => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem(`${INVOICE_STORAGE_KEY_PREFIX}${invoiceId}`, JSON.stringify(data));
+    // Ensure dates in items are stored as ISO strings
+    const dataToStore = {
+      ...data,
+      invoiceDate: data.invoiceDate, // Already ISO string from form
+      items: data.items.map(item => ({
+        ...item,
+        itemStartDate: item.itemStartDate ? item.itemStartDate : undefined,
+        itemEndDate: item.itemEndDate ? item.itemEndDate : undefined,
+      }))
+    };
+    localStorage.setItem(`${INVOICE_STORAGE_KEY_PREFIX}${invoiceId}`, JSON.stringify(dataToStore));
   }
 };
 
@@ -18,26 +28,22 @@ export const getInvoiceData = (invoiceId: string): StoredInvoiceData | null => {
     }
     const parsedData = JSON.parse(dataString) as StoredInvoiceData;
 
-    if (parsedData.startDate && typeof parsedData.startDate === 'string') {
-      parsedData.startDate = parseISO(parsedData.startDate);
-    }
-    if (parsedData.endDate && typeof parsedData.endDate === 'string') {
-      parsedData.endDate = parseISO(parsedData.endDate);
-    }
-    
-    // Ensure items have numeric quantity and rate if they were stringified/parsed weirdly
+    // Convert main invoiceDate back to string if needed or ensure it's a valid ISO string
+    // It should be stored as ISO string from form submission.
+
+    // Convert item dates from ISO strings back to Date objects
     if (parsedData.items && Array.isArray(parsedData.items)) {
       parsedData.items = parsedData.items.map(item => ({
         ...item,
+        itemStartDate: item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? item.itemStartDate : undefined,
+        itemEndDate: item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? item.itemEndDate : undefined,
         quantity: Number(item.quantity) || 0,
         rate: Number(item.rate) || 0,
       }));
     } else {
-      // Provide a default empty item if items array is missing or malformed
       parsedData.items = [{ description: "Default Item", quantity: 1, rate: 0 }];
     }
     
-    // Ensure totalFee is a number
     parsedData.totalFee = Number(parsedData.totalFee) || 0;
 
     return parsedData;

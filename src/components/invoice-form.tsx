@@ -4,8 +4,8 @@
 import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
-import { format, isValid, parse, parseISO } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, DollarSign } from "lucide-react";
+import { format, isValid, parse, parseISO, differenceInCalendarDays } from "date-fns";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -32,7 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { InvoiceFormSchemaType, StoredInvoiceData, LineItem } from "@/lib/invoice-types";
+import type { InvoiceFormSchemaType, StoredInvoiceData, LineItem, StoredLineItem } from "@/lib/invoice-types";
 import { invoiceFormSchema } from "@/lib/invoice-types";
 import { getInvoiceData, saveInvoiceData } from "@/lib/invoice-store";
 
@@ -41,6 +41,16 @@ const fileToDataUrl = (file: File, toastFn: ReturnType<typeof useToast>['toast']
     if (!file) {
         resolve(null);
         return;
+    }
+    if (file.size > 5 * 1024 * 1024) { // Max 5MB
+      toastFn({ variant: "destructive", title: "File Too Large", description: "File must be less than 5MB." });
+      resolve(null);
+      return;
+    }
+    if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+      toastFn({ variant: "destructive", title: "Invalid File Type", description: "File must be PNG, JPEG, or GIF." });
+      resolve(null);
+      return;
     }
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -68,17 +78,20 @@ export function InvoiceForm() {
   const watermarkFileRef = useRef<HTMLInputElement | null>(null);
   const companyLogoFileRef = useRef<HTMLInputElement | null>(null);
 
-  const defaultItem: LineItem = { description: "", quantity: 1, rate: 0 };
+  const defaultItem: LineItem = { 
+    description: "", 
+    quantity: 1, 
+    rate: 0, 
+    itemStartDate: undefined, 
+    itemEndDate: undefined 
+  };
 
-  const defaultFormValues: Partial<InvoiceFormSchemaType> = {
+  const defaultFormValues: InvoiceFormSchemaType = {
     invoiceNumber: String(Date.now()).slice(-6),
     customerName: "",
     companyName: "",
+    invoiceDate: new Date(),
     items: [defaultItem],
-    startDate: new Date(),
-    startTime: "09:00",
-    endDate: new Date(),
-    endTime: "17:00",
     invoiceNotes: "Thank you for your business! Payment is due within 30 days.",
     companyLogoFile: undefined,
     watermarkFile: undefined,
@@ -87,10 +100,10 @@ export function InvoiceForm() {
   const form = useForm<InvoiceFormSchemaType>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: defaultFormValues,
-    mode: "onChange", // Important for useFieldArray and live calculations
+    mode: "onChange", 
   });
 
-  const { watch, control, reset, setValue, trigger, getValues } = form;
+  const { watch, control, reset, setValue, trigger, getValues, formState: { errors } } = form;
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -101,14 +114,25 @@ export function InvoiceForm() {
 
   useEffect(() => {
     if (watchedItems) {
-      const total = watchedItems.reduce((sum, item) => {
-        const quantity = typeof item.quantity === 'number' ? item.quantity : 0;
-        const rate = typeof item.rate === 'number' ? item.rate : 0;
-        return sum + (quantity * rate);
-      }, 0);
+      let total = 0;
+      watchedItems.forEach((item, index) => {
+        let quantity = Number(item.quantity) || 0;
+        const rate = Number(item.rate) || 0;
+
+        if (item.itemStartDate && item.itemEndDate && isValid(item.itemStartDate) && isValid(item.itemEndDate) && item.itemEndDate >= item.itemStartDate) {
+          const days = differenceInCalendarDays(item.itemEndDate, item.itemStartDate) + 1;
+          quantity = days;
+          // Note: We don't directly call setValue for quantity here if it's derived,
+          // instead, ensure the calculation for total uses this derived quantity.
+          // However, if quantity field IS NOT read-only and is used for calculation,
+          // then `setValue(`items.${index}.quantity`, days, { shouldValidate: true });` might be needed.
+          // For now, we just use `days` in the `total` calculation directly.
+        }
+        total += quantity * rate;
+      });
       setCalculatedTotalFee(total);
     }
-  }, [watchedItems]);
+  }, [watchedItems, setValue]);
 
 
   useEffect(() => {
@@ -116,13 +140,19 @@ export function InvoiceForm() {
     if (invoiceIdToEdit && !initialDataLoaded) {
       const data = getInvoiceData(invoiceIdToEdit);
       if (data) {
+        const formItems = data.items?.map(item => ({
+          ...item,
+          itemStartDate: item.itemStartDate ? parseISO(item.itemStartDate) : undefined,
+          itemEndDate: item.itemEndDate ? parseISO(item.itemEndDate) : undefined,
+          quantity: Number(item.quantity) || 0, // ensure numeric
+          rate: Number(item.rate) || 0, // ensure numeric
+        })) || [defaultItem];
+
         const formData: InvoiceFormSchemaType = {
-          ...defaultFormValues, // Start with defaults
-          ...data, // Override with loaded data
-          invoiceNumber: data.invoiceNumber,
-          startDate: data.startDate ? (data.startDate instanceof Date ? data.startDate : parseISO(data.startDate as unknown as string)) : new Date(),
-          endDate: data.endDate ? (data.endDate instanceof Date ? data.endDate : parseISO(data.endDate as unknown as string)) : new Date(),
-          items: data.items && data.items.length > 0 ? data.items : [defaultItem],
+          ...defaultFormValues,
+          ...data,
+          invoiceDate: data.invoiceDate ? (parseISO(data.invoiceDate) instanceof Date && !isNaN(parseISO(data.invoiceDate).valueOf()) ? parseISO(data.invoiceDate) : new Date()) : new Date(),
+          items: formItems.length > 0 ? formItems : [defaultItem],
           companyLogoFile: undefined, 
           watermarkFile: undefined,
         };
@@ -144,7 +174,7 @@ export function InvoiceForm() {
       setCompanyLogoPreview(null);
       setInitialDataLoaded(true); 
     }
-  }, [searchParams, reset, toast, initialDataLoaded, defaultFormValues]);
+  }, [searchParams, reset, toast, initialDataLoaded, defaultFormValues, defaultItem]);
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -155,34 +185,23 @@ export function InvoiceForm() {
   
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
-      if (file.size > 2 * 1024 * 1024) {
-        toast({ variant: "destructive", title: "File Too Large", description: "Company logo must be less than 2MB." });
-        setValue('companyLogoFile', undefined, { shouldValidate: true });
-        setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
-        return;
-      }
-      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
-        toast({ variant: "destructive", title: "Invalid File Type", description: "Company logo must be PNG, JPEG, or GIF." });
-        setValue('companyLogoFile', undefined, { shouldValidate: true });
-        setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
-        return;
-      }
       fileToDataUrl(file, toast).then(dataUrl => {
-        setCompanyLogoPreview(dataUrl);
-        if (!dataUrl) {
-            setValue('companyLogoFile', undefined, { shouldValidate: true });
-            setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
+        if (dataUrl) {
+          setCompanyLogoPreview(dataUrl);
+        } else { // fileToDataUrl handles toast for errors
+          setValue('companyLogoFile', undefined, { shouldValidate: true });
+          setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
         }
       });
     } else {
-        const currentLogoFileValue = form.getValues('companyLogoFile');
-        if (existingData?.companyLogoDataUrl && (!currentLogoFileValue || currentLogoFileValue.length === 0)) {
-             setCompanyLogoPreview(existingData.companyLogoDataUrl);
-        } else if (!existingData && (!currentLogoFileValue || currentLogoFileValue.length === 0)) {
-            setCompanyLogoPreview(null);
-        }
+      const currentLogoFileValue = getValues('companyLogoFile');
+      if (existingData?.companyLogoDataUrl && (!currentLogoFileValue || currentLogoFileValue.length === 0)) {
+        setCompanyLogoPreview(existingData.companyLogoDataUrl);
+      } else if (!existingData && (!currentLogoFileValue || currentLogoFileValue.length === 0)) {
+        setCompanyLogoPreview(null);
+      }
     }
-  }, [watchedCompanyLogoFile, searchParams, setValue, toast, trigger, form]);
+  }, [watchedCompanyLogoFile, searchParams, setValue, toast, getValues]);
 
   useEffect(() => {
     const currentInvoiceId = searchParams.get('id');
@@ -190,34 +209,23 @@ export function InvoiceForm() {
   
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
-      if (file.size > 5 * 1024 * 1024) {
-        toast({ variant: "destructive", title: "File Too Large", description: "Watermark image must be less than 5MB." });
-        setValue('watermarkFile', undefined, { shouldValidate: true }); 
-        setWatermarkPreview(existingData?.watermarkDataUrl || null);
-        return;
-      }
-      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
-        toast({ variant: "destructive", title: "Invalid File Type", description: "Watermark must be PNG, JPEG, or GIF." });
-        setValue('watermarkFile', undefined, { shouldValidate: true });
-        setWatermarkPreview(existingData?.watermarkDataUrl || null);
-        return;
-      }
       fileToDataUrl(file, toast).then(dataUrl => {
-        setWatermarkPreview(dataUrl); 
-        if (!dataUrl) { 
-            setValue('watermarkFile', undefined, { shouldValidate: true }); 
-            setWatermarkPreview(existingData?.watermarkDataUrl || null);
+        if (dataUrl) {
+          setWatermarkPreview(dataUrl);
+        } else {
+          setValue('watermarkFile', undefined, { shouldValidate: true }); 
+          setWatermarkPreview(existingData?.watermarkDataUrl || null);
         }
       });
     } else {
-        const currentWatermarkFileValue = form.getValues('watermarkFile');
-        if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
-             setWatermarkPreview(existingData.watermarkDataUrl);
-        } else if (!existingData && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
-            setWatermarkPreview(null);
-        }
+      const currentWatermarkFileValue = getValues('watermarkFile');
+      if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
+        setWatermarkPreview(existingData.watermarkDataUrl);
+      } else if (!existingData && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
+        setWatermarkPreview(null);
+      }
     }
-  }, [watchedWatermarkFile, searchParams, setValue, toast, trigger, form]);
+  }, [watchedWatermarkFile, searchParams, setValue, toast, getValues]);
   
   async function onSubmit(data: InvoiceFormSchemaType) {
     setIsSubmitting(true);
@@ -226,28 +234,39 @@ export function InvoiceForm() {
       const existingInvoiceData = invoiceIdToEdit ? getInvoiceData(invoiceIdToEdit) : null;
 
       const invoiceId = existingInvoiceData?.id || `inv_${Date.now()}`;
-      const invoiceNumber = data.invoiceNumber; 
       
-      const currentDate = new Date();
-      const invoiceDateToStore = existingInvoiceData?.invoiceDate || currentDate.toISOString();
-
       let companyLogoDataUrlToStore: string | null = companyLogoPreview;
-      if (data.companyLogoFile && data.companyLogoFile.length > 0 && !companyLogoDataUrlToStore) {
-        // If preview isn't set but file exists (e.g., error during preview gen but still submitted)
-        companyLogoDataUrlToStore = await fileToDataUrl(data.companyLogoFile[0], toast);
-      } else if (!data.companyLogoFile && existingInvoiceData?.companyLogoDataUrl && !companyLogoPreview) {
-         // If no new file is selected and no preview is set (e.g. user cleared selection), but there was an existing logo
-         // This case might need clarification: if a user clears a selection, should we remove the existing logo?
-         // For now, if `companyLogoPreview` is null, it implies the logo should be removed or was never there.
+      if (data.companyLogoFile && data.companyLogoFile.length > 0 && companyLogoPreview) { // only use preview if it's set
+         // companyLogoDataUrlToStore is already set to companyLogoPreview
+      } else if (!data.companyLogoFile && existingInvoiceData?.companyLogoDataUrl) {
+         companyLogoDataUrlToStore = existingInvoiceData.companyLogoDataUrl;
+      } else {
+         companyLogoDataUrlToStore = null;
       }
-
 
       let watermarkDataUrlToStore: string | null = watermarkPreview;
-      if (data.watermarkFile && data.watermarkFile.length > 0 && !watermarkDataUrlToStore) {
-        watermarkDataUrlToStore = await fileToDataUrl(data.watermarkFile[0], toast);
+      if (data.watermarkFile && data.watermarkFile.length > 0 && watermarkPreview) {
+        // watermarkDataUrlToStore is already set to watermarkPreview
+      } else if (!data.watermarkFile && existingInvoiceData?.watermarkDataUrl) {
+        watermarkDataUrlToStore = existingInvoiceData.watermarkDataUrl;
+      } else {
+        watermarkDataUrlToStore = null;
       }
+      
+      const itemsToStore: StoredLineItem[] = data.items.map(item => {
+        let quantity = Number(item.quantity) || 0;
+        if (item.itemStartDate && item.itemEndDate && isValid(item.itemStartDate) && isValid(item.itemEndDate) && item.itemEndDate >= item.itemStartDate) {
+            quantity = differenceInCalendarDays(item.itemEndDate, item.itemStartDate) + 1;
+        }
+        return {
+          ...item,
+          quantity, // Store the possibly recalculated quantity
+          itemStartDate: item.itemStartDate ? item.itemStartDate.toISOString() : undefined,
+          itemEndDate: item.itemEndDate ? item.itemEndDate.toISOString() : undefined,
+        };
+      });
 
-      const totalFee = data.items.reduce((sum, item) => {
+      const totalFee = itemsToStore.reduce((sum, item) => {
         const quantity = Number(item.quantity) || 0;
         const rate = Number(item.rate) || 0;
         return sum + (quantity * rate);
@@ -255,17 +274,13 @@ export function InvoiceForm() {
       
       const storedData: StoredInvoiceData = {
         id: invoiceId,
-        invoiceNumber,
-        invoiceDate: invoiceDateToStore,
+        invoiceNumber: data.invoiceNumber,
+        invoiceDate: data.invoiceDate.toISOString(),
         customerName: data.customerName,
         companyName: data.companyName,
         companyLogoDataUrl: companyLogoDataUrlToStore,
-        startDate: data.startDate,
-        startTime: data.startTime,
-        endDate: data.endDate,
-        endTime: data.endTime,
-        items: data.items,
-        totalFee: totalFee, // Store the calculated total fee
+        items: itemsToStore,
+        totalFee: totalFee,
         invoiceNotes: data.invoiceNotes,
         watermarkDataUrl: watermarkDataUrlToStore,
       };
@@ -291,13 +306,6 @@ export function InvoiceForm() {
     }
   }
 
-  const formatDateWithTime = (date?: Date, time?: string) => {
-    if (!date || !time || !/^[0-2]\d:[0-5]\d$/.test(time)) return "Select date & time";
-    const fullDate = parse(`${format(date, "yyyy-MM-dd")} ${time}`, 'yyyy-MM-dd HH:mm', new Date());
-    if (!isValid(fullDate)) return "Invalid date/time";
-    return format(fullDate, "MMM d, yyyy hh:mm a");
-  };
-
   return (
     <Card className="w-full max-w-3xl mx-auto shadow-xl my-8">
       <CardHeader>
@@ -320,7 +328,7 @@ export function InvoiceForm() {
                         <FormControl>
                         <div className="relative">
                             <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="e.g., INV-001" {...field} className="pl-8" />
+                            <Input placeholder="e.g., 00123" {...field} className="pl-8" />
                         </div>
                         </FormControl>
                         <FormMessage />
@@ -328,24 +336,62 @@ export function InvoiceForm() {
                     )}
                 />
                 <FormField
-                    control={form.control}
-                    name="companyName"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Your Company Name</FormLabel>
-                        <FormControl>
-                        <Input placeholder="e.g., Acme Innovations Pvt. Ltd." {...field} />
-                        </FormControl>
-                        <FormMessage />
+                  control={form.control}
+                  name="invoiceDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Invoice Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal justify-start",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
                     </FormItem>
-                    )}
+                  )}
                 />
             </div>
+             <FormField
+                control={form.control}
+                name="companyName"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Your Company Name</FormLabel>
+                    <FormControl>
+                    <Input placeholder="e.g., Acme Innovations Pvt. Ltd." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
 
             <FormField
               control={control}
               name="companyLogoFile"
-              render={({ field: { onChange, onBlur, name, value: formFieldValue, ref: fieldRef } }) => ( 
+              render={({ field: { onChange, onBlur, name, value: formFieldValue } }) => ( 
                 <FormItem>
                   <FormLabel>Company Logo (Optional, PNG/JPEG/GIF, &lt;2MB)</FormLabel>
                   <FormControl>
@@ -402,125 +448,35 @@ export function InvoiceForm() {
                 )}
               />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Service Start Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal justify-start",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="startTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Start Time (24h)</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            {watch("startDate") && watch("startTime") && <FormDescription className="text-sm text-muted-foreground">Selected Start: {formatDateWithTime(watch("startDate"), watch("startTime"))}</FormDescription>}
-
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Service End Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal justify-start",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="endTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End Time (24h)</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            {watch("endDate") && watch("endTime") && <FormDescription className="text-sm text-muted-foreground">Selected End: {formatDateWithTime(watch("endDate"), watch("endTime"))}</FormDescription>}
-
             <Separator className="my-6" />
             
             <div>
               <FormLabel className="text-lg font-semibold">Invoice Items</FormLabel>
-              <CardDescription>Add items or services provided.</CardDescription>
-              <div className="space-y-4 mt-4">
-                {fields.map((item, index) => (
-                  <div key={item.id} className="p-4 border rounded-md shadow-sm space-y-3 bg-card">
+              <CardDescription>Add items or services provided. For services with a duration, provide start/end dates and a per-day rate.</CardDescription>
+              <div className="space-y-6 mt-4">
+                {fields.map((item, index) => {
+                  const itemStartDate = watch(`items.${index}.itemStartDate`);
+                  const itemEndDate = watch(`items.${index}.itemEndDate`);
+                  const itemRate = watch(`items.${index}.rate`);
+                  let calculatedDays = 0;
+                  let quantityIsCalculated = false;
+
+                  if (itemStartDate && itemEndDate && isValid(itemStartDate) && isValid(itemEndDate) && itemEndDate >= itemStartDate) {
+                    calculatedDays = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
+                    quantityIsCalculated = true;
+                    if (getValues(`items.${index}.quantity`) !== calculatedDays) {
+                        // setValue(`items.${index}.quantity`, calculatedDays, { shouldValidate: true, shouldDirty: true });
+                        // This direct setValue inside render can cause issues. Instead, rely on the totalFee calculation.
+                        // The quantity field can show the calculated days visually.
+                    }
+                  }
+                  
+                  const currentQuantity = quantityIsCalculated ? calculatedDays : (getValues(`items.${index}.quantity`) || 0);
+                  const currentRate = getValues(`items.${index}.rate`) || 0;
+                  const itemAmount = (Number(currentQuantity) * Number(currentRate)).toFixed(2);
+
+                  return (
+                  <div key={item.id} className="p-4 border rounded-md shadow-sm space-y-4 bg-card">
                     <FormField
                       control={control}
                       name={`items.${index}.description`}
@@ -528,24 +484,80 @@ export function InvoiceForm() {
                         <FormItem>
                           <FormLabel>Description</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., Web Development Services" {...field} />
+                            <Input placeholder="e.g., Web Development, Daily Consulting" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
+                        control={control}
+                        name={`items.${index}.itemStartDate`}
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Item Start Date (Optional)</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted-foreground")}>
+                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={control}
+                        name={`items.${index}.itemEndDate`}
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Item End Date (Optional)</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal justify-start", !field.value && "text-muted-foreground")}>
+                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => itemStartDate && date < itemStartDate} initialFocus />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                       <FormField
                         control={control}
                         name={`items.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Quantity</FormLabel>
+                            <FormLabel>{quantityIsCalculated ? "Days (Calculated)" : "Quantity"}</FormLabel>
                             <FormControl>
                               <Input 
                                 type="number" 
-                                placeholder="1" {...field} 
-                                onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                                placeholder="1" 
+                                {...field} 
+                                value={quantityIsCalculated ? calculatedDays : field.value}
+                                readOnly={quantityIsCalculated}
+                                onChange={e => {
+                                  if (!quantityIsCalculated) {
+                                    field.onChange(parseFloat(e.target.value) || 0)
+                                  }
+                                }}
+                                className={quantityIsCalculated ? "bg-muted/50" : ""}
                               />
                             </FormControl>
                             <FormMessage />
@@ -557,7 +569,7 @@ export function InvoiceForm() {
                         name={`items.${index}.rate`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Rate (₹)</FormLabel>
+                            <FormLabel>{quantityIsCalculated ? "Per Day Rate (₹)" : "Rate (₹)"}</FormLabel>
                             <FormControl>
                               <Input 
                                 type="number" 
@@ -570,8 +582,8 @@ export function InvoiceForm() {
                         )}
                       />
                        <div className="flex items-end">
-                        <p className="text-sm text-muted-foreground whitespace-nowrap">
-                            Amount: ₹{((Number(getValues(`items.${index}.quantity`)) || 0) * (Number(getValues(`items.${index}.rate`)) || 0)).toFixed(2)}
+                        <p className="text-sm text-muted-foreground whitespace-nowrap pt-7">
+                            Amount: ₹{itemAmount}
                         </p>
                       </div>
                     </div>
@@ -581,7 +593,7 @@ export function InvoiceForm() {
                       </Button>
                     )}
                   </div>
-                ))}
+                )})}
                 <Button
                   type="button"
                   variant="outline"
@@ -603,7 +615,7 @@ export function InvoiceForm() {
             <FormField
               control={control}
               name="watermarkFile"
-              render={({ field: { onChange, onBlur, name, value: formFieldValue, ref: fieldRef } }) => ( 
+              render={({ field: { onChange, onBlur, name, value: formFieldValue } }) => ( 
                 <FormItem>
                   <FormLabel>Custom Watermark (Optional, PNG/JPEG/GIF, &lt;5MB)</FormLabel>
                   <FormControl>
@@ -653,7 +665,7 @@ export function InvoiceForm() {
                 <FormItem>
                   <FormLabel>Notes/Terms</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="e.g., Payment due in 30 days. Late fees may apply." {...field} rows={3} />
+                    <Textarea placeholder="e.g., Payment terms, project details, etc." {...field} rows={3} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

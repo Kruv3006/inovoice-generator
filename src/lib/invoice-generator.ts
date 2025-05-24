@@ -1,11 +1,10 @@
 
-import type { StoredInvoiceData, StoredLineItem } from './invoice-types';
+import type { StoredInvoiceData } from './invoice-types';
 import { format, parseISO, isValid, differenceInCalendarDays } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { toast } from '@/hooks/use-toast'; 
 
-// Helper function to simulate file download
 const simulateDownload = (filename: string, dataUrlOrContent: string, mimeType: string, isDataUrl: boolean = false) => {
   const link = document.createElement('a');
   if (isDataUrl) {
@@ -23,14 +22,15 @@ const simulateDownload = (filename: string, dataUrlOrContent: string, mimeType: 
   }
 };
 
-const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string): string => {
+const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   const {
     companyName, customerName, invoiceNumber, invoiceDate,
     items, totalFee, invoiceNotes,
-    companyLogoDataUrl,
+    companyLogoDataUrl, watermarkDataUrl, watermarkOpacity,
   } = data;
 
   const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : new Date();
+  const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
   
   const fCurrency = (val?: number) => val != null ? `₹${val.toFixed(2)}` : '₹0.00';
 
@@ -39,17 +39,18 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
     : '';
   
   const watermarkHtml = watermarkDataUrl 
-    ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.03; pointer-events: none; z-index: 0; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
+    ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: ${displayWatermarkOpacity}; pointer-events: none; z-index: 0; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
          <img src="${watermarkDataUrl}" style="max-width: 70%; max-height: 70%; object-fit: contain;" alt="Watermark"/>
        </div>`
     : '';
 
-  const primaryColor = 'hsl(var(--invoice-primary-color, 217, 91%, 60%))';
-  const textColor = 'hsl(var(--invoice-text, 220, 15%, 25%))';
-  const mutedTextColor = 'hsl(var(--invoice-muted-text, 220, 10%, 45%))';
-  const borderColor = 'hsl(var(--invoice-border-color, 220, 15%, 88%))';
-  const headerBgColor = 'hsl(var(--invoice-header-bg, 220, 20%, 97%))';
-  const invoiceBgColor = 'hsl(var(--invoice-background, 0, 0%, 100%))';
+  // Attempt to use CSS variables for DOC, though Word's support is limited. Fallbacks are crucial.
+  const primaryColor = 'hsl(var(--invoice-primary-color, 217, 91%, 60%))'; // Fallback: #1D4ED8
+  const textColor = 'hsl(var(--invoice-text, 220, 15%, 25%))'; // Fallback: #334155
+  const mutedTextColor = 'hsl(var(--invoice-muted-text, 220, 10%, 45%))'; // Fallback: #64748B
+  const borderColor = 'hsl(var(--invoice-border-color, 220, 15%, 88%))'; // Fallback: #E0E7FF
+  const headerBgColor = 'hsl(var(--invoice-header-bg, 220, 20%, 97%))'; // Fallback: #F8FAFC
+  const invoiceBgColor = 'hsl(var(--invoice-background, 0, 0%, 100%))'; // Fallback: #FFFFFF
 
 
   let itemsHtml = '';
@@ -66,16 +67,16 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
       }
 
       itemsHtml += `
-        <tr>
-          <td class="description-col">${item.description}${dateRangeHtml}</td>
-          <td class="qty-col">${displayQuantity}</td>
-          <td class="rate-col">${fCurrency(item.rate)}</td>
-          <td class="amount-col">${fCurrency(displayQuantity * item.rate)}</td>
+        <tr style="background-color: ${invoiceBgColor};">
+          <td style="padding: 10px; border: 1px solid ${borderColor}; vertical-align: top; color: ${textColor};">${item.description}${dateRangeHtml}</td>
+          <td style="padding: 10px; border: 1px solid ${borderColor}; vertical-align: top; text-align: right; color: ${mutedTextColor};">${displayQuantity}</td>
+          <td style="padding: 10px; border: 1px solid ${borderColor}; vertical-align: top; text-align: right; color: ${mutedTextColor};">${fCurrency(item.rate)}</td>
+          <td style="padding: 10px; border: 1px solid ${borderColor}; vertical-align: top; text-align: right; color: ${textColor};">${fCurrency(displayQuantity * item.rate)}</td>
         </tr>
       `;
     });
   } else {
-    itemsHtml = `<tr><td colspan="4" style="text-align:center; padding: 20px;">No items listed.</td></tr>`;
+    itemsHtml = `<tr><td colspan="4" style="text-align:center; padding: 20px; border: 1px solid ${borderColor}; color: ${mutedTextColor};">No items listed.</td></tr>`;
   }
 
   return `
@@ -103,16 +104,15 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
           .client-info-section h3 { font-size: 9pt; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; margin-bottom: 4px; margin-top:0; }
           .client-info-section p { margin: 0 0 3px 0; color: ${textColor}; }
           
-          .items-table-doc { width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 25px; font-size: 9.5pt; }
-          .items-table-doc th, .items-table-doc td { padding: 10px; border: 1px solid ${borderColor}; }
-          .items-table-doc th { background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt;}
+          .items-table-doc { width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 25px; font-size: 9.5pt; border: 1px solid ${borderColor}; border-radius: 6px; overflow: hidden; }
+          .items-table-doc th { padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt;}
           .items-table-doc .description-col { width: 55%; }
           .items-table-doc .qty-col { width: 10%; text-align: right;}
           .items-table-doc .rate-col { width: 15%; text-align: right; }
           .items-table-doc .amount-col { width: 20%; text-align: right; }
           
           .totals-section { text-align: right; margin-top: 20px; margin-bottom: 25px; font-size: 10pt; }
-          .totals-section .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColor}; background-color: hsla(var(--invoice-primary-color-hsl, 217, 91%, 60%), 0.1); padding: 8px; margin-top:8px; border-radius: 4px;}
+          .totals-section .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColor}; background-color: hsla(var(--invoice-primary-color-hsl, 217, 91%, 60%), 0.1); padding: 10px 12px; margin-top:8px; border-radius: 4px; display: inline-block;}
           
           .notes-section { margin-top: 25px; padding-top:15px; border-top: 1px solid ${borderColor}; font-size: 9pt; color: ${mutedTextColor}; }
           .notes-section h4 { font-size: 9pt; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; margin-bottom: 4px; margin-top:0; }
@@ -124,7 +124,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
         <div class="invoice-container">
           ${watermarkHtml ? `<div class="watermark-bg">${watermarkHtml}</div>` : ''}
           <div class="content-wrapper">
-            <div class="header-section">
+            <header class="header-section">
               <div class="header-left">
                 ${companyLogoHtml ? `<div class="company-logo-doc">${companyLogoHtml}</div>` : ''}
                 <div class="company-name-doc">${companyName || 'Your Company'}</div>
@@ -134,7 +134,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
                 <div><strong>Invoice No:</strong> ${invoiceNumber}</div>
                 <div><strong>Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</div>
               </div>
-            </div>
+            </header>
 
             <div class="client-info-section">
               <div class="client-info-left">
@@ -146,10 +146,10 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
             <table class="items-table-doc">
               <thead>
                 <tr>
-                  <th class="description-col">Description</th>
-                  <th class="qty-col">Qty / Days</th>
-                  <th class="rate-col">Rate / Per Day</th>
-                  <th class="amount-col">Amount</th>
+                  <th class="description-col" style="padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt; text-align: left;">Description</th>
+                  <th class="qty-col" style="padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt; text-align: right;">Qty / Days</th>
+                  <th class="rate-col" style="padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt; text-align: right;">Rate / Per Day</th>
+                  <th class="amount-col" style="padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt; text-align: right;">Amount</th>
                 </tr>
               </thead>
               <tbody>
@@ -161,7 +161,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
               <div class="grand-total-line">TOTAL: ${fCurrency(totalFee)}</div>
             </div>
 
-            ${invoiceNotes ? `<div class="notes-section"><h4>Notes & Terms</h4><p>${invoiceNotes.replace(/\n/g, '<br/>')}</p></div>` : ''}
+            ${invoiceNotes ? `<div class="notes-section"><h4>Notes & Terms</h4><p style="white-space: pre-line;">${invoiceNotes.replace(/\n/g, '<br/>')}</p></div>` : ''}
             
             <div class="footer-section">
               <p>Thank you for your business!</p>
@@ -174,8 +174,8 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData, watermarkDataUrl?: string
 };
 
 
-export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: string, elementToCapture?: HTMLElement | null): Promise<void> => {
-  console.log("Generating PDF for:", data.invoiceNumber, "with watermark:", _watermarkDataUrl ? "Yes" : "No");
+export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: string, elementToCapture?: HTMLElement | null): Promise<void> => {
+  console.log("Generating PDF for:", data.invoiceNumber, "with watermark opacity:", data.watermarkOpacity);
   if (!elementToCapture) {
     toast({ variant: "destructive", title: "PDF Error", description: "Template element not found for PDF generation."});
     throw new Error("Template element not provided for PDF generation.");
@@ -188,6 +188,15 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
       throw new Error("Capture element (PDF) has no dimensions.");
   }
   
+  // Make element visible for capture
+  const originalStyle = {
+      opacity: elementToCapture.style.opacity,
+      position: elementToCapture.style.position,
+      left: elementToCapture.style.left,
+      top: elementToCapture.style.top,
+      zIndex: elementToCapture.style.zIndex,
+      backgroundColor: elementToCapture.style.backgroundColor,
+  };
   elementToCapture.style.opacity = '1';
   elementToCapture.style.position = 'fixed';
   elementToCapture.style.left = '0px'; 
@@ -197,7 +206,7 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
   elementToCapture.style.backgroundColor = `hsl(${docInvoiceBg})`;
 
 
-  await new Promise(resolve => setTimeout(resolve, 300)); 
+  await new Promise(resolve => setTimeout(resolve, 300)); // Short delay for rendering
 
   try {
     const canvas = await html2canvas(elementToCapture, {
@@ -212,10 +221,13 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
       removeContainer: true, 
     });
 
-    elementToCapture.style.opacity = '1'; 
-    elementToCapture.style.position = 'fixed';
-    elementToCapture.style.left = '-9999px';
-    elementToCapture.style.zIndex = ''; 
+    // Restore original styles
+    elementToCapture.style.opacity = originalStyle.opacity; 
+    elementToCapture.style.position = originalStyle.position;
+    elementToCapture.style.left = originalStyle.left;
+    elementToCapture.style.top = originalStyle.top;
+    elementToCapture.style.zIndex = originalStyle.zIndex;
+    elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
 
 
     if (canvas.width === 0 || canvas.height === 0) {
@@ -237,13 +249,21 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkDataUrl?: s
   } catch (error) {
     console.error("Error generating PDF with html2canvas:", error);
     toast({ variant: "destructive", title: "PDF Generation Error", description: "Could not generate PDF. Check console." });
+    
+    // Restore original styles even on error
+    elementToCapture.style.opacity = originalStyle.opacity; 
+    elementToCapture.style.position = originalStyle.position;
+    elementToCapture.style.left = originalStyle.left;
+    elementToCapture.style.top = originalStyle.top;
+    elementToCapture.style.zIndex = originalStyle.zIndex;
+    elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
     throw error;
   }
 };
 
-export const generateDoc = async (data: StoredInvoiceData, watermarkDataUrl?: string): Promise<void> => {
+export const generateDoc = async (data: StoredInvoiceData): Promise<void> => {
   console.log("Generating DOC for:", data.invoiceNumber);
-  const htmlContent = getInvoiceHtmlForDoc(data, watermarkDataUrl); 
+  const htmlContent = getInvoiceHtmlForDoc(data); 
   const content = `
     <!DOCTYPE html>
     <html xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -256,8 +276,8 @@ export const generateDoc = async (data: StoredInvoiceData, watermarkDataUrl?: st
   simulateDownload(`invoice_${data.invoiceNumber}.doc`, content, 'application/vnd.ms-word');
 };
 
-export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: string, elementToCapture?: HTMLElement | null): Promise<void> => {
-  console.log("Generating JPEG for:", data.invoiceNumber, "with watermark:", _watermarkDataUrl ? "Yes" : "No");
+export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: string, elementToCapture?: HTMLElement | null): Promise<void> => {
+  console.log("Generating JPEG for:", data.invoiceNumber, "with watermark opacity:", data.watermarkOpacity);
   if (!elementToCapture) {
     toast({ variant: "destructive", title: "JPEG Error", description: "Template element not found for JPEG generation."});
     throw new Error("Template element not provided for JPEG generation.");
@@ -270,6 +290,15 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
       throw new Error("Capture element (JPEG) has no dimensions.");
   }
   
+  // Make element visible for capture
+  const originalStyle = {
+      opacity: elementToCapture.style.opacity,
+      position: elementToCapture.style.position,
+      left: elementToCapture.style.left,
+      top: elementToCapture.style.top,
+      zIndex: elementToCapture.style.zIndex,
+      backgroundColor: elementToCapture.style.backgroundColor,
+  };
   elementToCapture.style.opacity = '1';
   elementToCapture.style.position = 'fixed';
   elementToCapture.style.left = '0px';
@@ -279,7 +308,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
   elementToCapture.style.backgroundColor = `hsl(${docInvoiceBg})`;
 
 
-  await new Promise(resolve => setTimeout(resolve, 300)); 
+  await new Promise(resolve => setTimeout(resolve, 300)); // Short delay for rendering
 
   try {
     const canvas = await html2canvas(elementToCapture, {
@@ -294,10 +323,13 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
         removeContainer: true,
     });
 
-    elementToCapture.style.opacity = '1';
-    elementToCapture.style.position = 'fixed';
-    elementToCapture.style.left = '-9999px';
-    elementToCapture.style.zIndex = '';
+    // Restore original styles
+    elementToCapture.style.opacity = originalStyle.opacity; 
+    elementToCapture.style.position = originalStyle.position;
+    elementToCapture.style.left = originalStyle.left;
+    elementToCapture.style.top = originalStyle.top;
+    elementToCapture.style.zIndex = originalStyle.zIndex; 
+    elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
 
 
     if (canvas.width === 0 || canvas.height === 0) {
@@ -311,6 +343,14 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkDataUrl?: 
   } catch (error) {
     console.error("Error generating JPEG with html2canvas:", error);
     toast({ variant: "destructive", title: "JPEG Generation Error", description: "Could not generate JPEG. Check console." });
+    
+    // Restore original styles even on error
+    elementToCapture.style.opacity = originalStyle.opacity; 
+    elementToCapture.style.position = originalStyle.position;
+    elementToCapture.style.left = originalStyle.left;
+    elementToCapture.style.top = originalStyle.top;
+    elementToCapture.style.zIndex = originalStyle.zIndex;
+    elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
     throw error;
   }
 };

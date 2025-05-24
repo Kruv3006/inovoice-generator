@@ -50,7 +50,7 @@ export default function InvoiceDownloadPage() {
   }, [invoiceId, router, toast]);
 
   const handleGenerate = async (
-    generator: (data: StoredInvoiceData, watermark?: string, element?: HTMLElement | null) => Promise<void>,
+    generator: (data: StoredInvoiceData, watermarkDataUrlOrOpacity?: string | number, element?: HTMLElement | null) => Promise<void>,
     formatName: string
   ) => {
     if (!invoiceData) {
@@ -68,10 +68,14 @@ export default function InvoiceDownloadPage() {
     setIsGenerating(true);
     toast({ title: `Generating ${formatName}...`, description: "Please wait." });
     try {
+      // For PDF/JPEG, the second argument to generator is not used for watermark URL,
+      // as the template component handles rendering it with opacity from invoiceData.
+      // The generator function for PDF/JPEG will use elementToCapture which contains the rendered template.
       if (formatName === 'PDF' || formatName === 'JPEG') {
-        await generator(invoiceData, invoiceData.watermarkDataUrl || undefined, invoiceTemplateRef.current);
+        await generator(invoiceData, undefined, invoiceTemplateRef.current);
       } else { 
-        await generator(invoiceData, invoiceData.watermarkDataUrl || undefined);
+        // For DOC, watermarkDataUrl is still relevant if the getInvoiceHtmlForDoc uses it.
+        await generator(invoiceData); // DOC doesn't need element, uses invoiceData directly
       }
       toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
     } catch (e) {
@@ -133,12 +137,14 @@ export default function InvoiceDownloadPage() {
           </div>
         </div>
         
+        {/* This hidden div is for html2canvas to capture the styled template */}
         <div 
-          className="fixed top-0 left-[-9999px] opacity-100 z-[-1] print:hidden"
+          className="fixed top-0 left-[-9999px] opacity-100 z-[-1] print:hidden" // opacity ensures it's "rendered" by browser
           aria-hidden="true" 
         > 
             <div ref={invoiceTemplateRef} className="bg-transparent print:bg-white" style={{ width: '800px', padding: '0', margin: '0' }}>
-              {invoiceData && <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />}
+              {/* Pass invoiceData directly, template will use watermarkDataUrl and watermarkOpacity from it */}
+              {invoiceData && <InvoiceTemplate data={invoiceData} />}
             </div>
         </div>
 

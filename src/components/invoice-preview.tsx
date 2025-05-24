@@ -90,10 +90,10 @@ export default function InvoicePreview() {
           </div>
         </div>
 
-        {/* Invoice Template Wrapper for consistent styling and scaling */}
         <div className="mx-auto w-full max-w-4xl"> 
-          <div className="transform scale-[0.9] sm:scale-[1] origin-top"> {/* Adjust scale for smaller screens if needed, or remove scale */}
-             <InvoiceTemplate data={invoiceData} watermarkDataUrl={invoiceData.watermarkDataUrl} />
+          <div className="transform scale-[0.8] sm:scale-[0.9] md:scale-[1] origin-top">
+             {/* Pass invoiceData directly; template handles watermark and opacity from it */}
+             <InvoiceTemplate data={invoiceData} />
           </div>
         </div>
         

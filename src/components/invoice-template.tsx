@@ -1,13 +1,14 @@
 
 "use client";
 
-import type { StoredInvoiceData, StoredLineItem } from "@/lib/invoice-types";
+import type { StoredInvoiceData } from "@/lib/invoice-types";
 import { format, parseISO, isValid, differenceInCalendarDays } from "date-fns";
-import Image from "next/image";
+import Image from "next/image"; // Keep for company logo for now
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
-  watermarkDataUrl?: string | null;
+  watermarkDataUrl?: string | null; // Explicitly pass watermark URL
+  // watermarkOpacity is now part of data
 }
 
 const formatCurrency = (amount?: number) => {
@@ -15,7 +16,7 @@ const formatCurrency = (amount?: number) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 };
 
-export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermarkDataUrl }) => {
+export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
   const {
     companyName,
     companyLogoDataUrl,
@@ -25,21 +26,29 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
     items,
     totalFee,
     invoiceNotes,
+    watermarkDataUrl, // Get from data
+    watermarkOpacity, // Get from data
   } = data;
 
   const defaultDisplayDate = new Date();
   const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : defaultDisplayDate;
+  const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
+
 
   return (
     <div className="bg-[var(--invoice-background)] text-[var(--invoice-text)] font-sans shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white"
-         style={{ width: '100%', border: '1px solid var(--invoice-border-color)', borderRadius: '0.5rem', overflow: 'hidden' }}>
+         style={{ width: '100%', border: '1px solid var(--invoice-border-color)', borderRadius: '0.5rem', overflow: 'hidden', position: 'relative' }}> {/* Added position relative */}
       
       {watermarkDataUrl && (
         <div
-          className="absolute inset-0 flex items-center justify-center opacity-[0.03] print:opacity-[0.02] pointer-events-none"
-          style={{ zIndex: 0 }}
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{ 
+            zIndex: 0,
+            opacity: displayWatermarkOpacity,
+          }}
           data-ai-hint="abstract pattern"
         >
+          {/* Use standard img tag for better html2canvas compatibility */}
           <img 
             src={watermarkDataUrl}
             alt="Watermark"
@@ -54,7 +63,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
         </div>
       )}
 
-      <div className="relative p-6 sm:p-8 md:p-10" style={{ zIndex: 1 }}>
+      <div className="relative p-6 sm:p-8 md:p-10" style={{ zIndex: 1 }}> {/* Ensure content is above watermark */}
         <header className="flex flex-col sm:flex-row justify-between items-start pb-6 mb-6 border-b border-[var(--invoice-border-color)]">
           <div className="flex items-center gap-4 mb-4 sm:mb-0">
             {companyLogoDataUrl && (
@@ -82,7 +91,6 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, watermar
             <h3 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">BILL TO</h3>
             <p className="text-lg font-medium text-[var(--invoice-text)] print:text-black">{customerName || "Client Name"}</p>
           </div>
-          {/* Global service period removed */}
         </section>
 
         <section className="mb-8">

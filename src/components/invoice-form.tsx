@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parse, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2 } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, Percent } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { InvoiceFormSchemaType, StoredInvoiceData, LineItem, StoredLineItem } from "@/lib/invoice-types";
@@ -42,16 +43,7 @@ const fileToDataUrl = (file: File, toastFn: ReturnType<typeof useToast>['toast']
         resolve(null);
         return;
     }
-    if (file.size > 5 * 1024 * 1024) { // Max 5MB
-      toastFn({ variant: "destructive", title: "File Too Large", description: "File must be less than 5MB." });
-      resolve(null);
-      return;
-    }
-    if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
-      toastFn({ variant: "destructive", title: "Invalid File Type", description: "File must be PNG, JPEG, or GIF." });
-      resolve(null);
-      return;
-    }
+    // Validation moved to useEffect to prevent multiple toasts if file re-selected
     const reader = new FileReader();
     reader.onloadend = () => {
       resolve(reader.result as string);
@@ -95,6 +87,7 @@ export function InvoiceForm() {
     invoiceNotes: "Thank you for your business! Payment is due within 30 days.",
     companyLogoFile: undefined,
     watermarkFile: undefined,
+    watermarkOpacity: 0.05, // Default opacity 0-1 scale
   };
 
   const form = useForm<InvoiceFormSchemaType>({
@@ -111,28 +104,24 @@ export function InvoiceForm() {
   });
 
   const watchedItems = watch("items");
+  const watchedWatermarkOpacity = watch("watermarkOpacity");
 
   useEffect(() => {
     if (watchedItems) {
       let total = 0;
-      watchedItems.forEach((item, index) => {
+      watchedItems.forEach((item) => {
         let quantity = Number(item.quantity) || 0;
         const rate = Number(item.rate) || 0;
 
         if (item.itemStartDate && item.itemEndDate && isValid(item.itemStartDate) && isValid(item.itemEndDate) && item.itemEndDate >= item.itemStartDate) {
           const days = differenceInCalendarDays(item.itemEndDate, item.itemStartDate) + 1;
           quantity = days;
-          // Note: We don't directly call setValue for quantity here if it's derived,
-          // instead, ensure the calculation for total uses this derived quantity.
-          // However, if quantity field IS NOT read-only and is used for calculation,
-          // then `setValue(`items.${index}.quantity`, days, { shouldValidate: true });` might be needed.
-          // For now, we just use `days` in the `total` calculation directly.
         }
         total += quantity * rate;
       });
       setCalculatedTotalFee(total);
     }
-  }, [watchedItems, setValue]);
+  }, [watchedItems]);
 
 
   useEffect(() => {
@@ -144,8 +133,8 @@ export function InvoiceForm() {
           ...item,
           itemStartDate: item.itemStartDate ? parseISO(item.itemStartDate) : undefined,
           itemEndDate: item.itemEndDate ? parseISO(item.itemEndDate) : undefined,
-          quantity: Number(item.quantity) || 0, // ensure numeric
-          rate: Number(item.rate) || 0, // ensure numeric
+          quantity: Number(item.quantity) || 0,
+          rate: Number(item.rate) || 0,
         })) || [defaultItem];
 
         const formData: InvoiceFormSchemaType = {
@@ -155,6 +144,7 @@ export function InvoiceForm() {
           items: formItems.length > 0 ? formItems : [defaultItem],
           companyLogoFile: undefined, 
           watermarkFile: undefined,
+          watermarkOpacity: data.watermarkOpacity ?? defaultFormValues.watermarkOpacity,
         };
         reset(formData);
 
@@ -185,10 +175,22 @@ export function InvoiceForm() {
   
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
+       if (file.size > 2 * 1024 * 1024) {
+        toast({ variant: "destructive", title: "Logo File Too Large", description: "Logo must be less than 2MB." });
+        setValue('companyLogoFile', undefined, { shouldValidate: true });
+        setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
+        return;
+      }
+      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+        toast({ variant: "destructive", title: "Invalid Logo File Type", description: "Logo must be PNG, JPEG, or GIF." });
+        setValue('companyLogoFile', undefined, { shouldValidate: true });
+        setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
+        return;
+      }
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setCompanyLogoPreview(dataUrl);
-        } else { // fileToDataUrl handles toast for errors
+        } else { 
           setValue('companyLogoFile', undefined, { shouldValidate: true });
           setCompanyLogoPreview(existingData?.companyLogoDataUrl || null);
         }
@@ -197,7 +199,7 @@ export function InvoiceForm() {
       const currentLogoFileValue = getValues('companyLogoFile');
       if (existingData?.companyLogoDataUrl && (!currentLogoFileValue || currentLogoFileValue.length === 0)) {
         setCompanyLogoPreview(existingData.companyLogoDataUrl);
-      } else if (!existingData && (!currentLogoFileValue || currentLogoFileValue.length === 0)) {
+      } else if (!existingData?.companyLogoDataUrl && (!currentLogoFileValue || currentLogoFileValue.length === 0)) {
         setCompanyLogoPreview(null);
       }
     }
@@ -209,6 +211,18 @@ export function InvoiceForm() {
   
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ variant: "destructive", title: "Watermark File Too Large", description: "Watermark must be less than 5MB." });
+        setValue('watermarkFile', undefined, { shouldValidate: true });
+        setWatermarkPreview(existingData?.watermarkDataUrl || null);
+        return;
+      }
+      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+        toast({ variant: "destructive", title: "Invalid Watermark File Type", description: "Watermark must be PNG, JPEG, or GIF." });
+        setValue('watermarkFile', undefined, { shouldValidate: true });
+        setWatermarkPreview(existingData?.watermarkDataUrl || null);
+        return;
+      }
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setWatermarkPreview(dataUrl);
@@ -221,7 +235,7 @@ export function InvoiceForm() {
       const currentWatermarkFileValue = getValues('watermarkFile');
       if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
         setWatermarkPreview(existingData.watermarkDataUrl);
-      } else if (!existingData && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
+      } else if (!existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
         setWatermarkPreview(null);
       }
     }
@@ -236,20 +250,21 @@ export function InvoiceForm() {
       const invoiceId = existingInvoiceData?.id || `inv_${Date.now()}`;
       
       let companyLogoDataUrlToStore: string | null = companyLogoPreview;
-      if (data.companyLogoFile && data.companyLogoFile.length > 0 && companyLogoPreview) { // only use preview if it's set
+      if (data.companyLogoFile && data.companyLogoFile.length > 0 && companyLogoPreview) {
          // companyLogoDataUrlToStore is already set to companyLogoPreview
-      } else if (!data.companyLogoFile && existingInvoiceData?.companyLogoDataUrl) {
+      } else if ((!data.companyLogoFile || data.companyLogoFile.length === 0) && existingInvoiceData?.companyLogoDataUrl) {
          companyLogoDataUrlToStore = existingInvoiceData.companyLogoDataUrl;
-      } else {
+      } else if ((!data.companyLogoFile || data.companyLogoFile.length === 0) && !existingInvoiceData?.companyLogoDataUrl) {
          companyLogoDataUrlToStore = null;
       }
+
 
       let watermarkDataUrlToStore: string | null = watermarkPreview;
       if (data.watermarkFile && data.watermarkFile.length > 0 && watermarkPreview) {
         // watermarkDataUrlToStore is already set to watermarkPreview
-      } else if (!data.watermarkFile && existingInvoiceData?.watermarkDataUrl) {
+      } else if ((!data.watermarkFile || data.watermarkFile.length === 0) && existingInvoiceData?.watermarkDataUrl) {
         watermarkDataUrlToStore = existingInvoiceData.watermarkDataUrl;
-      } else {
+      } else if ((!data.watermarkFile || data.watermarkFile.length === 0) && !existingInvoiceData?.watermarkDataUrl) {
         watermarkDataUrlToStore = null;
       }
       
@@ -260,7 +275,7 @@ export function InvoiceForm() {
         }
         return {
           ...item,
-          quantity, // Store the possibly recalculated quantity
+          quantity,
           itemStartDate: item.itemStartDate ? item.itemStartDate.toISOString() : undefined,
           itemEndDate: item.itemEndDate ? item.itemEndDate.toISOString() : undefined,
         };
@@ -283,6 +298,7 @@ export function InvoiceForm() {
         totalFee: totalFee,
         invoiceNotes: data.invoiceNotes,
         watermarkDataUrl: watermarkDataUrlToStore,
+        watermarkOpacity: data.watermarkOpacity,
       };
 
       saveInvoiceData(invoiceId, storedData);
@@ -457,18 +473,12 @@ export function InvoiceForm() {
                 {fields.map((item, index) => {
                   const itemStartDate = watch(`items.${index}.itemStartDate`);
                   const itemEndDate = watch(`items.${index}.itemEndDate`);
-                  const itemRate = watch(`items.${index}.rate`);
                   let calculatedDays = 0;
                   let quantityIsCalculated = false;
 
                   if (itemStartDate && itemEndDate && isValid(itemStartDate) && isValid(itemEndDate) && itemEndDate >= itemStartDate) {
                     calculatedDays = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
                     quantityIsCalculated = true;
-                    if (getValues(`items.${index}.quantity`) !== calculatedDays) {
-                        // setValue(`items.${index}.quantity`, calculatedDays, { shouldValidate: true, shouldDirty: true });
-                        // This direct setValue inside render can cause issues. Instead, rely on the totalFee calculation.
-                        // The quantity field can show the calculated days visually.
-                    }
                   }
                   
                   const currentQuantity = quantityIsCalculated ? calculatedDays : (getValues(`items.${index}.quantity`) || 0);
@@ -550,11 +560,12 @@ export function InvoiceForm() {
                                 type="number" 
                                 placeholder="1" 
                                 {...field} 
-                                value={quantityIsCalculated ? calculatedDays : field.value}
+                                value={quantityIsCalculated ? calculatedDays : (field.value || '')}
                                 readOnly={quantityIsCalculated}
                                 onChange={e => {
                                   if (!quantityIsCalculated) {
-                                    field.onChange(parseFloat(e.target.value) || 0)
+                                    const val = parseFloat(e.target.value);
+                                    field.onChange(isNaN(val) ? 0 : val)
                                   }
                                 }}
                                 className={quantityIsCalculated ? "bg-muted/50" : ""}
@@ -573,8 +584,13 @@ export function InvoiceForm() {
                             <FormControl>
                               <Input 
                                 type="number" 
-                                placeholder="100.00" {...field} 
-                                onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                                placeholder="100.00" 
+                                {...field} 
+                                value={field.value || ''}
+                                onChange={e => {
+                                    const val = parseFloat(e.target.value);
+                                    field.onChange(isNaN(val) ? 0 : val)
+                                }}
                               />
                             </FormControl>
                             <FormMessage />
@@ -650,13 +666,47 @@ export function InvoiceForm() {
             />
 
             {watermarkPreview && (
-              <div className="mt-2">
-                <FormLabel>Watermark Preview</FormLabel>
-                <div className="mt-1 p-2 border rounded-md aspect-video relative w-full max-w-xs bg-muted overflow-hidden">
-                  <Image src={watermarkPreview} alt="Watermark preview" layout="fill" objectFit="contain" data-ai-hint="design pattern"/>
+              <>
+                <div className="mt-2">
+                  <FormLabel>Watermark Preview</FormLabel>
+                  <div className="mt-1 p-2 border rounded-md aspect-video relative w-full max-w-xs bg-muted overflow-hidden">
+                    <Image 
+                        src={watermarkPreview} 
+                        alt="Watermark preview" 
+                        layout="fill" 
+                        objectFit="contain" 
+                        data-ai-hint="design pattern"
+                        style={{ opacity: watchedWatermarkOpacity ?? 0.05 }}
+                    />
+                  </div>
                 </div>
-              </div>
+                <FormField
+                  control={control}
+                  name="watermarkOpacity"
+                  render={({ field }) => (
+                    <FormItem className="mt-4">
+                      <div className="flex justify-between items-center">
+                        <FormLabel>Watermark Opacity</FormLabel>
+                        <span className="text-sm text-muted-foreground">{(field.value * 100).toFixed(0)}%</span>
+                      </div>
+                      <FormControl>
+                        <Slider
+                          defaultValue={[ (field.value ?? defaultFormValues.watermarkOpacity ?? 0.05) * 100 ]}
+                          onValueChange={(value) => field.onChange(value[0] / 100)}
+                          max={100}
+                          step={1}
+                          className="py-2"
+                          aria-label="Watermark opacity"
+                        />
+                      </FormControl>
+                       <FormDescription>Adjust the visibility of the watermark on the invoice.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
             )}
+
 
             <FormField
               control={form.control}

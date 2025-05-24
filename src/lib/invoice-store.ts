@@ -6,15 +6,15 @@ const INVOICE_STORAGE_KEY_PREFIX = 'invoiceData_';
 
 export const saveInvoiceData = (invoiceId: string, data: StoredInvoiceData): void => {
   if (typeof window !== 'undefined') {
-    // Ensure dates in items are stored as ISO strings
-    const dataToStore = {
+    const dataToStore: StoredInvoiceData = {
       ...data,
       invoiceDate: data.invoiceDate, // Already ISO string from form
       items: data.items.map(item => ({
         ...item,
         itemStartDate: item.itemStartDate ? item.itemStartDate : undefined,
         itemEndDate: item.itemEndDate ? item.itemEndDate : undefined,
-      }))
+      })),
+      watermarkOpacity: typeof data.watermarkOpacity === 'number' ? data.watermarkOpacity : 0.05,
     };
     localStorage.setItem(`${INVOICE_STORAGE_KEY_PREFIX}${invoiceId}`, JSON.stringify(dataToStore));
   }
@@ -28,10 +28,6 @@ export const getInvoiceData = (invoiceId: string): StoredInvoiceData | null => {
     }
     const parsedData = JSON.parse(dataString) as StoredInvoiceData;
 
-    // Convert main invoiceDate back to string if needed or ensure it's a valid ISO string
-    // It should be stored as ISO string from form submission.
-
-    // Convert item dates from ISO strings back to Date objects
     if (parsedData.items && Array.isArray(parsedData.items)) {
       parsedData.items = parsedData.items.map(item => ({
         ...item,
@@ -45,6 +41,8 @@ export const getInvoiceData = (invoiceId: string): StoredInvoiceData | null => {
     }
     
     parsedData.totalFee = Number(parsedData.totalFee) || 0;
+    parsedData.watermarkOpacity = typeof parsedData.watermarkOpacity === 'number' ? parsedData.watermarkOpacity : 0.05;
+
 
     return parsedData;
   }

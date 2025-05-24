@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'InvoiceCraft',
   description: 'Generate professional invoices with ease.',
-  manifest: '/manifest.json', // Added manifest link for PWA
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
@@ -37,7 +37,6 @@ export default function RootLayout({
         <meta name="theme-color" content="#64B5F6" /> 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        {/* You can also add apple-touch-icon links here if you have specific iOS icons */}
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-background`}>
         <header className="sticky top-0 z-50 w-full border-b bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/80">
@@ -46,20 +45,20 @@ export default function RootLayout({
               <FileText className="h-7 w-7 text-primary group-hover:text-primary/90 transition-colors" />
               <h1 className="text-2xl font-semibold tracking-tight group-hover:text-primary/90 transition-colors">InvoiceCraft</h1>
             </Link>
-            <nav className="flex items-center gap-4"> {/* Increased gap from 2 to 4 */}
+            <nav className="flex items-center gap-4">
               <Link href="/invoices" passHref>
-                <Button variant="ghost" className="text-muted-foreground hover:text-primary">
+                <Button variant="outline">
                   <ListChecks className="h-4 w-4" />
                   Invoices
                 </Button>
               </Link>
               <Link href="/settings" passHref>
-                 <Button variant="ghost" className="text-muted-foreground hover:text-primary">
+                 <Button variant="outline">
                    <Settings className="h-4 w-4" />
                    Settings
                  </Button>
               </Link>
-              <ThemeToggleButton />
+              <ThemeToggleButton /> {/* This is already variant="outline" size="icon" */}
             </nav>
           </div>
         </header>

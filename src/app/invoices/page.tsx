@@ -11,7 +11,7 @@ export default function InvoicesPage() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-primary">Your Invoices</h1>
-          <p className="text-muted-foreground">View, manage, and track all your created invoices.</p>
+          <p className="text-muted-foreground mt-1">View, manage, and track all your created invoices right here.</p>
         </div>
         <Link href="/invoice/details" passHref>
           <Button>

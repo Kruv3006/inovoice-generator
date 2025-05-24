@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, parseISO, isValid } from 'date-fns';
-import { Eye, Edit, Download, Trash2, AlertTriangle, Loader2, ListChecks } from 'lucide-react';
+import { Eye, Edit, Download, Trash2, AlertTriangle, Loader2, ListChecks, FilePlus2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -62,15 +62,22 @@ export default function InvoiceList() {
 
   if (invoices.length === 0) {
     return (
-      <Card className="text-center shadow-md">
-        <CardHeader>
-          <ListChecks className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-          <CardTitle>No Invoices Found</CardTitle>
-          <CardDescription>You haven't created any invoices yet. Get started by creating a new one!</CardDescription>
+      <Card className="text-center shadow-md py-12">
+        <CardHeader className="items-center">
+          <div className="p-3 bg-primary/10 rounded-full mb-4 w-fit">
+            <ListChecks className="mx-auto h-12 w-12 text-primary" />
+          </div>
+          <CardTitle className="text-2xl font-semibold">No Invoices Yet!</CardTitle>
+          <CardDescription className="text-muted-foreground max-w-sm mx-auto">
+            It looks like you haven't created any invoices.
+            Get started by creating your first one.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Link href="/invoice/details" passHref>
-            <Button size="lg">Create New Invoice</Button>
+            <Button size="lg">
+              <FilePlus2 className="mr-2 h-5 w-5" /> Create New Invoice
+            </Button>
           </Link>
         </CardContent>
       </Card>

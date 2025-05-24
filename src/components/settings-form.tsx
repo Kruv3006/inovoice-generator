@@ -6,7 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Image from 'next/image';
-import { Building, UserPlus, Trash2, FileText, PlusCircle, Save } from 'lucide-react';
+import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,9 +90,13 @@ export function SettingsForm() {
   }, [companyProfileForm]);
 
   const handleCompanyProfileSubmit = async (data: CompanyProfileFormValues) => {
-    let logoDataUrl = companyLogoPreview;
-    if (data.companyLogoFile && data.companyLogoFile.length > 0) {
-      const file = data.companyLogoFile[0];
+    let logoDataUrl = companyLogoPreview; // Start with existing preview
+    
+    // Check if a new file is actually selected in the form data
+    const newLogoFile = companyProfileForm.getValues("companyLogoFile");
+
+    if (newLogoFile && newLogoFile.length > 0) {
+      const file = newLogoFile[0];
       if (file.size > 2 * 1024 * 1024) {
         toast({ variant: "destructive", title: "Logo File Too Large", description: "Logo must be less than 2MB." });
         return;
@@ -102,8 +106,23 @@ export function SettingsForm() {
         return;
       }
       logoDataUrl = await fileToDataUrl(file);
-      if (logoDataUrl) setCompanyLogoPreview(logoDataUrl); else logoDataUrl = companyLogoPreview; // keep old if new fails
+      if (logoDataUrl) {
+        setCompanyLogoPreview(logoDataUrl); // Update preview if conversion successful
+      } else {
+        // If conversion fails, keep the old logoDataUrl if it exists, otherwise null
+        logoDataUrl = getCompanyProfile()?.companyLogoDataUrl || null; 
+        setCompanyLogoPreview(logoDataUrl); // Revert preview
+        toast({ variant: "destructive", title: "Logo Upload Failed", description: "Could not process the logo file." });
+      }
+    } else if (data.companyLogoFile === undefined && companyLogoPreview) {
+      // This case means no new file was selected, so we keep the existing companyLogoPreview
+      // which should already be the correct data URL from the profile or previous upload.
+      logoDataUrl = companyLogoPreview;
+    } else if (!companyLogoPreview && data.companyLogoFile === undefined) {
+        // No new file chosen, and no existing preview (e.g. user wants to remove logo)
+        logoDataUrl = null;
     }
+
 
     saveCompanyProfile({
       companyName: data.companyName,
@@ -152,10 +171,14 @@ export function SettingsForm() {
       fileToDataUrl(file).then(dataUrl => {
         if (dataUrl) setCompanyLogoPreview(dataUrl);
       });
-    } else if (!watchedCompanyLogoFile && getCompanyProfile()?.companyLogoDataUrl) {
-        // If file input is cleared, but there was an existing logo, keep showing it.
-        // User has to explicitly save to remove it (by saving with no file).
-        // setCompanyLogoPreview(getCompanyProfile()?.companyLogoDataUrl || null); // This line might be too aggressive
+    } else if (!watchedCompanyLogoFile) { // No file selected in input
+        // If file input is cleared, check if a profile logo exists and show it
+        const profile = getCompanyProfile();
+        if (profile?.companyLogoDataUrl) {
+            setCompanyLogoPreview(profile.companyLogoDataUrl);
+        } else {
+            setCompanyLogoPreview(null); // No profile logo, clear preview
+        }
     }
   }, [watchedCompanyLogoFile]);
 
@@ -166,7 +189,7 @@ export function SettingsForm() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><Building className="mr-2 h-5 w-5 text-primary" /> Company Profile</CardTitle>
-          <CardDescription>Set your default company information for invoices.</CardDescription>
+          <CardDescription>Set your default company information for invoices. This will pre-fill new invoices.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={companyProfileForm.handleSubmit(handleCompanyProfileSubmit)} className="space-y-6">
@@ -192,6 +215,9 @@ export function SettingsForm() {
                     {companyProfileForm.getValues("companyLogoFile")?.[0]?.name}
                   </span>
                 )}
+                 {companyLogoPreview && !companyProfileForm.getValues("companyLogoFile")?.[0]?.name && (
+                  <span className="text-sm text-muted-foreground">Current logo active.</span>
+                 )}
               </div>
               {companyLogoPreview && (
                 <div className="mt-2 p-2 border rounded-md aspect-square relative w-24 h-24 bg-muted overflow-hidden">
@@ -201,7 +227,7 @@ export function SettingsForm() {
             </div>
             <div>
               <Label htmlFor="defaultInvoiceNotes">Default Invoice Notes/Terms</Label>
-              <Textarea id="defaultInvoiceNotes" {...companyProfileForm.register("defaultInvoiceNotes")} placeholder="e.g., Payment is due within 30 days." rows={3} />
+              <Textarea id="defaultInvoiceNotes" {...companyProfileForm.register("defaultInvoiceNotes")} placeholder="e.g., Payment is due within 30 days. Thank you for your business!" rows={3} />
             </div>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">
               <Save className="mr-2 h-4 w-4" /> Save Company Profile
@@ -216,13 +242,13 @@ export function SettingsForm() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><UserPlus className="mr-2 h-5 w-5 text-primary" /> Client Management</CardTitle>
-          <CardDescription>Save and manage your frequent clients.</CardDescription>
+          <CardDescription>Save and manage your frequent clients. They will be available in a dropdown when creating invoices.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={newClientForm.handleSubmit(handleAddClient)} className="flex items-end gap-2 mb-6">
             <div className="flex-grow">
               <Label htmlFor="clientNameInput">New Client Name</Label>
-              <Input id="clientNameInput" {...newClientForm.register("clientName")} placeholder="e.g., Priya Sharma" />
+              <Input id="clientNameInput" {...newClientForm.register("clientName")} placeholder="e.g., Priya Sharma Consulting" />
               {newClientForm.formState.errors.clientName && <p className="text-sm text-destructive mt-1">{newClientForm.formState.errors.clientName.message}</p>}
             </div>
             <Button type="submit" variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Add Client</Button>
@@ -230,15 +256,21 @@ export function SettingsForm() {
           {clients.length > 0 ? (
             <ul className="space-y-2">
               {clients.map(client => (
-                <li key={client.id} className="flex justify-between items-center p-2 border rounded-md">
-                  <span>{client.name}</span>
-                  <Button variant="ghost" size="sm" onClick={() => handleDeleteClient(client.id)} aria-label="Remove client">
+                <li key={client.id} className="flex justify-between items-center p-3 border rounded-md bg-muted/20">
+                  <span className="text-sm font-medium">{client.name}</span>
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteClient(client.id)} aria-label={`Remove client ${client.name}`}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </li>
               ))}
             </ul>
-          ) : <p className="text-sm text-muted-foreground">No clients saved yet.</p>}
+          ) : (
+            <div className="text-center py-6">
+                <Info className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+                <p className="text-sm text-muted-foreground">No clients saved yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">Add clients here to quickly select them when creating invoices.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -248,7 +280,7 @@ export function SettingsForm() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" /> Saved Invoice Items</CardTitle>
-          <CardDescription>Save frequently used line items for quick invoice creation.</CardDescription>
+          <CardDescription>Save frequently used line items for quick invoice creation. They can be loaded directly into an invoice.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={newSavedItemForm.handleSubmit(handleAddSavedItem)} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-6">
@@ -267,18 +299,24 @@ export function SettingsForm() {
           {savedItems.length > 0 ? (
             <ul className="space-y-2">
               {savedItems.map(item => (
-                <li key={item.id} className="flex justify-between items-center p-3 border rounded-md">
+                <li key={item.id} className="flex justify-between items-center p-3 border rounded-md bg-muted/20">
                   <div>
                     <p className="font-medium">{item.description}</p>
                     <p className="text-sm text-muted-foreground">Rate: ₹{item.rate.toFixed(2)}</p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => handleDeleteSavedItem(item.id)} aria-label="Remove saved item">
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteSavedItem(item.id)} aria-label={`Remove saved item ${item.description}`}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </li>
               ))}
             </ul>
-          ) : <p className="text-sm text-muted-foreground">No items saved yet.</p>}
+          ) : (
+            <div className="text-center py-6">
+                <Info className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+                <p className="text-sm text-muted-foreground">No items saved yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">Save common invoice line items here for faster invoice creation.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

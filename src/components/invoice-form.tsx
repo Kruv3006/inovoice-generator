@@ -386,6 +386,7 @@ export function InvoiceForm() {
                             <Input placeholder="e.g., 00123" {...field} className="pl-8" />
                         </div>
                         </FormControl>
+                        <FormDescription>A unique identifier for this invoice (e.g., INV-001).</FormDescription>
                         <FormMessage />
                     </FormItem>
                     )}
@@ -424,6 +425,7 @@ export function InvoiceForm() {
                           />
                         </PopoverContent>
                       </Popover>
+                      <FormDescription>The date the invoice is issued.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -442,6 +444,7 @@ export function InvoiceForm() {
                     <FormControl>
                     <Input placeholder="e.g., Acme Innovations Pvt. Ltd." {...field} />
                     </FormControl>
+                    <FormDescription>Your company's name as it should appear on the invoice. You can set a default in Settings.</FormDescription>
                     <FormMessage />
                 </FormItem>
                 )}
@@ -476,8 +479,8 @@ export function InvoiceForm() {
                   </FormControl>
                    <FormDescription>
                     {(searchParams.get('id') || getCompanyProfile()?.companyLogoDataUrl) && companyLogoPreview && (!formFieldValue || formFieldValue.length === 0) 
-                      ? "Current logo will be used unless a new image is uploaded." 
-                      : "Upload a logo to display on the invoice."}
+                      ? "Current logo (from profile or this invoice) will be used unless a new image is uploaded." 
+                      : "Upload a logo to display on the invoice. Set a default in Settings."}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -521,7 +524,7 @@ export function InvoiceForm() {
                       </FormControl>
                     )}
                     <FormDescription>
-                      {clients.length > 0 ? "Select from saved clients or type a new name." : "Enter the customer's name. You can save clients in Settings."}
+                      {clients.length > 0 ? "Select from saved clients or type a new name." : "Enter the customer's name. You can save clients in Settings for faster entry."}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -531,10 +534,10 @@ export function InvoiceForm() {
             <Separator className="my-6" />
             
             <div>
-              <div className="flex justify-between items-center">
-                <FormLabel className="text-lg font-semibold">Invoice Items</FormLabel>
+              <div className="flex justify-between items-center mb-1">
+                <FormLabel className="text-xl font-semibold">Invoice Items</FormLabel>
               </div>
-              <CardDescription>Add items or services provided. For services with a duration, provide start/end dates and a per-day rate.</CardDescription>
+              <FormDescription className="mb-4">Add items or services provided. For services with a duration, provide start/end dates and a per-day rate. The quantity will be calculated automatically as days.</FormDescription>
               <div className="space-y-6 mt-4">
                 {fields.map((item, index) => {
                   const itemStartDate = watch(`items.${index}.itemStartDate`);
@@ -606,6 +609,7 @@ export function InvoiceForm() {
                                 <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                               </PopoverContent>
                             </Popover>
+                            <FormDescription className="text-xs">If set, quantity becomes days.</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -629,6 +633,7 @@ export function InvoiceForm() {
                                 <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => itemStartDate && date < itemStartDate} initialFocus />
                               </PopoverContent>
                             </Popover>
+                            <FormDescription className="text-xs">Must be on or after start date.</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -746,8 +751,8 @@ export function InvoiceForm() {
                   </FormControl>
                   <FormDescription>
                     {searchParams.get('id') && watermarkPreview && (!formFieldValue || formFieldValue.length === 0) 
-                      ? "Current watermark will be used unless a new image is uploaded." 
-                      : "Upload a new image to set or change the watermark."}
+                      ? "Current watermark (from this invoice) will be used unless a new image is uploaded." 
+                      : "Upload an image to set as a watermark on the invoice."}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -804,8 +809,9 @@ export function InvoiceForm() {
                 <FormItem>
                   <FormLabel>Notes/Terms</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="e.g., Payment terms, project details, etc." {...field} rows={3} value={field.value || ''} />
+                    <Textarea placeholder="e.g., Payment terms, project details, thank you note, etc." {...field} rows={3} value={field.value || ''} />
                   </FormControl>
+                   <FormDescription>Any additional notes or terms for the client. You can set default notes in Settings.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

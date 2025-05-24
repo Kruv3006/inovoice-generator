@@ -43,18 +43,18 @@ export default function RootLayout({
           <div className="container flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
             <Link href="/" className="flex items-center gap-3 group">
               <FileText className="h-7 w-7 text-primary group-hover:text-primary/90 transition-colors" />
-              <h1 className="text-2xl font-semibold tracking-tight group-hover:text-primary/90 transition-colors">InvoiceCraft</h1>
+              <h1 className="text-xl font-semibold tracking-tight group-hover:text-primary/90 transition-colors">InvoiceCraft</h1>
             </Link>
-            <nav className="flex items-center gap-4">
+            <nav className="flex items-center gap-2">
               <Link href="/invoices" passHref>
                 <Button variant="outline">
-                  <ListChecks className="h-4 w-4" />
+                  <ListChecks />
                   Invoices
                 </Button>
               </Link>
               <Link href="/settings" passHref>
                  <Button variant="outline">
-                   <Settings className="h-4 w-4" />
+                   <Settings />
                    Settings
                  </Button>
               </Link>

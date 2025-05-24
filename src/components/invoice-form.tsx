@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, FontText, Shapes, CalendarClock } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, Type, Shapes, CalendarClock } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -1032,7 +1032,7 @@ export function InvoiceForm() {
                     name="fontTheme"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel className="flex items-center"><FontText className="mr-2 h-4 w-4"/> Invoice Font Style</FormLabel>
+                        <FormLabel className="flex items-center"><Type className="mr-2 h-4 w-4"/> Invoice Font Style</FormLabel>
                         <Select 
                             onValueChange={field.onChange} 
                             value={field.value}

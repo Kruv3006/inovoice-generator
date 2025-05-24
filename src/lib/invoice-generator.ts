@@ -38,12 +38,6 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     ? `<img src="${companyLogoDataUrl}" style="max-height: 70px; max-width: 180px; margin-bottom: 10px; object-fit: contain;" alt="Company Logo"/>`
     : '';
   
-  const watermarkHtml = watermarkDataUrl 
-    ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 0; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
-         <img src="${watermarkDataUrl}" style="max-width: 70%; max-height: 70%; object-fit: contain; opacity: ${displayWatermarkOpacity};" alt="Watermark"/>
-       </div>`
-    : '';
-
   const primaryColor = 'hsl(var(--invoice-primary-color, 217, 91%, 60%))'; 
   const textColor = 'hsl(var(--invoice-text, 220, 15%, 25%))'; 
   const mutedTextColor = 'hsl(var(--invoice-muted-text, 220, 10%, 45%))'; 
@@ -87,7 +81,6 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
         <style>
           body { font-family: Arial, sans-serif; margin: 0; color: ${textColor}; font-size: 10pt; background-color: #f9fafb; }
           .invoice-container { max-width: 800px; margin: 20px auto; padding: 30px; border: 1px solid ${borderColor}; background-color: ${invoiceBgColor}; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
-          .watermark-bg { position: absolute; top:0; left:0; width:100%; height:100%; overflow:hidden; z-index:0; }
           .content-wrapper { position:relative; z-index:1; }
           
           .header-section { display: table; width: 100%; margin-bottom: 25px; padding-bottom:15px; border-bottom: 1px solid ${borderColor}; }
@@ -122,8 +115,15 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
       </head>
       <body>
         <div class="invoice-container">
-          ${watermarkHtml ? `<div class="watermark-bg">${watermarkHtml}</div>` : ''}
-          <div class="content-wrapper">
+          <!-- Watermark Layer -->
+          ${watermarkDataUrl ? `
+          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0;">
+            <img src="${watermarkDataUrl}" style="max-width: 80%; max-height: 70%; object-fit: contain; opacity: ${displayWatermarkOpacity};" alt="Watermark"/>
+          </div>
+          ` : ''}
+          
+          <!-- Content Layer -->
+          <div class="content-wrapper" style="position: relative; z-index: 1;">
             <header class="header-section">
               <div class="header-left">
                 ${companyLogoHtml ? `<div class="company-logo-doc">${companyLogoHtml}</div>` : ''}
@@ -148,8 +148,8 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
                 <tr>
                   <th class="description-col" style="padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt; text-align: left;">Description</th>
                   <th class="qty-col" style="padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt; text-align: right;">Qty / Days</th>
-                  <th class="rate-col" style="padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt; text-align: right;">Rate / Per Day</th>
-                  <th class="amount-col" style="padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt; text-align: right;">Amount</th>
+                  <th class="rate-col" style="padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt; text-align: right;">Rate / Per Day (₹)</th>
+                  <th class="amount-col" style="padding: 10px; border-bottom: 1px solid ${borderColor}; background-color: ${headerBgColor}; font-weight: bold; color: ${mutedTextColor}; text-transform: uppercase; font-size: 9pt; text-align: right;">Amount (₹)</th>
                 </tr>
               </thead>
               <tbody>
@@ -345,7 +345,6 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
     elementToCapture.style.top = originalStyle.top;
     elementToCapture.style.zIndex = originalStyle.zIndex;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
-    // throw error; // Removed throw to prevent unhandled rejection if toast is sufficient
+    // No throw error here, toast is sufficient as per previous iterations.
   }
 };
-

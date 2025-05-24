@@ -1,10 +1,13 @@
 
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
 import { Toaster } from '@/components/ui/toaster';
-import { FileText } from 'lucide-react'; // Or consider a more business-y icon like Briefcase
+import { FileText, ListChecks, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,14 +34,28 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-background`}>
         <header className="sticky top-0 z-50 w-full border-b bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <div className="container flex h-16 items-center justify-between">
-            <div className="flex items-center gap-3">
-              <FileText className="h-7 w-7 text-primary" />
-              <h1 className="text-2xl font-semibold tracking-tight">InvoiceCraft</h1>
-            </div>
-            <ThemeToggleButton />
+            <Link href="/" className="flex items-center gap-3 group">
+              <FileText className="h-7 w-7 text-primary group-hover:text-primary/90 transition-colors" />
+              <h1 className="text-2xl font-semibold tracking-tight group-hover:text-primary/90 transition-colors">InvoiceCraft</h1>
+            </Link>
+            <nav className="flex items-center gap-2">
+              <Link href="/invoices" passHref>
+                <Button variant="ghost" className="text-muted-foreground hover:text-primary">
+                  <ListChecks className="mr-2 h-4 w-4" />
+                  Invoices
+                </Button>
+              </Link>
+              <Link href="/settings" passHref>
+                 <Button variant="ghost" className="text-muted-foreground hover:text-primary">
+                   <Settings className="mr-2 h-4 w-4" />
+                   Settings
+                 </Button>
+              </Link>
+              <ThemeToggleButton />
+            </nav>
           </div>
         </header>
-        <main className="flex-1 w-full"> {/* Container usually in page, not layout for more control */}
+        <main className="flex-1 w-full">
           {children}
         </main>
         <Toaster />

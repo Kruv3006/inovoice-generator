@@ -91,7 +91,7 @@ const defaultItem: LineItem = {
 };
 
 const generateDefaultFormValues = (companyProfile?: CompanyProfileData | null): InvoiceFormSchemaType => {
-  const profile = companyProfile || getCompanyProfile() || { currency: availableCurrencies[0], defaultTemplateStyle: 'classic', showClientAddressOnInvoice: true};
+  const profile = companyProfile || getCompanyProfile() || { currency: availableCurrencies[0], defaultTemplateStyle: 'classic', showClientAddressOnInvoice: true, defaultInvoiceNotes: '', defaultTermsAndConditions: '' };
   return {
     invoiceNumber: String(Date.now()).slice(-6),
     customerName: "",
@@ -160,9 +160,8 @@ export function InvoiceForm() {
   const watchedWatermarkOpacity = watch("watermarkOpacity");
   const watchedGlobalDiscountType = watch("globalDiscountType");
   const watchedGlobalDiscountValue = watch("globalDiscountValue");
-  const watchedCustomerName = watch("customerName"); // To react to client selection
+  const watchedCustomerName = watch("customerName"); 
 
-  // Update client details when a saved client is selected
   useEffect(() => {
     if (watchedCustomerName) {
         const selectedClient = clients.find(c => c.name === watchedCustomerName);
@@ -206,25 +205,28 @@ export function InvoiceForm() {
 
   const resetFormToDefaults = () => {
     const profile = getCompanyProfile();
-    setCompanyProfile(profile);
+    setCompanyProfile(profile); // Update local state as well
     setCurrentCurrency(profile?.currency || availableCurrencies[0]);
     const defaults = generateDefaultFormValues(profile);
     reset(defaults);
     setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
     setWatermarkPreview(null);
+    if (companyLogoFileRef.current) companyLogoFileRef.current.value = "";
+    if (watermarkFileRef.current) watermarkFileRef.current.value = "";
     toast({ title: "Form Reset", description: "Invoice details have been reset to defaults.", variant: "default" });
   };
 
 
   useEffect(() => {
+    const profileData = getCompanyProfile(); 
+    setCompanyProfile(profileData);
+    setCurrentCurrency(profileData?.currency || availableCurrencies[0]);
+
+    let baseFormValues = generateDefaultFormValues(profileData);
+
     const invoiceIdToEdit = searchParams.get('id');
-    const profile = getCompanyProfile(); // Re-fetch for latest defaults
-    setCompanyProfile(profile);
-    setCurrentCurrency(profile?.currency || availableCurrencies[0]);
-
-    let baseFormValues = generateDefaultFormValues(profile);
-
     const duplicateId = searchParams.get('duplicate');
+
     if (duplicateId && !initialDataLoaded) {
         const sourceInvoice = getInvoiceData(duplicateId);
         if (sourceInvoice) {
@@ -241,24 +243,23 @@ export function InvoiceForm() {
             })) || [defaultItem];
 
             const formData: InvoiceFormSchemaType = {
-                ...baseFormValues, // Start with current defaults
-                ...sourceInvoice, // Override with source invoice data
+                ...baseFormValues, 
+                ...sourceInvoice, 
                 invoiceNumber: `COPY-${sourceInvoice.invoiceNumber}-${String(Date.now()).slice(-4)}`,
-                invoiceDate: new Date(), // New date for duplicated invoice
-                dueDate: sourceInvoice.dueDate ? parseISO(sourceInvoice.dueDate) : undefined,
+                invoiceDate: new Date(), 
+                dueDate: sourceInvoice.dueDate ? (isValid(parseISO(sourceInvoice.dueDate)) ? parseISO(sourceInvoice.dueDate) : undefined) : undefined,
                 items: duplicatedItems.length > 0 ? duplicatedItems : [defaultItem],
-                companyLogoFile: undefined, // Don't carry over file objects
+                companyLogoFile: undefined, 
                 watermarkFile: undefined,
                 companyName: sourceInvoice.companyName || baseFormValues.companyName,
-                invoiceNotes: sourceInvoice.invoiceNotes || baseFormValues.invoiceNotes,
-                termsAndConditions: sourceInvoice.termsAndConditions || baseFormValues.termsAndConditions,
+                invoiceNotes: sourceInvoice.invoiceNotes ?? baseFormValues.invoiceNotes,
+                termsAndConditions: sourceInvoice.termsAndConditions ?? baseFormValues.termsAndConditions,
                 watermarkOpacity: sourceInvoice.watermarkOpacity ?? baseFormValues.watermarkOpacity,
                 themeColor: sourceInvoice.themeColor ?? baseFormValues.themeColor,
                 fontTheme: sourceInvoice.fontTheme ?? baseFormValues.fontTheme,
                 templateStyle: sourceInvoice.templateStyle ?? baseFormValues.templateStyle,
                 globalDiscountType: sourceInvoice.globalDiscountType ?? baseFormValues.globalDiscountType,
                 globalDiscountValue: sourceInvoice.globalDiscountValue ?? baseFormValues.globalDiscountValue,
-                // Client specific details from source
                 customerName: sourceInvoice.customerName,
                 customerAddress: sourceInvoice.customerAddress || '',
                 customerEmail: sourceInvoice.customerEmail || '',
@@ -266,13 +267,12 @@ export function InvoiceForm() {
             };
             reset(formData);
             if (sourceInvoice.watermarkDataUrl) setWatermarkPreview(sourceInvoice.watermarkDataUrl);
-            // Set company logo: 1. From source invoice, 2. From current profile, 3. Null
-            setCompanyLogoPreview(sourceInvoice.companyLogoDataUrl || profile?.companyLogoDataUrl || null);
+            setCompanyLogoPreview(sourceInvoice.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
             toast({ title: "Invoice Duplicated", description: "Review and update the details below.", variant: "default" });
         } else {
             toast({ title: "Duplication Error", description: "Could not load source invoice for duplication. Using defaults.", variant: "destructive" });
             reset(baseFormValues);
-            setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
+            setCompanyLogoPreview(profileData?.companyLogoDataUrl || null);
             setWatermarkPreview(null);
         }
         setInitialDataLoaded(true);
@@ -285,8 +285,8 @@ export function InvoiceForm() {
       if (data) {
         const formItems = data.items?.map(item => ({
           ...item,
-          itemStartDate: item.itemStartDate ? parseISO(item.itemStartDate) : undefined,
-          itemEndDate: item.itemEndDate ? parseISO(item.itemEndDate) : undefined,
+          itemStartDate: item.itemStartDate ? (isValid(parseISO(item.itemStartDate)) ? parseISO(item.itemStartDate) : undefined) : undefined,
+          itemEndDate: item.itemEndDate ? (isValid(parseISO(item.itemEndDate)) ? parseISO(item.itemEndDate) : undefined) : undefined,
           itemStartTime: item.itemStartTime || '',
           itemEndTime: item.itemEndTime || '',
           quantity: Number(item.quantity) || 0,
@@ -296,8 +296,8 @@ export function InvoiceForm() {
         })) || [defaultItem];
 
         const formData: InvoiceFormSchemaType = {
-          ...baseFormValues, // Start with defaults
-          ...data, // Override with stored invoice data
+          ...baseFormValues, 
+          ...data, 
           invoiceNumber: data.invoiceNumber || baseFormValues.invoiceNumber,
           invoiceDate: data.invoiceDate ? (isValid(parseISO(data.invoiceDate)) ? parseISO(data.invoiceDate) : new Date()) : new Date(),
           dueDate: data.dueDate ? (isValid(parseISO(data.dueDate)) ? parseISO(data.dueDate) : undefined) : undefined,
@@ -313,7 +313,6 @@ export function InvoiceForm() {
           themeColor: data.themeColor ?? baseFormValues.themeColor,
           fontTheme: data.fontTheme ?? baseFormValues.fontTheme,
           templateStyle: data.templateStyle ?? baseFormValues.templateStyle,
-          // Client specific details
           customerName: data.customerName,
           customerAddress: data.customerAddress || '',
           customerEmail: data.customerEmail || '',
@@ -322,22 +321,22 @@ export function InvoiceForm() {
         reset(formData);
 
         if (data.watermarkDataUrl) setWatermarkPreview(data.watermarkDataUrl);
-        setCompanyLogoPreview(data.companyLogoDataUrl || profile?.companyLogoDataUrl || null);
+        setCompanyLogoPreview(data.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
       } else {
         toast({ title: "Edit Error", description: "Could not load invoice data for editing. Using defaults.", variant: "destructive" });
         reset(baseFormValues);
-        setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
+        setCompanyLogoPreview(profileData?.companyLogoDataUrl || null);
         setWatermarkPreview(null);
       }
       setInitialDataLoaded(true);
-    } else if (!initialDataLoaded) {
+    } else if (!initialDataLoaded) { // This is for a completely new invoice
       reset(baseFormValues);
-      setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
+      setCompanyLogoPreview(profileData?.companyLogoDataUrl || null);
       setWatermarkPreview(null);
       setInitialDataLoaded(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, reset, toast, initialDataLoaded, router, companyProfile]); // Added companyProfile to deps
+  }, [searchParams, reset, toast, initialDataLoaded, router]); // Removed companyProfile state from deps; profileData is fetched inside.
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -364,17 +363,14 @@ export function InvoiceForm() {
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setCompanyLogoPreview(dataUrl);
-        } else { // File read error, revert
+        } else { 
           setValue('companyLogoFile', undefined, { shouldValidate: true });
           setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
         }
       });
     } else {
-      // If file input is cleared (watchedCompanyLogoFile becomes undefined or empty array)
-      // or if it was never set (e.g., on initial load of an existing invoice with a logo)
       const currentLogoFileValue = getValues('companyLogoFile');
       if (!currentLogoFileValue || currentLogoFileValue.length === 0) {
-          // Prioritize existing invoice logo, then profile logo
           if (existingData?.companyLogoDataUrl) {
               setCompanyLogoPreview(existingData.companyLogoDataUrl);
           } else if (profileData?.companyLogoDataUrl) {
@@ -384,6 +380,7 @@ export function InvoiceForm() {
           }
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedCompanyLogoFile, searchParams, setValue, toast, getValues]);
 
   useEffect(() => {
@@ -392,7 +389,7 @@ export function InvoiceForm() {
 
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) { 
         toast({ variant: "destructive", title: "Watermark File Too Large", description: "Watermark must be less than 5MB." });
         setValue('watermarkFile', undefined, { shouldValidate: true });
         setWatermarkPreview(existingData?.watermarkDataUrl || null);
@@ -407,21 +404,20 @@ export function InvoiceForm() {
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setWatermarkPreview(dataUrl);
-        } else { // File read error, revert
+        } else { 
             setValue('watermarkFile', undefined, { shouldValidate: true });
             setWatermarkPreview(existingData?.watermarkDataUrl || null);
         }
       });
     } else {
-      // If file input is cleared or on initial load for an existing invoice
       const currentWatermarkFileValue = getValues('watermarkFile');
       if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
         setWatermarkPreview(existingData.watermarkDataUrl);
       } else if (!existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
-        // No existing watermark and no file selected, ensure preview is null
         setWatermarkPreview(null);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedWatermarkFile, searchParams, setValue, toast, getValues]);
 
 
@@ -429,7 +425,7 @@ export function InvoiceForm() {
     setIsSubmitting(true);
     try {
       const invoiceIdToEdit = searchParams.get('id');
-      const isDuplicating = searchParams.get('duplicate'); // This should be cleared by now, but check defensively
+      const isDuplicating = searchParams.get('duplicate'); 
       const invoiceId = (invoiceIdToEdit && !isDuplicating) ? invoiceIdToEdit : `inv_${Date.now()}`;
 
       let companyLogoDataUrlToStore: string | null = companyLogoPreview;
@@ -448,7 +444,7 @@ export function InvoiceForm() {
         return {
           ...item,
           quantity: Number(item.quantity) || 0,
-          unit: item.unit || '', // Ensure unit is always a string
+          unit: item.unit || '', 
           itemStartDate: item.itemStartDate ? item.itemStartDate.toISOString() : undefined,
           itemEndDate: item.itemEndDate ? item.itemEndDate.toISOString() : undefined,
           itemStartTime: item.itemStartTime || undefined,
@@ -459,10 +455,12 @@ export function InvoiceForm() {
 
       const finalSubTotal = calculatedSubTotal;
       const finalTotalFee = calculatedTotalFee;
-      const currentProfile = getCompanyProfile(); // Use current profile for currency
+      
+      const currentProfile = getCompanyProfile();
+      const currentCurrencyForStorage = currentProfile?.currency || availableCurrencies[0];
 
-      // Placeholder for amount in words
-      const amountInWordsPlaceholder = `[Total ${currentProfile?.currency?.symbol || '₹'}${finalTotalFee.toFixed(2)} in words - Placeholder]`;
+
+      const amountInWordsPlaceholder = `[Total ${currentCurrencyForStorage?.symbol || '₹'}${finalTotalFee.toFixed(2)} in words - Placeholder]`;
 
       const storedData: StoredInvoiceData = {
         id: invoiceId,
@@ -480,7 +478,7 @@ export function InvoiceForm() {
         globalDiscountType: data.globalDiscountType,
         globalDiscountValue: data.globalDiscountValue,
         totalFee: finalTotalFee,
-        currency: currentProfile?.currency || availableCurrencies[0],
+        currency: currentCurrencyForStorage,
         amountInWords: amountInWordsPlaceholder,
         invoiceNotes: data.invoiceNotes,
         termsAndConditions: data.termsAndConditions,
@@ -519,7 +517,6 @@ export function InvoiceForm() {
       setValue(`items.${itemIndex}.rate`, selectedSavedItem.rate);
       setValue(`items.${itemIndex}.quantity`, selectedSavedItem.defaultQuantity ?? 1);
       setValue(`items.${itemIndex}.unit`, selectedSavedItem.defaultUnit ?? '');
-      // Clear date/time fields when loading a generic saved item
       setValue(`items.${itemIndex}.itemStartDate`, undefined);
       setValue(`items.${itemIndex}.itemEndDate`, undefined);
       setValue(`items.${itemIndex}.itemStartTime`, '');
@@ -554,7 +551,7 @@ export function InvoiceForm() {
                            <Hash className="mr-1 h-4 w-4 text-muted-foreground" /> Invoice Number *
                         </FormLabel>
                         <FormControl>
-                        <Input placeholder="e.g., 00123" {...field} />
+                        <Input placeholder="e.g., INV-00123" {...field} />
                         </FormControl>
                         <FormDescription>A unique ID for this invoice. You can edit this.</FormDescription>
                         <FormMessage />
@@ -690,7 +687,7 @@ export function InvoiceForm() {
                     </div>
                   </FormControl>
                    <FormDescription>
-                    {(searchParams.get('id') || getCompanyProfile()?.companyLogoDataUrl) && companyLogoPreview && (!formFieldValue || formFieldValue.length === 0)
+                    {(searchParams.get('id') || companyProfile?.companyLogoDataUrl) && companyLogoPreview && (!formFieldValue || formFieldValue.length === 0)
                       ? "Current logo (from profile or this invoice) will be used. Upload a new image to change it."
                       : "Upload a logo for the invoice. You can set a default logo in Application Settings."}
                   </FormDescription>
@@ -726,7 +723,7 @@ export function InvoiceForm() {
                                 setValue('customerAddress', selectedClient.address || '');
                                 setValue('customerEmail', selectedClient.email || '');
                                 setValue('customerPhone', selectedClient.phone || '');
-                            } else { // Clear fields if typed name doesn't match a saved client
+                            } else { 
                                 setValue('customerAddress', '');
                                 setValue('customerEmail', '');
                                 setValue('customerPhone', '');
@@ -751,7 +748,7 @@ export function InvoiceForm() {
                       </FormControl>
                     )}
                     <FormDescription>
-                      {clients.length > 0 ? "Select from saved clients or type a new name." : "Enter the customer's name. You can save clients in Application Settings for faster entry."}
+                      {clients.length > 0 ? "Select from saved clients or type a new name. Manage clients in Application Settings." : "Enter the customer's name. You can save clients in Application Settings for faster entry."}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -764,7 +761,7 @@ export function InvoiceForm() {
                   <FormItem>
                       <FormLabel className="flex items-center"><MapPin className="mr-1 h-4 w-4 text-muted-foreground" /> Client Address (Optional)</FormLabel>
                       <FormControl>
-                      <Textarea placeholder="123 Tech Park, Info City" {...field} rows={2} />
+                      <Textarea placeholder="123 Tech Park, Info City" {...field} rows={2} value={field.value || ''}/>
                       </FormControl>
                       <FormMessage />
                   </FormItem>
@@ -778,7 +775,7 @@ export function InvoiceForm() {
                     <FormItem>
                         <FormLabel className="flex items-center"><Mail className="mr-1 h-4 w-4 text-muted-foreground" /> Client Email (Optional)</FormLabel>
                         <FormControl>
-                        <Input type="email" placeholder="client@example.com" {...field} />
+                        <Input type="email" placeholder="client@example.com" {...field} value={field.value || ''}/>
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -791,7 +788,7 @@ export function InvoiceForm() {
                     <FormItem>
                         <FormLabel className="flex items-center"><Phone className="mr-1 h-4 w-4 text-muted-foreground" /> Client Phone (Optional)</FormLabel>
                         <FormControl>
-                        <Input type="tel" placeholder="+91 1234567890" {...field} />
+                        <Input type="tel" placeholder="+91 1234567890" {...field} value={field.value || ''}/>
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -807,10 +804,10 @@ export function InvoiceForm() {
                 <FormLabel className="text-xl font-semibold">Invoice Items *</FormLabel>
               </div>
               <FormDescription className="mb-4">
-                Add items or services. For services with a duration:
-                <br />- Provide start/end dates &amp; times for **hourly calculation** (Quantity becomes total hours, Rate is per hour, Unit is 'hours').
-                <br />- Provide start/end dates (no times) for **daily calculation** (Quantity becomes total days, Rate is per day, Unit is 'days').
-                <br />- Otherwise, enter Quantity, Unit, and Rate manually.
+                Add items or services. For services with specific durations:
+                <br />- Provide start/end dates &amp; times for **automatic hourly calculation** (Quantity becomes total hours, Rate is per hour, Unit is 'hours').
+                <br />- Provide start/end dates (no times) for **automatic daily calculation** (Quantity becomes total days, Rate is per day, Unit is 'days').
+                <br />- Otherwise, enter Quantity, Unit, and Rate manually for other types of items or services.
               </FormDescription>
               <div className="space-y-6 mt-4">
                 {fields.map((item, index) => {
@@ -871,6 +868,7 @@ export function InvoiceForm() {
                     if (unitIsAutoCalculated && newUnit !== currentFormUnit) {
                         setValue(`items.${itemIndex}.unit`, newUnit, { shouldValidate: true, shouldDirty: true });
                     }
+                  // eslint-disable-next-line react-hooks/exhaustive-deps
                   }, [itemStartDate, itemEndDate, itemStartTime, itemEndTime, setValue, getValues, itemIndex]);
 
 
@@ -1076,7 +1074,7 @@ export function InvoiceForm() {
                              <div className="relative">
                                 <Shapes className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                  placeholder="e.g. hrs, pcs, day"
+                                  placeholder="e.g. hrs, pcs"
                                   {...field}
                                   value={field.value || ''}
                                   className={`pl-8 ${isUnitReadOnly ? "bg-muted/50" : ""}`}
@@ -1370,8 +1368,8 @@ export function InvoiceForm() {
                     </div>
                   </FormControl>
                   <FormDescription>
-                    {searchParams.get('id') && watermarkPreview && (!formFieldValue || formFieldValue.length === 0)
-                      ? "Current watermark will be used. Upload a new image to change it."
+                    {(searchParams.get('id') && watermarkPreview && (!formFieldValue || formFieldValue.length === 0))
+                      ? "Current watermark (from this invoice) will be used. Upload a new image to change it."
                       : "Upload an image to be used as a faint background watermark."}
                   </FormDescription>
                   <FormMessage />
@@ -1384,7 +1382,7 @@ export function InvoiceForm() {
                 <div className="mt-2">
                   <FormLabel>Watermark Preview (Opacity applied)</FormLabel>
                   <div className="mt-1 p-2 border rounded-md aspect-video relative w-full max-w-xs bg-muted overflow-hidden">
-                     <div style={{position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                     <div className="absolute inset-0 flex items-center justify-center">
                         <img
                             src={watermarkPreview}
                             alt="Watermark preview"
@@ -1394,7 +1392,7 @@ export function InvoiceForm() {
                                 objectFit: 'contain',
                                 opacity: watchedWatermarkOpacity ?? 0.05,
                             }}
-                            data-ai-hint="abstract pattern"
+                            data-ai-hint="background pattern"
                         />
                     </div>
                   </div>
@@ -1490,4 +1488,3 @@ export function InvoiceForm() {
   );
 }
 
-    

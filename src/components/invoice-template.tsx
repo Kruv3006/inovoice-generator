@@ -6,7 +6,7 @@ import { format, parseISO, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import React from 'react'; 
 import { MapPin, Mail, Phone } from "lucide-react";
-import { getCompanyProfile } from "@/lib/settings-store"; // To get showClientAddressOnInvoice setting
+import { getCompanyProfile } from "@/lib/settings-store"; 
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
@@ -15,15 +15,15 @@ interface InvoiceTemplateProps {
 
 const formatCurrency = (amount?: number, currency?: AvailableCurrency) => {
   if (typeof amount !== 'number') return `${currency?.symbol || '₹'}0.00`;
-  const currentCurrency = currency || { symbol: '₹', code: 'INR' }; // Default to INR
+  const currentCurrency = currency || { symbol: '₹', code: 'INR', name: 'Indian Rupee' }; 
   try {
-    return new Intl.NumberFormat('en-IN', { // Using 'en-IN' as a base, currency symbol will override
+    return new Intl.NumberFormat('en-IN', { 
         style: 'currency', 
         currency: currentCurrency.code, 
         minimumFractionDigits: 2, 
         maximumFractionDigits: 2 
     }).format(amount);
-  } catch (e) { // Fallback for unsupported currency codes by Intl (should be rare with common ones)
+  } catch (e) { 
     return `${currentCurrency.symbol}${amount.toFixed(2)}`;
   }
 };
@@ -184,7 +184,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
     amountInWords,
     themeColor = 'default',
     fontTheme = 'default',
-    templateStyle = 'classic',
+    templateStyle = 'classic', // Default to classic if undefined
   } = data;
 
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
@@ -226,20 +226,20 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
         border: '1px solid var(--invoice-border-color)',
         borderRadius: '0.5rem',
         overflow: 'hidden',
-        position: 'relative'
+        position: 'relative' // For z-indexing watermark
       }}
     >
       {watermarkDataUrl && (
          <div
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            style={{ zIndex: 0 }} 
+            style={{ zIndex: 0 }} // Watermark layer
          >
             <img
                 src={watermarkDataUrl}
                 alt="Watermark"
                 style={{
-                maxWidth: '70%', 
-                maxHeight: '60%',
+                maxWidth: '80%', // Slightly larger for better coverage
+                maxHeight: '70%',
                 objectFit: 'contain',
                 opacity: displayWatermarkOpacity,
                 filter: templateStyle === 'modern' || templateStyle === 'compact' ? 'grayscale(50%)' : 'none', 
@@ -251,22 +251,22 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
 
       <div
         className={cn(
-          "relative p-6 sm:p-8 md:p-10",
-          templateStyle === 'compact' && "p-4 sm:p-6 md:p-8"
+          "relative p-6 sm:p-8 md:p-10", // Standard padding
+          templateStyle === 'compact' && "p-4 sm:p-6 md:p-8" // Reduced padding for compact
         )}
-        style={{ zIndex: 1 }} 
+        style={{ zIndex: 1 }} // Content layer on top of watermark
       >
         {renderHeader()}
 
         <section className="mb-8">
           <div className={cn(
             "overflow-x-auto rounded-md border border-[var(--invoice-border-color)]",
-            templateStyle === 'compact' && "border-0"
+            templateStyle === 'compact' && "border-0" // No border for table in compact
             )}>
             <table className="w-full table-auto">
               <thead className={cn(
                 "bg-[var(--invoice-header-bg)] print:bg-gray-100",
-                (templateStyle === 'modern' || templateStyle === 'compact') && "border-b-2 border-[var(--invoice-primary-color)]"
+                (templateStyle === 'modern' || templateStyle === 'compact') && "border-b-2 border-[var(--invoice-primary-color)]" // Stronger header line for modern/compact
               )}>
                 <tr>
                   <th className={cn("p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600 w-2/5 sm:w-[40%]", templateStyle === 'compact' && "p-2 text-[10px]")}>Description</th>
@@ -398,9 +398,9 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
 
         <div className={cn(
           "grid gap-6",
-           (invoiceNotes && termsAndConditions && (templateStyle === 'classic' || templateStyle === 'compact')) && "grid-cols-1",
-           (invoiceNotes && termsAndConditions && templateStyle === 'modern') && "md:grid-cols-2", 
-           (!invoiceNotes || !termsAndConditions) && "grid-cols-1" 
+           (invoiceNotes && termsAndConditions && (templateStyle === 'classic' || templateStyle === 'compact')) && "grid-cols-1", // Stack notes and terms for classic/compact
+           (invoiceNotes && termsAndConditions && templateStyle === 'modern') && "md:grid-cols-2", // Side-by-side for modern on medium screens
+           (!invoiceNotes || !termsAndConditions) && "grid-cols-1" // Single column if only one exists
         )}>
           {invoiceNotes && (
             <section className={cn("pt-4 border-t border-[var(--invoice-border-color)]", templateStyle === 'compact' && "pt-2 text-xs")}>
@@ -413,7 +413,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
             <section className={cn(
               "pt-4 border-t border-[var(--invoice-border-color)]",
               templateStyle === 'compact' && "pt-2",
-              (invoiceNotes && templateStyle === 'modern') && "md:border-t-0 md:pt-0 md:pl-6 md:border-l"
+              (invoiceNotes && templateStyle === 'modern') && "md:border-t-0 md:pt-0 md:pl-6 md:border-l" // Modern style: terms beside notes on md+
             )}>
               <h4 className={cn("text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600", templateStyle === 'compact' && "text-xs")}>Terms &amp; Conditions</h4>
               <p className={cn("text-xs text-[var(--invoice-muted-text)]/80 whitespace-pre-line print:text-gray-500 print:text-[10px]", templateStyle === 'compact' && "text-[10px]")}>{termsAndConditions}</p>
@@ -429,4 +429,3 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
   );
 });
 
-    

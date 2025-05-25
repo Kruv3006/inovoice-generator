@@ -4,8 +4,7 @@ import { format, parseISO, isValid } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { toast } from '@/hooks/use-toast';
-// Placeholder for number to words - replace with actual implementation if needed
-// import { numberToWords } from './number-to-words'; 
+import { getCompanyProfile } from '@/lib/settings-store'; // Used for showClientAddress
 
 const formatCurrencyForDoc = (amount?: number, currency?: AvailableCurrency) => {
   if (typeof amount !== 'number') return `${currency?.symbol || '₹'}0.00`;
@@ -41,15 +40,14 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
 
   const currentCurrency = currency || { symbol: '₹', code: 'INR', name: 'Indian Rupee' };
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
-  const invoiceBgColorDoc = 'hsl(0 0% 100%)';
-  const textColorDoc = 'hsl(0 0% 10%)'; // Adjusted for B/W theme potential
+  const invoiceBgColorDoc = 'hsl(0 0% 100%)'; // Always white for DOC
+  const textColorDoc = 'hsl(0 0% 10%)'; 
   const mutedTextColorDoc = 'hsl(0 0% 40%)';
   let primaryColorDoc = 'hsl(217 91% 55%)'; 
   let headerBgColorDoc = 'hsl(220 20% 95%)';
   let borderColorDoc = 'hsl(220 15% 85%)';
 
-
-  // Apply Theme Colors (Light Mode Version)
+  // Apply Theme Colors (Light Mode Version for DOC)
   if (themeColor === 'classic-blue') { primaryColorDoc = 'hsl(210 80% 50%)'; headerBgColorDoc = 'hsl(210 50% 96%)'; borderColorDoc = 'hsl(210 30% 80%)'; } 
   else if (themeColor === 'emerald-green') { primaryColorDoc = 'hsl(145 63% 40%)'; headerBgColorDoc = 'hsl(145 40% 95%)'; borderColorDoc = 'hsl(145 30% 80%)'; }
   else if (themeColor === 'crimson-red') { primaryColorDoc = 'hsl(340 70% 45%)'; headerBgColorDoc = 'hsl(340 50% 96%)'; borderColorDoc = 'hsl(340 40% 85%)'; }
@@ -67,6 +65,9 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   const parsedDueDate = dueDate && isValid(parseISO(dueDate)) ? parseISO(dueDate) : null;
   
   const fCurrency = (val?: number) => formatCurrencyForDoc(val, currentCurrency);
+  const companyProfileSettings = getCompanyProfile(); // For client address visibility
+  const showClientAddressOnInvoice = companyProfileSettings?.showClientAddressOnInvoice !== false;
+
 
   const companyLogoHtml = companyLogoDataUrl
     ? `<img src="${companyLogoDataUrl}" style="max-height: ${templateStyle === 'modern' || templateStyle === 'compact' ? '50px' : '70px'}; max-width: ${templateStyle === 'modern' || templateStyle === 'compact' ? '150px' : '180px'}; object-fit: contain;" alt="Company Logo"/>`
@@ -153,8 +154,8 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   }
 
   const clientDetailsHtml = `
-    <p style="margin: 0; color: ${textColorDoc}; font-weight: bold;">${customerName}</p>
-    ${(getCompanyProfile()?.showClientAddressOnInvoice !== false && customerAddress) ? `<p style="margin: 2px 0; white-space: pre-line; color: ${mutedTextColorDoc};">${customerAddress}</p>` : ''}
+    <p style="margin: 0; color: ${textColorDoc}; font-weight: bold;">${customerName || 'Client Name'}</p>
+    ${(showClientAddressOnInvoice && customerAddress) ? `<p style="margin: 2px 0; white-space: pre-line; color: ${mutedTextColorDoc};">${customerAddress}</p>` : ''}
     ${customerEmail ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc};">Email: ${customerEmail}</p>` : ''}
     ${customerPhone ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc};">Phone: ${customerPhone}</p>` : ''}
   `;
@@ -255,6 +256,33 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     </div>
   ` : '';
 
+  const tableStyles = `
+    width: 100%;
+    text-align: left;
+    border-collapse: collapse;
+    margin-bottom: 20px; /* Increased bottom margin for items table */
+    font-size: ${templateStyle === 'compact' ? '8pt' : '9.5pt'};
+    border: 1px solid ${borderColorDoc};
+    border-radius: 6px; /* Not always supported in Word but good practice */
+    overflow: hidden; /* For border-radius effect */
+  `;
+  const thStyles = `
+    padding: ${templateStyle === 'compact' ? '6px' : '10px'};
+    border-bottom: 1px solid ${borderColorDoc};
+    background-color: ${headerBgColorDoc};
+    font-weight: bold;
+    color: ${mutedTextColorDoc};
+    text-transform: uppercase;
+    font-size: ${templateStyle === 'compact' ? '7pt' : '9pt'};
+    ${(templateStyle === 'modern' || templateStyle === 'compact') ? `border-bottom-width:2px; border-bottom-color:${primaryColorDoc};` : ''}
+  `;
+  const totalsTableStyles = `
+    width: ${templateStyle === 'modern' || templateStyle === 'compact' ? '50%' : '45%'};
+    margin-left: auto;
+    margin-bottom: 25px;
+    font-size: ${templateStyle === 'compact' ? '9pt' : '10pt'};
+  `;
+
   return `
     <html>
       <head>
@@ -263,13 +291,13 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
         <style>
           body { font-family: ${fontFamilyDoc}; margin: 0; color: ${textColorDoc}; font-size: ${templateStyle === 'compact' ? '9pt' : '10pt'}; background-color: #FFFFFF; }
           .invoice-container-doc { max-width: 800px; margin: 20px auto; padding: ${templateStyle === 'compact' ? '20px' : '30px'}; border: 1px solid ${borderColorDoc}; background-color: ${invoiceBgColorDoc}; position: relative; }
-          .watermark-wrapper-doc { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; overflow: hidden; display: flex; align-items: center; justify-content: center;}
+          .watermark-wrapper-doc { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
           .watermark-img-doc { max-width: 70%; max-height: 60%; object-fit: contain; opacity: ${displayWatermarkOpacity}; ${templateStyle === 'modern' || templateStyle === 'compact' ? 'filter: grayscale(50%);' : ''} }
           .content-wrapper-doc { position:relative; z-index:1; }
-          .items-table-doc { width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 5px; font-size: ${templateStyle === 'compact' ? '8pt' : '9.5pt'}; border: 1px solid ${borderColorDoc}; border-radius: 6px; overflow: hidden; }
-          .items-table-doc th { padding: ${templateStyle === 'compact' ? '6px' : '10px'}; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: ${templateStyle === 'compact' ? '7pt' : '9pt'}; ${templateStyle === 'modern' || templateStyle === 'compact' ? 'border-bottom-width:2px; border-bottom-color:'+primaryColorDoc+';' : ''}}
+          .items-table-doc { ${tableStyles} }
+          .items-table-doc th { ${thStyles} }
           .items-table-doc td { padding: ${templateStyle === 'compact' ? '6px' : '10px'}; border: 1px solid ${borderColorDoc}; vertical-align:top;}
-          .totals-summary-table { width: ${templateStyle === 'modern' || templateStyle === 'compact' ? '50%' : '45%'}; margin-left: auto; margin-bottom: 25px; font-size: ${templateStyle === 'compact' ? '9pt' : '10pt'}; }
+          .totals-summary-table { ${totalsTableStyles} }
           .totals-summary-table td { padding: ${templateStyle === 'compact' ? '6px' : '8px'}; }
           .grand-total-line { font-weight: bold; font-size: ${templateStyle === 'compact' ? '12pt' : '14pt'}; color: ${primaryColorDoc}; background-color: ${primaryColorDoc}1A; padding: ${templateStyle === 'compact' ? '8px 10px' : '10px 12px'}; border-radius: 4px; }
           .footer-section-doc { text-align: center; font-size: ${templateStyle === 'compact' ? '7pt' : '8pt'}; color: #9ca3af; margin-top: 30px; padding-top: 15px; border-top: 1px solid ${borderColorDoc}; }
@@ -330,35 +358,35 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
   
   const originalStyle = {
       opacity: elementToCapture.style.opacity,
-      position: elementToCapture.style.position, // Only if you plan to change it for capture
-      left: elementToCapture.style.left,       // Only if you plan to change it for capture
-      top: elementToCapture.style.top,         // Only if you plan to change it for capture
-      zIndex: elementToCapture.style.zIndex,     // Only if you plan to change it for capture
+      position: elementToCapture.style.position, 
+      left: elementToCapture.style.left,       
+      top: elementToCapture.style.top,         
+      zIndex: elementToCapture.style.zIndex,     
       backgroundColor: elementToCapture.style.backgroundColor,
   };
   
   elementToCapture.style.opacity = '1'; 
-  elementToCapture.style.backgroundColor = 'hsl(0 0% 100%)'; 
+  elementToCapture.style.backgroundColor = 'hsl(0 0% 100%)'; // Force white background on capture element
 
   const docElement = document.documentElement;
   const wasDark = docElement.classList.contains('dark');
   if (wasDark) {
-    docElement.classList.remove('dark');
+    docElement.classList.remove('dark'); // Force light mode for CSS variable resolution
   }
   
-  await new Promise(resolve => setTimeout(resolve, 100)); // Increased delay slightly
+  await new Promise(resolve => setTimeout(resolve, 100)); // Delay for style changes
 
   try {
     const canvas = await html2canvas(elementToCapture, {
       scale: 2, 
       useCORS: true,
-      logging: true, // Enable for debugging if issues persist
-      backgroundColor: '#FFFFFF', 
+      logging: false, 
+      backgroundColor: '#FFFFFF', // Explicit white background for canvas
       scrollX: -window.scrollX,
       scrollY: -window.scrollY,
       windowWidth: elementToCapture.scrollWidth,
       windowHeight: elementToCapture.scrollHeight,
-      removeContainer: true, // This helps if the library clones the element
+      removeContainer: true, 
     });
 
     if (canvas.width === 0 || canvas.height === 0) {
@@ -376,19 +404,14 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
 
     pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
     pdf.save(`invoice_${data.invoiceNumber}.pdf`);
+    toast({ title: "PDF Generated!", description: "Your download should start shortly." });
   } catch (error) {
     console.error("Error generating PDF with html2canvas:", error);
     toast({ variant: "destructive", title: "PDF Generation Error", description: "Could not generate PDF. Check console." });
     throw error; 
   } finally {
-    // Restore original styles and dark mode
     elementToCapture.style.opacity = originalStyle.opacity;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
-    // Note: Position, left, top, zIndex are only restored if they were part of originalStyle and changed for capture
-    // elementToCapture.style.position = originalStyle.position; 
-    // elementToCapture.style.left = originalStyle.left;
-    // elementToCapture.style.top = originalStyle.top;
-    // elementToCapture.style.zIndex = originalStyle.zIndex;
     if (wasDark) {
       docElement.classList.add('dark');
     }
@@ -408,6 +431,7 @@ export const generateDoc = async (data: StoredInvoiceData): Promise<void> => {
     <body>${htmlContent.substring(htmlContent.indexOf("<body>") + 6, htmlContent.lastIndexOf("</body>"))}</body></html>`;
 
   simulateDownload(`invoice_${data.invoiceNumber}.doc`, content, 'application/vnd.ms-word');
+  toast({ title: "DOC Generated!", description: "Your download should start shortly." });
 };
 
 export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: string, elementToCapture?: HTMLElement | null): Promise<void> => {
@@ -434,13 +458,13 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   if (wasDark) {
     docElement.classList.remove('dark');
   }
-  await new Promise(resolve => setTimeout(resolve, 100)); // Increased delay
+  await new Promise(resolve => setTimeout(resolve, 100));
 
   try {
     const canvas = await html2canvas(elementToCapture, {
         scale: 1.5, 
         useCORS: true,
-        logging: true, // Enable for debugging
+        logging: false, 
         backgroundColor: '#FFFFFF',
         scrollX: -window.scrollX,
         scrollY: -window.scrollY,
@@ -456,6 +480,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
 
     const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9); 
     simulateDownload(`invoice_${data.invoiceNumber}.jpeg`, jpegDataUrl, 'image/jpeg', true);
+    toast({ title: "JPEG Generated!", description: "Your download should start shortly." });
   } catch (error) {
     console.error("Error generating JPEG with html2canvas:", error);
     toast({ variant: "destructive", title: "JPEG Generation Error", description: "Could not generate JPEG. Check console." });
@@ -468,5 +493,3 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
     }
   }
 };
-
-    

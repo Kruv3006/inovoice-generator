@@ -89,7 +89,6 @@ export type LineItem = z.infer<typeof lineItemSchema>;
 export const invoiceFormSchema = z.object({
   invoiceNumber: z.string().min(1, "Invoice number is required."),
   customerName: z.string().min(1, "Customer name is required"),
-  // Client details are now sourced from selected client or typed directly
   customerAddress: z.string().optional(),
   customerEmail: z.string().email("Invalid email address").optional().or(z.literal('')),
   customerPhone: z.string().optional(),
@@ -125,19 +124,20 @@ export const invoiceFormSchema = z.object({
     )
     .optional(),
   watermarkOpacity: z.number().min(0).max(1).optional().default(0.05),
+  
   invoiceNotes: z.string().optional(),
   termsAndConditions: z.string().optional(),
+
   themeColor: z.string().optional().default('default'),
-  fontTheme: z.string().optional().default('default'),
+  fontTheme: z.enum(['default', 'serif', 'mono']).optional().default('default'),
   templateStyle: z.enum(['classic', 'modern', 'compact']).optional().default('classic'),
-  // Currency will be derived from settings or defaults
 });
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
 
 export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEndDate' | 'discount' | 'itemStartTime' | 'itemEndTime' | 'unit'> {
-  itemStartDate?: string;
-  itemEndDate?: string;
+  itemStartDate?: string; // ISO string
+  itemEndDate?: string; // ISO string
   itemStartTime?: string;
   itemEndTime?: string;
   discount?: number;
@@ -145,8 +145,8 @@ export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEn
 }
 export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'dueDate' | 'watermarkOpacity' | 'invoiceNotes' | 'termsAndConditions' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor' | 'fontTheme' | 'templateStyle' | 'customerAddress' | 'customerEmail' | 'customerPhone'> {
   id: string;
-  invoiceDate: string;
-  dueDate?: string;
+  invoiceDate: string; // ISO string
+  dueDate?: string; // ISO string
   customerAddress?: string;
   customerEmail?: string;
   customerPhone?: string;
@@ -160,10 +160,10 @@ export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyL
   globalDiscountType?: 'percentage' | 'fixed';
   globalDiscountValue?: number;
   totalFee: number;
-  currency: AvailableCurrency; // Added currency
-  amountInWords?: string; // Added for amount in words
-  themeColor?: string;
-  fontTheme?: string;
+  currency: AvailableCurrency;
+  amountInWords?: string;
+  themeColor?: string; // e.g., 'default', 'emerald-green'
+  fontTheme?: 'default' | 'serif' | 'mono';
   templateStyle?: 'classic' | 'modern' | 'compact';
 }
 
@@ -175,7 +175,7 @@ export interface CompanyProfileData {
   defaultTermsAndConditions?: string;
   defaultTemplateStyle?: 'classic' | 'modern' | 'compact';
   currency?: AvailableCurrency;
-  showClientAddressOnInvoice?: boolean;
+  showClientAddressOnInvoice?: boolean; // Default to true if undefined
 }
 
 export interface ClientData {
@@ -201,5 +201,3 @@ export interface AppBackupData {
   savedItems?: SavedItemData[];
   invoices?: StoredInvoiceData[];
 }
-
-    

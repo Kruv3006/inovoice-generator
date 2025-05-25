@@ -91,9 +91,10 @@ export default function InvoicePreview() {
         </div>
 
         {/* Wrapper to simulate white paper and ensure light mode rendering for the template */}
-        <div className="bg-white p-4 sm:p-8 shadow-2xl rounded-lg mx-auto max-w-4xl print-target-area"> 
-          <div className="transform scale-[0.8] sm:scale-[0.9] md:scale-[1] origin-top">
-             <InvoiceTemplate data={invoiceData} forceLightMode={true} />
+        <div className="bg-white p-2 sm:p-4 md:p-6 shadow-2xl rounded-lg mx-auto max-w-4xl print-target-area overflow-hidden"> 
+          {/* Scale container for better viewing of potentially large template */}
+          <div className="mx-auto" style={{ transform: 'scale(0.95)', transformOrigin: 'top', width: '105.26%' }}> {/* Adjust scale and width for fit */}
+             {invoiceData && <InvoiceTemplate data={invoiceData} forceLightMode={true} />}
           </div>
         </div>
         
@@ -103,7 +104,7 @@ export default function InvoicePreview() {
                 size="lg"
                 className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-md"
             >
-                Proceed to Download & Share <ArrowRight className="ml-2 h-5 w-5" />
+                Proceed to Download, Share & Print <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
         </div>
       </div>

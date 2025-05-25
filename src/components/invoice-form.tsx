@@ -109,9 +109,9 @@ const generateDefaultFormValues = (companyProfile?: CompanyProfileData | null): 
     companyLogoFile: undefined,
     watermarkFile: undefined,
     watermarkOpacity: 0.05,
-    themeColor: 'default',
-    fontTheme: 'default',
-    templateStyle: profile?.defaultTemplateStyle || 'classic',
+    themeColor: 'default', // Matches zod default
+    fontTheme: profile?.defaultTemplateStyle === 'serif' ? 'serif' : profile?.defaultTemplateStyle === 'mono' ? 'mono' : 'default', // Infer from profile if possible
+    templateStyle: profile?.defaultTemplateStyle || 'classic', // Matches zod default
   };
 };
 
@@ -128,7 +128,7 @@ export function InvoiceForm() {
 
   const [clients, setClients] = useState<ClientData[]>([]);
   const [savedItems, setSavedItems] = useState<SavedItemData[]>([]);
-  const [companyProfile, setCompanyProfile] = useState<CompanyProfileData | null>(null);
+  const [companyProfile, setCompanyProfileState] = useState<CompanyProfileData | null>(null); // Renamed to avoid conflict with global
   const [currentCurrency, setCurrentCurrency] = useState<AvailableCurrency>(availableCurrencies[0]);
 
   const watermarkFileRef = useRef<HTMLInputElement | null>(null);
@@ -136,7 +136,7 @@ export function InvoiceForm() {
 
   useEffect(() => {
     const profile = getCompanyProfile();
-    setCompanyProfile(profile);
+    setCompanyProfileState(profile);
     setCurrentCurrency(profile?.currency || availableCurrencies[0]);
     setClients(getClients());
     setSavedItems(getSavedItems());
@@ -145,7 +145,7 @@ export function InvoiceForm() {
 
   const form = useForm<InvoiceFormSchemaType>({
     resolver: zodResolver(invoiceFormSchema),
-    defaultValues: generateDefaultFormValues(companyProfile),
+    defaultValues: generateDefaultFormValues(companyProfile), // Pass local state here
     mode: "onChange",
   });
 
@@ -204,8 +204,8 @@ export function InvoiceForm() {
 
 
   const resetFormToDefaults = () => {
-    const profile = getCompanyProfile();
-    setCompanyProfile(profile); // Update local state as well
+    const profile = getCompanyProfile(); // Fetch fresh profile
+    setCompanyProfileState(profile); // Update local state as well
     setCurrentCurrency(profile?.currency || availableCurrencies[0]);
     const defaults = generateDefaultFormValues(profile);
     reset(defaults);
@@ -218,14 +218,19 @@ export function InvoiceForm() {
 
 
   useEffect(() => {
+    // This effect runs when component mounts or searchParams change
+    // It's crucial for loading initial data for new/edit/duplicate scenarios
     const profileData = getCompanyProfile(); 
-    setCompanyProfile(profileData);
+    setCompanyProfileState(profileData);
     setCurrentCurrency(profileData?.currency || availableCurrencies[0]);
 
     let baseFormValues = generateDefaultFormValues(profileData);
 
     const invoiceIdToEdit = searchParams.get('id');
     const duplicateId = searchParams.get('duplicate');
+
+    let formDataToSet: InvoiceFormSchemaType = baseFormValues;
+    let toastMessage: { title: string, description: string, variant: "default" | "destructive" } | null = null;
 
     if (duplicateId && !initialDataLoaded) {
         const sourceInvoice = getInvoiceData(duplicateId);
@@ -242,7 +247,7 @@ export function InvoiceForm() {
                 discount: Number(item.discount) || 0,
             })) || [defaultItem];
 
-            const formData: InvoiceFormSchemaType = {
+            formDataToSet = {
                 ...baseFormValues, 
                 ...sourceInvoice, 
                 invoiceNumber: `COPY-${sourceInvoice.invoiceNumber}-${String(Date.now()).slice(-4)}`,
@@ -265,17 +270,14 @@ export function InvoiceForm() {
                 customerEmail: sourceInvoice.customerEmail || '',
                 customerPhone: sourceInvoice.customerPhone || '',
             };
-            reset(formData);
             if (sourceInvoice.watermarkDataUrl) setWatermarkPreview(sourceInvoice.watermarkDataUrl);
             setCompanyLogoPreview(sourceInvoice.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
-            toast({ title: "Invoice Duplicated", description: "Review and update the details below.", variant: "default" });
+            toastMessage = { title: "Invoice Duplicated", description: "Review and update the details below.", variant: "default" };
         } else {
-            toast({ title: "Duplication Error", description: "Could not load source invoice for duplication. Using defaults.", variant: "destructive" });
-            reset(baseFormValues);
+            toastMessage = { title: "Duplication Error", description: "Could not load source invoice for duplication. Using defaults.", variant: "destructive" };
             setCompanyLogoPreview(profileData?.companyLogoDataUrl || null);
             setWatermarkPreview(null);
         }
-        setInitialDataLoaded(true);
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.delete('duplicate');
         router.replace(currentUrl.toString(), { scroll: false });
@@ -295,7 +297,7 @@ export function InvoiceForm() {
           discount: Number(item.discount) || 0,
         })) || [defaultItem];
 
-        const formData: InvoiceFormSchemaType = {
+        formDataToSet = {
           ...baseFormValues, 
           ...data, 
           invoiceNumber: data.invoiceNumber || baseFormValues.invoiceNumber,
@@ -318,25 +320,25 @@ export function InvoiceForm() {
           customerEmail: data.customerEmail || '',
           customerPhone: data.customerPhone || '',
         };
-        reset(formData);
-
         if (data.watermarkDataUrl) setWatermarkPreview(data.watermarkDataUrl);
         setCompanyLogoPreview(data.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
       } else {
-        toast({ title: "Edit Error", description: "Could not load invoice data for editing. Using defaults.", variant: "destructive" });
-        reset(baseFormValues);
+        toastMessage = { title: "Edit Error", description: "Could not load invoice data for editing. Using defaults.", variant: "destructive" };
         setCompanyLogoPreview(profileData?.companyLogoDataUrl || null);
         setWatermarkPreview(null);
       }
-      setInitialDataLoaded(true);
-    } else if (!initialDataLoaded) { // This is for a completely new invoice
-      reset(baseFormValues);
+    } else if (!initialDataLoaded) { 
       setCompanyLogoPreview(profileData?.companyLogoDataUrl || null);
       setWatermarkPreview(null);
-      setInitialDataLoaded(true);
+    }
+    
+    if (!initialDataLoaded) {
+        reset(formDataToSet); // Reset form with the determined data
+        if (toastMessage) toast(toastMessage);
+        setInitialDataLoaded(true); // Mark as loaded
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, reset, toast, initialDataLoaded, router]); // Removed companyProfile state from deps; profileData is fetched inside.
+  }, [searchParams, reset, toast, initialDataLoaded, router]); // Removed companyProfile state from deps
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -344,13 +346,14 @@ export function InvoiceForm() {
   useEffect(() => {
     const currentInvoiceId = searchParams.get('id');
     const existingData = currentInvoiceId ? getInvoiceData(currentInvoiceId) : null;
-    const profileData = getCompanyProfile();
+    const profileData = getCompanyProfile(); // Fetch fresh profile data
 
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
        if (file.size > 2 * 1024 * 1024) {
         toast({ variant: "destructive", title: "Logo File Too Large", description: "Logo must be less than 2MB." });
         setValue('companyLogoFile', undefined, { shouldValidate: true });
+        // Revert to existing logo if validation fails
         setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
         return;
       }
@@ -364,19 +367,23 @@ export function InvoiceForm() {
         if (dataUrl) {
           setCompanyLogoPreview(dataUrl);
         } else { 
+          // If file read fails, clear from form and revert preview
           setValue('companyLogoFile', undefined, { shouldValidate: true });
           setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
         }
       });
     } else {
+      // This block handles the case where the file input is cleared or was never set (e.g., on initial load for edit)
+      // It ensures the preview shows the logo from localStorage or profile if no new file is staged.
       const currentLogoFileValue = getValues('companyLogoFile');
       if (!currentLogoFileValue || currentLogoFileValue.length === 0) {
+          // No new file is staged. Show the existing logo.
           if (existingData?.companyLogoDataUrl) {
               setCompanyLogoPreview(existingData.companyLogoDataUrl);
           } else if (profileData?.companyLogoDataUrl) {
               setCompanyLogoPreview(profileData.companyLogoDataUrl);
           } else {
-              setCompanyLogoPreview(null);
+              setCompanyLogoPreview(null); // No logo anywhere
           }
       }
     }
@@ -425,20 +432,28 @@ export function InvoiceForm() {
     setIsSubmitting(true);
     try {
       const invoiceIdToEdit = searchParams.get('id');
-      const isDuplicating = searchParams.get('duplicate'); 
+      const isDuplicating = searchParams.get('duplicate'); // Should have been cleared, but good to check
       const invoiceId = (invoiceIdToEdit && !isDuplicating) ? invoiceIdToEdit : `inv_${Date.now()}`;
 
       let companyLogoDataUrlToStore: string | null = companyLogoPreview;
-      if (data.companyLogoFile && data.companyLogoFile.length > 0) {
-         const newLogoUrl = await fileToDataUrl(data.companyLogoFile[0], toast);
-         if (newLogoUrl) companyLogoDataUrlToStore = newLogoUrl;
+      // Only update from file if a new file was actually selected and successfully previewed
+      if (data.companyLogoFile && data.companyLogoFile.length > 0 && companyLogoPreview && companyLogoPreview.startsWith('data:image')) {
+         // companyLogoPreview already holds the new Data URL
+      } else if (!companyLogoPreview && data.companyLogoFile === undefined ) {
+         // No preview and no file selected means no logo or logo was cleared.
+         companyLogoDataUrlToStore = null;
       }
+      // Otherwise, companyLogoPreview (from existing data or profile) is used.
+
 
       let watermarkDataUrlToStore: string | null = watermarkPreview;
-       if (data.watermarkFile && data.watermarkFile.length > 0) {
-         const newWatermarkUrl = await fileToDataUrl(data.watermarkFile[0], toast);
-         if (newWatermarkUrl) watermarkDataUrlToStore = newWatermarkUrl;
+      if (data.watermarkFile && data.watermarkFile.length > 0 && watermarkPreview && watermarkPreview.startsWith('data:image')) {
+        // watermarkPreview already holds the new Data URL
+      } else if (!watermarkPreview && data.watermarkFile === undefined) {
+        watermarkDataUrlToStore = null;
       }
+      // Otherwise, watermarkPreview (from existing data) is used.
+
 
       const itemsToStore: StoredLineItem[] = data.items.map(item => {
         return {
@@ -456,8 +471,10 @@ export function InvoiceForm() {
       const finalSubTotal = calculatedSubTotal;
       const finalTotalFee = calculatedTotalFee;
       
-      const currentProfile = getCompanyProfile();
-      const currentCurrencyForStorage = currentProfile?.currency || availableCurrencies[0];
+      const currentProfileForStorage = getCompanyProfile();
+      const currentCurrencyForStorage = data.dueDate // Check any field to ensure data is form data
+        ? currentCurrency // Use current state if it's a new/edited form
+        : (currentProfileForStorage?.currency || availableCurrencies[0]);
 
 
       const amountInWordsPlaceholder = `[Total ${currentCurrencyForStorage?.symbol || '₹'}${finalTotalFee.toFixed(2)} in words - Placeholder]`;
@@ -517,7 +534,7 @@ export function InvoiceForm() {
       setValue(`items.${itemIndex}.rate`, selectedSavedItem.rate);
       setValue(`items.${itemIndex}.quantity`, selectedSavedItem.defaultQuantity ?? 1);
       setValue(`items.${itemIndex}.unit`, selectedSavedItem.defaultUnit ?? '');
-      setValue(`items.${itemIndex}.itemStartDate`, undefined);
+      setValue(`items.${itemIndex}.itemStartDate`, undefined); // Reset dates when loading item
       setValue(`items.${itemIndex}.itemEndDate`, undefined);
       setValue(`items.${itemIndex}.itemStartTime`, '');
       setValue(`items.${itemIndex}.itemEndTime`, '');
@@ -1069,15 +1086,13 @@ export function InvoiceForm() {
                         name={`items.${index}.unit`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Unit (Opt.)</FormLabel>
+                            <FormLabel className="flex items-center"><Shapes className="mr-1 h-3 w-3 text-muted-foreground" />Unit (Opt.)</FormLabel>
                             <FormControl>
-                             <div className="relative">
-                                <Shapes className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
                                   placeholder="e.g. hrs, pcs"
                                   {...field}
                                   value={field.value || ''}
-                                  className={`pl-8 ${isUnitReadOnly ? "bg-muted/50" : ""}`}
+                                  className={`${isUnitReadOnly ? "bg-muted/50" : ""}`}
                                   readOnly={isUnitReadOnly}
                                   onChange={e => {
                                     if (!isUnitReadOnly) {
@@ -1085,7 +1100,6 @@ export function InvoiceForm() {
                                     }
                                   }}
                                 />
-                             </div>
                             </FormControl>
                             <FormDescription className="text-xs">e.g., hours, pcs, day. Auto-set if dates used.</FormDescription>
                             <FormMessage />

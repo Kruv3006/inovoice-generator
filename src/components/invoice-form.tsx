@@ -128,7 +128,7 @@ export function InvoiceForm() {
 
   const [clients, setClients] = useState<ClientData[]>([]);
   const [savedItems, setSavedItems] = useState<SavedItemData[]>([]);
-  const [companyProfile, setCompanyProfileState] = useState<CompanyProfileData | null>(null); // Renamed to avoid conflict with global
+  const [companyProfileState, setCompanyProfileState] = useState<CompanyProfileData | null>(null);
   const [currentCurrency, setCurrentCurrency] = useState<AvailableCurrency>(availableCurrencies[0]);
 
   const watermarkFileRef = useRef<HTMLInputElement | null>(null);
@@ -145,7 +145,7 @@ export function InvoiceForm() {
 
   const form = useForm<InvoiceFormSchemaType>({
     resolver: zodResolver(invoiceFormSchema),
-    defaultValues: generateDefaultFormValues(companyProfile), // Pass local state here
+    defaultValues: generateDefaultFormValues(companyProfileState),
     mode: "onChange",
   });
 
@@ -204,8 +204,8 @@ export function InvoiceForm() {
 
 
   const resetFormToDefaults = () => {
-    const profile = getCompanyProfile(); // Fetch fresh profile
-    setCompanyProfileState(profile); // Update local state as well
+    const profile = getCompanyProfile(); 
+    setCompanyProfileState(profile); 
     setCurrentCurrency(profile?.currency || availableCurrencies[0]);
     const defaults = generateDefaultFormValues(profile);
     reset(defaults);
@@ -218,10 +218,8 @@ export function InvoiceForm() {
 
 
   useEffect(() => {
-    // This effect runs when component mounts or searchParams change
-    // It's crucial for loading initial data for new/edit/duplicate scenarios
     const profileData = getCompanyProfile(); 
-    setCompanyProfileState(profileData);
+    setCompanyProfileState(profileData); // Update local state, used by generateDefaultFormValues
     setCurrentCurrency(profileData?.currency || availableCurrencies[0]);
 
     let baseFormValues = generateDefaultFormValues(profileData);
@@ -333,12 +331,12 @@ export function InvoiceForm() {
     }
     
     if (!initialDataLoaded) {
-        reset(formDataToSet); // Reset form with the determined data
+        reset(formDataToSet); 
         if (toastMessage) toast(toastMessage);
-        setInitialDataLoaded(true); // Mark as loaded
+        setInitialDataLoaded(true); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, reset, toast, initialDataLoaded, router]); // Removed companyProfile state from deps
+  }, [searchParams, reset, toast, initialDataLoaded, router]); 
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -346,14 +344,13 @@ export function InvoiceForm() {
   useEffect(() => {
     const currentInvoiceId = searchParams.get('id');
     const existingData = currentInvoiceId ? getInvoiceData(currentInvoiceId) : null;
-    const profileData = getCompanyProfile(); // Fetch fresh profile data
+    const profileData = getCompanyProfile(); 
 
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
        if (file.size > 2 * 1024 * 1024) {
         toast({ variant: "destructive", title: "Logo File Too Large", description: "Logo must be less than 2MB." });
         setValue('companyLogoFile', undefined, { shouldValidate: true });
-        // Revert to existing logo if validation fails
         setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
         return;
       }
@@ -367,23 +364,19 @@ export function InvoiceForm() {
         if (dataUrl) {
           setCompanyLogoPreview(dataUrl);
         } else { 
-          // If file read fails, clear from form and revert preview
           setValue('companyLogoFile', undefined, { shouldValidate: true });
           setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
         }
       });
     } else {
-      // This block handles the case where the file input is cleared or was never set (e.g., on initial load for edit)
-      // It ensures the preview shows the logo from localStorage or profile if no new file is staged.
       const currentLogoFileValue = getValues('companyLogoFile');
       if (!currentLogoFileValue || currentLogoFileValue.length === 0) {
-          // No new file is staged. Show the existing logo.
           if (existingData?.companyLogoDataUrl) {
               setCompanyLogoPreview(existingData.companyLogoDataUrl);
           } else if (profileData?.companyLogoDataUrl) {
               setCompanyLogoPreview(profileData.companyLogoDataUrl);
           } else {
-              setCompanyLogoPreview(null); // No logo anywhere
+              setCompanyLogoPreview(null); 
           }
       }
     }
@@ -432,28 +425,20 @@ export function InvoiceForm() {
     setIsSubmitting(true);
     try {
       const invoiceIdToEdit = searchParams.get('id');
-      const isDuplicating = searchParams.get('duplicate'); // Should have been cleared, but good to check
+      const isDuplicating = searchParams.get('duplicate'); 
       const invoiceId = (invoiceIdToEdit && !isDuplicating) ? invoiceIdToEdit : `inv_${Date.now()}`;
 
       let companyLogoDataUrlToStore: string | null = companyLogoPreview;
-      // Only update from file if a new file was actually selected and successfully previewed
       if (data.companyLogoFile && data.companyLogoFile.length > 0 && companyLogoPreview && companyLogoPreview.startsWith('data:image')) {
-         // companyLogoPreview already holds the new Data URL
       } else if (!companyLogoPreview && data.companyLogoFile === undefined ) {
-         // No preview and no file selected means no logo or logo was cleared.
          companyLogoDataUrlToStore = null;
       }
-      // Otherwise, companyLogoPreview (from existing data or profile) is used.
-
 
       let watermarkDataUrlToStore: string | null = watermarkPreview;
       if (data.watermarkFile && data.watermarkFile.length > 0 && watermarkPreview && watermarkPreview.startsWith('data:image')) {
-        // watermarkPreview already holds the new Data URL
       } else if (!watermarkPreview && data.watermarkFile === undefined) {
         watermarkDataUrlToStore = null;
       }
-      // Otherwise, watermarkPreview (from existing data) is used.
-
 
       const itemsToStore: StoredLineItem[] = data.items.map(item => {
         return {
@@ -472,12 +457,12 @@ export function InvoiceForm() {
       const finalTotalFee = calculatedTotalFee;
       
       const currentProfileForStorage = getCompanyProfile();
-      const currentCurrencyForStorage = data.dueDate // Check any field to ensure data is form data
-        ? currentCurrency // Use current state if it's a new/edited form
+      const currentCurrencyForStorage = data.dueDate 
+        ? currentCurrency 
         : (currentProfileForStorage?.currency || availableCurrencies[0]);
 
 
-      const amountInWordsPlaceholder = `[Total ${currentCurrencyForStorage?.symbol || '₹'}${finalTotalFee.toFixed(2)} in words - Placeholder]`;
+      const amountInWordsPlaceholder = `[Amount for ${currentCurrencyForStorage?.symbol || '₹'}${finalTotalFee.toFixed(2)} in words - Auto-generation pending]`;
 
       const storedData: StoredInvoiceData = {
         id: invoiceId,
@@ -704,7 +689,7 @@ export function InvoiceForm() {
                     </div>
                   </FormControl>
                    <FormDescription>
-                    {(searchParams.get('id') || companyProfile?.companyLogoDataUrl) && companyLogoPreview && (!formFieldValue || formFieldValue.length === 0)
+                    {(searchParams.get('id') || companyProfileState?.companyLogoDataUrl) && companyLogoPreview && (!formFieldValue || formFieldValue.length === 0)
                       ? "Current logo (from profile or this invoice) will be used. Upload a new image to change it."
                       : "Upload a logo for the invoice. You can set a default logo in Application Settings."}
                   </FormDescription>
@@ -1288,6 +1273,7 @@ export function InvoiceForm() {
                           <SelectItem value="classic">Classic - Traditional and professional</SelectItem>
                           <SelectItem value="modern">Modern - Sleek and contemporary</SelectItem>
                           <SelectItem value="compact">Compact - Minimalist and space-saving</SelectItem>
+                          <SelectItem value="minimalist">Minimalist - Clean and elegant</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormDescription>Choose a visual style for your invoice. Default from Settings.</FormDescription>
@@ -1422,7 +1408,7 @@ export function InvoiceForm() {
                       </div>
                       <FormControl>
                         <Slider
-                          value={[ (field.value ?? generateDefaultFormValues(companyProfile).watermarkOpacity ?? 0.05) * 100 ]}
+                          value={[ (field.value ?? generateDefaultFormValues(companyProfileState).watermarkOpacity ?? 0.05) * 100 ]}
                           onValueChange={(value) => field.onChange(value[0] / 100)}
                           max={100}
                           step={1}
@@ -1501,4 +1487,3 @@ export function InvoiceForm() {
     </Card>
   );
 }
-

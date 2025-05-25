@@ -130,7 +130,7 @@ export const invoiceFormSchema = z.object({
 
   themeColor: z.string().optional().default('default'),
   fontTheme: z.enum(['default', 'serif', 'mono']).optional().default('default'),
-  templateStyle: z.enum(['classic', 'modern', 'compact']).optional().default('classic'),
+  templateStyle: z.enum(['classic', 'modern', 'compact', 'minimalist']).optional().default('classic'),
 });
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
@@ -164,7 +164,7 @@ export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyL
   amountInWords?: string;
   themeColor?: string; // e.g., 'default', 'emerald-green'
   fontTheme?: 'default' | 'serif' | 'mono';
-  templateStyle?: 'classic' | 'modern' | 'compact';
+  templateStyle?: 'classic' | 'modern' | 'compact' | 'minimalist';
 }
 
 // Settings Page Types
@@ -173,7 +173,7 @@ export interface CompanyProfileData {
   companyLogoDataUrl?: string | null;
   defaultInvoiceNotes?: string;
   defaultTermsAndConditions?: string;
-  defaultTemplateStyle?: 'classic' | 'modern' | 'compact';
+  defaultTemplateStyle?: 'classic' | 'modern' | 'compact' | 'minimalist';
   currency?: AvailableCurrency;
   showClientAddressOnInvoice?: boolean; // Default to true if undefined
 }

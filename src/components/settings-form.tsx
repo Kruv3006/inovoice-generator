@@ -6,7 +6,7 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Image from 'next/image';
-import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash, RotateCcw, LayoutTemplate, DollarSign, Mail, Phone, MapPin, Download, Upload, Eye, EyeOff } from 'lucide-react';
+import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash, RotateCcw, LayoutTemplate, DollarSign, Mail, Phone, MapPin, Download, Upload, Eye, EyeOff, Database } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ import { availableCurrencies } from '@/lib/invoice-types';
 import {
   saveCompanyProfile, getCompanyProfile,
   getClients, addClient, updateClient, removeClient,
-  getSavedItems, addSavedItem, removeSavedItem
+  getSavedItems, addSavedItem, removeSavedItem, saveClients, saveSavedItems
 } from '@/lib/settings-store';
 import { getAllInvoices, saveInvoiceData, removeInvoiceData, INVOICE_STORAGE_KEY_PREFIX } from '@/lib/invoice-store';
 import {
@@ -49,7 +49,7 @@ const companyProfileSchema = z.object({
   companyLogoFile: z.custom<FileList>().optional(),
   defaultInvoiceNotes: z.string().optional(),
   defaultTermsAndConditions: z.string().optional(),
-  defaultTemplateStyle: z.enum(['classic', 'modern', 'compact']).optional().default('classic'),
+  defaultTemplateStyle: z.enum(['classic', 'modern', 'compact', 'minimalist']).optional().default('classic'),
   currencyCode: z.string().optional().default(availableCurrencies[0].code),
   showClientAddressOnInvoice: z.boolean().optional().default(true),
 });
@@ -243,12 +243,24 @@ export function SettingsForm() {
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
       if (file.size > 2 * 1024 * 1024 || !['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+        // If validation fails here (e.g., due to direct file drop), reset the preview and the file value
+        companyProfileForm.setValue('companyLogoFile', undefined);
+        const profile = getCompanyProfile();
+        setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
         return;
       }
       fileToDataUrl(file, toast).then(dataUrl => {
-        if (dataUrl) setCompanyLogoPreview(dataUrl);
+        if (dataUrl) {
+            setCompanyLogoPreview(dataUrl);
+        } else {
+            // If file read fails, reset preview and file value
+            companyProfileForm.setValue('companyLogoFile', undefined);
+            const profile = getCompanyProfile();
+            setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
+        }
       });
     } else if (!watchedCompanyLogoFile && !companyProfileForm.formState.isDirty) {
+        // On initial load or reset, if no file is staged, load from profile
         const profile = getCompanyProfile();
         if (profile?.companyLogoDataUrl) {
             setCompanyLogoPreview(profile.companyLogoDataUrl);
@@ -256,18 +268,19 @@ export function SettingsForm() {
             setCompanyLogoPreview(null);
         }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedCompanyLogoFile, companyProfileForm.formState.isDirty, toast]);
 
 
   const handleExportData = () => {
     try {
-        const companyProfile = getCompanyProfile();
+        const companyProfileData = getCompanyProfile();
         const clientsData = getClients();
         const savedItemsData = getSavedItems();
         const invoicesData = getAllInvoices();
 
         const backupData: AppBackupData = {
-            companyProfile,
+            companyProfile: companyProfileData,
             clients: clientsData,
             savedItems: savedItemsData,
             invoices: invoicesData,
@@ -304,24 +317,36 @@ export function SettingsForm() {
 
             if (importedData.companyProfile) {
                 saveCompanyProfile(importedData.companyProfile);
+                // Update form and preview after importing profile
+                companyProfileForm.reset({
+                    companyName: importedData.companyProfile.companyName || '',
+                    defaultInvoiceNotes: importedData.companyProfile.defaultInvoiceNotes || '',
+                    defaultTermsAndConditions: importedData.companyProfile.defaultTermsAndConditions || '',
+                    defaultTemplateStyle: importedData.companyProfile.defaultTemplateStyle || 'classic',
+                    currencyCode: importedData.companyProfile.currency?.code || availableCurrencies[0].code,
+                    showClientAddressOnInvoice: importedData.companyProfile.showClientAddressOnInvoice === undefined ? true : importedData.companyProfile.showClientAddressOnInvoice,
+                });
+                setCompanyLogoPreview(importedData.companyProfile.companyLogoDataUrl || null);
             }
             if (importedData.clients && Array.isArray(importedData.clients)) {
                 saveClients(importedData.clients);
+                setClients(importedData.clients);
             }
             if (importedData.savedItems && Array.isArray(importedData.savedItems)) {
                 saveSavedItems(importedData.savedItems);
+                setSavedItems(importedData.savedItems);
             }
             if (importedData.invoices && Array.isArray(importedData.invoices)) {
                 // Clear existing invoices first to avoid duplicates if IDs clash or for a clean import
-                const existingInvoiceIds = Object.keys(localStorage).filter(key => key.startsWith(INVOICE_STORAGE_KEY_PREFIX));
-                existingInvoiceIds.forEach(key => localStorage.removeItem(key));
+                const existingInvoiceKeys = Object.keys(localStorage).filter(key => key.startsWith(INVOICE_STORAGE_KEY_PREFIX));
+                existingInvoiceKeys.forEach(key => localStorage.removeItem(key));
                 
                 importedData.invoices.forEach(invoice => saveInvoiceData(invoice.id, invoice));
             }
 
-            toast({ title: "Data Imported Successfully!", description: "Please refresh the page to see all changes." });
-            // Force reload or re-fetch states
-            window.location.reload(); 
+            toast({ title: "Data Imported Successfully!", description: "Please refresh the page to see all changes reflected, or re-navigate if already refreshed." });
+            // Consider a full page reload or more targeted state updates if needed
+            // window.location.reload(); // Uncomment if a full reload is desired after import
 
         } catch (error) {
             console.error("Error importing data:", error);
@@ -428,6 +453,7 @@ export function SettingsForm() {
                       <SelectItem value="classic">Classic - Traditional and professional</SelectItem>
                       <SelectItem value="modern">Modern - Sleek and contemporary</SelectItem>
                       <SelectItem value="compact">Compact - Minimalist and space-saving</SelectItem>
+                      <SelectItem value="minimalist">Minimalist - Clean and elegant</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">Choose the default look for your new invoices.</p>
@@ -500,7 +526,7 @@ export function SettingsForm() {
                     <Input id="clientPhoneInput" type="tel" {...clientForm.register("clientPhone")} placeholder="+91 9876543210" />
                 </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
                 <Button type="submit" variant={editingClient ? "default" : "outline"} className="w-full sm:w-auto">
                     <PlusCircle className="mr-2 h-4 w-4" /> {editingClient ? "Update Client" : "Add Client"}
                 </Button>
@@ -570,15 +596,15 @@ export function SettingsForm() {
           <CardDescription>Save common line items (description, rate, default quantity, default unit) for quick use in invoices.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={newSavedItemForm.handleSubmit(handleAddSavedItem)} className="space-y-4 mb-6">
+          <form onSubmit={newSavedItemForm.handleSubmit(handleAddSavedItem)} className="space-y-4 mb-6 p-4 border rounded-md">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="itemDescriptionInput">Item Description</Label>
+                <Label htmlFor="itemDescriptionInput">Item Description *</Label>
                 <Input id="itemDescriptionInput" {...newSavedItemForm.register("itemDescription")} placeholder="e.g., Web Development Hour" />
                 {newSavedItemForm.formState.errors.itemDescription && <p className="text-sm text-destructive mt-1">{newSavedItemForm.formState.errors.itemDescription.message}</p>}
               </div>
               <div>
-                <Label htmlFor="itemRateInput">Item Rate ({getCompanyProfile()?.currency?.symbol || '₹'})</Label>
+                <Label htmlFor="itemRateInput">Item Rate ({getCompanyProfile()?.currency?.symbol || '₹'}) *</Label>
                 <Input id="itemRateInput" type="number" step="0.01" {...newSavedItemForm.register("itemRate")} placeholder="100.00" />
                 {newSavedItemForm.formState.errors.itemRate && <p className="text-sm text-destructive mt-1">{newSavedItemForm.formState.errors.itemRate.message}</p>}
               </div>
@@ -681,14 +707,3 @@ export function SettingsForm() {
     </div>
   );
 }
-
-// Helper icon - replace with actual Lucide icon if available or keep as is
-const Database = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <ellipse cx="12" cy="5" rx="9" ry="3"/>
-    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-  </svg>
-);
-
-    

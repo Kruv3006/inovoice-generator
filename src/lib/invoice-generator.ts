@@ -4,7 +4,7 @@ import { format, parseISO, isValid } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { toast } from '@/hooks/use-toast';
-import { getCompanyProfile } from '@/lib/settings-store'; // Used for showClientAddress
+import { getCompanyProfile } from '@/lib/settings-store'; 
 
 const formatCurrencyForDoc = (amount?: number, currency?: AvailableCurrency) => {
   if (typeof amount !== 'number') return `${currency?.symbol || '₹'}0.00`;
@@ -40,7 +40,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
 
   const currentCurrency = currency || { symbol: '₹', code: 'INR', name: 'Indian Rupee' };
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
-  const invoiceBgColorDoc = 'hsl(0 0% 100%)'; // Always white for DOC
+  const invoiceBgColorDoc = 'hsl(0 0% 100%)'; 
   const textColorDoc = 'hsl(0 0% 10%)'; 
   const mutedTextColorDoc = 'hsl(0 0% 40%)';
   let primaryColorDoc = 'hsl(217 91% 55%)'; 
@@ -65,12 +65,12 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   const parsedDueDate = dueDate && isValid(parseISO(dueDate)) ? parseISO(dueDate) : null;
   
   const fCurrency = (val?: number) => formatCurrencyForDoc(val, currentCurrency);
-  const companyProfileSettings = getCompanyProfile(); // For client address visibility
+  const companyProfileSettings = getCompanyProfile(); 
   const showClientAddressOnInvoice = companyProfileSettings?.showClientAddressOnInvoice !== false;
 
 
   const companyLogoHtml = companyLogoDataUrl
-    ? `<img src="${companyLogoDataUrl}" style="max-height: ${templateStyle === 'modern' || templateStyle === 'compact' ? '50px' : '70px'}; max-width: ${templateStyle === 'modern' || templateStyle === 'compact' ? '150px' : '180px'}; object-fit: contain;" alt="Company Logo"/>`
+    ? `<img src="${companyLogoDataUrl}" style="max-height: ${templateStyle === 'modern' || templateStyle === 'compact' || templateStyle === 'minimalist' ? '60px' : '70px'}; max-width: ${templateStyle === 'modern' || templateStyle === 'compact' || templateStyle === 'minimalist' ? '160px' : '180px'}; object-fit: contain;" alt="Company Logo"/>`
     : '';
 
   let itemsHtml = '';
@@ -103,11 +103,11 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
                   } else if (fullDays === 0 && remainingHoursAfterFullDays === 0 && remainingMinutesAfterFullHours > 0) {
                     durationParts.push(`${remainingMinutesAfterFullHours} min${remainingMinutesAfterFullHours > 1 ? 's' : ''}`);
                   }
-                  if (durationParts.length > 0) displayDurationStringDoc = `<div style="font-size: 8pt; color: ${mutedTextColorDoc}; margin-top: 3px;">(Duration: ${durationParts.join(', ')})</div>`;
+                  if (durationParts.length > 0) displayDurationStringDoc = `<div style="font-size: ${templateStyle === 'minimalist' ? '7.5pt' : '8pt'}; color: ${mutedTextColorDoc}; margin-top: 3px;">(Duration: ${durationParts.join(', ')})</div>`;
               }
           } catch (e) { /* ignore */ }
       } else if (item.itemStartDate && item.itemEndDate && isValid(parseISO(item.itemStartDate)) && isValid(parseISO(item.itemEndDate))) {
-          displayDurationStringDoc = `<div style="font-size: 8pt; color: ${mutedTextColorDoc}; margin-top: 3px;">(${format(parseISO(item.itemStartDate), "MMM d, yyyy")} - ${format(parseISO(item.itemEndDate), "MMM d, yyyy")})</div>`;
+          displayDurationStringDoc = `<div style="font-size: ${templateStyle === 'minimalist' ? '7.5pt' : '8pt'}; color: ${mutedTextColorDoc}; margin-top: 3px;">(${format(parseISO(item.itemStartDate), "MMM d, yyyy")} - ${format(parseISO(item.itemEndDate), "MMM d, yyyy")})</div>`;
       }
 
       const itemQuantity = Number(item.quantity) || 0;
@@ -116,14 +116,16 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
       const itemSubtotal = itemQuantity * itemRate;
       const discountedAmount = itemSubtotal * (1 - itemDiscount / 100);
 
+      const itemTdStyle = `padding: ${templateStyle === 'minimalist' ? '8px 0' : '10px'}; border: ${templateStyle === 'minimalist' ? '0' : '1px solid ' + borderColorDoc}; ${templateStyle === 'minimalist' ? 'border-bottom: 1px solid ' + borderColorDoc : ''}; vertical-align: top;`;
+
       itemsHtml += `
         <tr style="background-color: ${invoiceBgColorDoc};">
-          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; color: ${textColorDoc};">${item.description}${displayDurationStringDoc}</td>
-          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${itemQuantity}</td>
-          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${item.unit || '-'}</td>
-          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${fCurrency(itemRate)}</td>
-          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${itemDiscount > 0 ? `${itemDiscount}%` : '-'}</td>
-          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${textColorDoc};">${fCurrency(discountedAmount)}</td>
+          <td style="${itemTdStyle} color: ${textColorDoc}; text-align:left;">${item.description}${displayDurationStringDoc}</td>
+          <td style="${itemTdStyle} text-align: right; color: ${mutedTextColorDoc};">${itemQuantity}</td>
+          <td style="${itemTdStyle} text-align: right; color: ${mutedTextColorDoc};">${item.unit || '-'}</td>
+          <td style="${itemTdStyle} text-align: right; color: ${mutedTextColorDoc};">${fCurrency(itemRate)}</td>
+          <td style="${itemTdStyle} text-align: right; color: ${mutedTextColorDoc};">${itemDiscount > 0 ? `${itemDiscount}%` : '-'}</td>
+          <td style="${itemTdStyle} text-align: right; color: ${textColorDoc};">${fCurrency(discountedAmount)}</td>
         </tr>
       `;
     });
@@ -143,10 +145,10 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     }
     globalDiscountHtml = `
       <tr>
-        <td colspan="5" style="padding: 8px; text-align: right; font-weight: normal; color: ${mutedTextColorDoc}; border-top: 1px solid ${borderColorDoc};">
+        <td colspan="5" style="padding: ${templateStyle === 'minimalist' ? '4px 0' : '8px'}; text-align: right; font-weight: normal; color: ${mutedTextColorDoc}; ${templateStyle === 'minimalist' ? '' : 'border-top: 1px solid '+borderColorDoc};">
           ${discountLabel}:
         </td>
-        <td style="padding: 8px; text-align: right; font-weight: normal; color: ${mutedTextColorDoc}; border-top: 1px solid ${borderColorDoc};">
+        <td style="padding: ${templateStyle === 'minimalist' ? '4px 0' : '8px'}; text-align: right; font-weight: normal; color: ${mutedTextColorDoc}; ${templateStyle === 'minimalist' ? '' : 'border-top: 1px solid '+borderColorDoc};">
           - ${fCurrency(discountAmountDisplay)}
         </td>
       </tr>
@@ -154,10 +156,10 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   }
 
   const clientDetailsHtml = `
-    <p style="margin: 0; color: ${textColorDoc}; font-weight: bold;">${customerName || 'Client Name'}</p>
-    ${(showClientAddressOnInvoice && customerAddress) ? `<p style="margin: 2px 0; white-space: pre-line; color: ${mutedTextColorDoc};">${customerAddress}</p>` : ''}
-    ${customerEmail ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc};">Email: ${customerEmail}</p>` : ''}
-    ${customerPhone ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc};">Phone: ${customerPhone}</p>` : ''}
+    <p style="margin: 0; color: ${textColorDoc}; font-weight: ${templateStyle === 'minimalist' ? '600' : 'bold'}; font-size: ${templateStyle === 'minimalist' ? '10pt' : 'inherit'};">${customerName || 'Client Name'}</p>
+    ${(showClientAddressOnInvoice && customerAddress) ? `<p style="margin: 2px 0; white-space: pre-line; color: ${mutedTextColorDoc}; font-size: ${templateStyle === 'minimalist' ? '8pt' : '9pt'};">${customerAddress}</p>` : ''}
+    ${customerEmail ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc}; font-size: ${templateStyle === 'minimalist' ? '8pt' : '9pt'};">Email: ${customerEmail}</p>` : ''}
+    ${customerPhone ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc}; font-size: ${templateStyle === 'minimalist' ? '8pt' : '9pt'};">Phone: ${customerPhone}</p>` : ''}
   `;
 
   const classicHeaderHtml = `
@@ -182,7 +184,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   const modernHeaderHtml = `
     <div style="padding-bottom:15px; margin-bottom: 25px; border-bottom: 1px solid ${borderColorDoc};">
         <div style="display:table; width:100%; vertical-align:top;">
-            <div style="display:table-cell; width:60%;">
+            <div style="display:table-cell; width:60%; vertical-align:top;">
                 ${companyLogoHtml ? `<div style="margin-bottom: 5px;">${companyLogoHtml}</div>` : ''}
                 <div style="font-size: 18px; font-weight: bold; color: ${primaryColorDoc};">${companyName || 'Your Company'}</div>
             </div>
@@ -228,30 +230,60 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
         ${clientDetailsHtml}
     </div>
   `;
+
+  const minimalistHeaderHtml = `
+    <div style="padding-bottom:20px; margin-bottom:20px;">
+        <table style="width:100%; border-collapse:collapse;">
+            <tr>
+                <td style="width:60%; vertical-align:top;">
+                    ${companyLogoHtml ? `<div>${companyLogoHtml}</div>` : `<div style="font-size:22px; font-weight:600; color:${primaryColorDoc};">${companyName || 'Your Company'}</div>`}
+                    ${companyLogoHtml && companyName ? `<div style="font-size:18px; font-weight:600; color:${primaryColorDoc}; margin-top:5px;">${companyName}</div>` : ''}
+                </td>
+                <td style="width:40%; text-align:right; vertical-align:top;">
+                    <div style="font-size:16px; font-weight:normal; color:${mutedTextColorDoc}; text-transform:uppercase; letter-spacing:1px;">INVOICE</div>
+                    <div style="font-size:9pt; color:${mutedTextColorDoc}; margin-top:2px;">${invoiceNumber}</div>
+                </td>
+            </tr>
+        </table>
+        <table style="width:100%; border-collapse:collapse; margin-top:15px;">
+            <tr>
+                <td style="width:60%; vertical-align:top; font-size:8pt;">
+                    <h3 style="font-size:8pt; font-weight:500; color:${mutedTextColorDoc}; text-transform:uppercase; margin-bottom:4px; margin-top:0; letter-spacing:0.5px;">Billed To</h3>
+                    ${clientDetailsHtml}
+                </td>
+                <td style="width:40%; text-align:right; vertical-align:top; font-size:9pt;">
+                    <p style="margin:0; color:${textColorDoc};"><strong style="font-weight:500;">Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</p>
+                    ${parsedDueDate ? `<p style="margin:2px 0 0 0; color:${textColorDoc};"><strong style="font-weight:500;">Due Date:</strong> ${format(parsedDueDate, "MMMM d, yyyy")}</p>` : ''}
+                </td>
+            </tr>
+        </table>
+    </div>
+  `;
   
   let selectedHeaderHtml;
   switch(templateStyle) {
     case 'modern': selectedHeaderHtml = modernHeaderHtml; break;
     case 'compact': selectedHeaderHtml = compactHeaderHtml; break;
+    case 'minimalist': selectedHeaderHtml = minimalistHeaderHtml; break;
     case 'classic':
     default: selectedHeaderHtml = classicHeaderHtml;
   }
 
-  const notesAndTermsLayout = (templateStyle === 'modern' && invoiceNotes && termsAndConditions) 
+  const notesAndTermsLayout = ((templateStyle === 'modern' || templateStyle === 'minimalist') && invoiceNotes && termsAndConditions) 
     ? `<tr>
-        <td style="vertical-align:top; width:50%; padding-right:10px;">${invoiceNotes ? `<h4 style="font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4><p style="white-space: pre-line; margin-top:0;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>` : ''}</td>
-        <td style="vertical-align:top; width:50%; padding-left:10px; border-left: 1px solid ${borderColorDoc};">${termsAndConditions ? `<h4 style="font-size: 8pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:0;">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: 7pt; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>` : ''}</td>
+        <td style="vertical-align:top; width:48%; padding-right:2%;">${invoiceNotes ? `<h4 style="font-size: ${templateStyle === 'minimalist' ? '8pt' : '9pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">${templateStyle === 'minimalist' ? 'Additional Notes' : 'Notes'}</h4><p style="white-space: pre-line; margin-top:0;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>` : ''}</td>
+        <td style="vertical-align:top; width:48%; padding-left:2%; ${templateStyle === 'minimalist' ? '' : 'border-left: 1px solid '+borderColorDoc};">${termsAndConditions ? `<h4 style="font-size: ${templateStyle === 'minimalist' ? '7pt' : '8pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:0;">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'minimalist' ? '6.5pt' : '7pt'}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>` : ''}</td>
        </tr>`
-    : `<tr><td colspan="2">${invoiceNotes ? `<h4 style="font-size: ${templateStyle === 'compact' ? '7pt' : '9pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4><p style="white-space: pre-line; margin-top:0; margin-bottom:10px;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>` : ''}${termsAndConditions ? `<h4 style="font-size: ${templateStyle === 'compact' ? '6pt' : '8pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:${invoiceNotes ? '10px' : '0'}; border-top:${invoiceNotes ? '1px solid '+borderColorDoc : 'none'}; padding-top:${invoiceNotes ? '10px' : '0'};">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'compact' ? '6pt' : '7pt'}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>` : ''}</td></tr>`;
+    : `<tr><td colspan="2">${invoiceNotes ? `<h4 style="font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">${templateStyle === 'minimalist' ? 'Additional Notes' : 'Notes'}</h4><p style="white-space: pre-line; margin-top:0; margin-bottom:10px;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>` : ''}${termsAndConditions ? `<h4 style="font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '7pt' : '8pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:${invoiceNotes ? '10px' : '0'}; ${templateStyle !== 'minimalist' && invoiceNotes ? 'border-top:1px solid '+borderColorDoc+'; padding-top:'+(invoiceNotes ? '10px' : '0')+';' : ''}">${termsAndConditions ? `Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '6.5pt' : '7pt')}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>` : ''}` : ''}</td></tr>`;
 
   const notesAndTermsHtml = (invoiceNotes || termsAndConditions) ? `
-    <table style="width:100%; margin-top: 25px; padding-top:15px; border-top: 1px solid ${borderColorDoc}; font-size: ${templateStyle === 'compact' ? '7pt' : '9pt'}; color: ${mutedTextColorDoc};">
+    <table style="width:100%; margin-top: ${templateStyle === 'minimalist' ? '30px' : '25px'}; padding-top:${templateStyle === 'minimalist' ? '0' : '15px'}; ${templateStyle !== 'minimalist' ? 'border-top: 1px solid '+borderColorDoc : ''}; font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; color: ${mutedTextColorDoc};">
       ${notesAndTermsLayout}
     </table>
   ` : '';
 
   const amountInWordsHtml = amountInWords ? `
-    <div style="margin-top:15px; padding-top:10px; border-top: 1px solid ${borderColorDoc}; font-size:${templateStyle === 'compact' ? '7pt' : '8pt'}; color:${mutedTextColorDoc}; font-style: italic;">
+    <div style="margin-top:${templateStyle === 'minimalist' ? '20px' : '15px'}; padding-top:${templateStyle === 'minimalist' ? '0' : '10px'}; ${templateStyle !== 'minimalist' ? 'border-top: 1px solid '+borderColorDoc : ''}; font-size:${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '7.5pt' : '8pt')}; color:${mutedTextColorDoc}; font-style: italic;">
         <strong>Amount in Words:</strong> ${amountInWords}
     </div>
   ` : '';
@@ -260,28 +292,31 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     width: 100%;
     text-align: left;
     border-collapse: collapse;
-    margin-bottom: 20px; /* Increased bottom margin for items table */
-    font-size: ${templateStyle === 'compact' ? '8pt' : '9.5pt'};
-    border: 1px solid ${borderColorDoc};
-    border-radius: 6px; /* Not always supported in Word but good practice */
-    overflow: hidden; /* For border-radius effect */
+    margin-bottom: 20px; 
+    font-size: ${templateStyle === 'compact' ? '8pt' : (templateStyle === 'minimalist' ? '9pt' : '9.5pt')};
+    ${templateStyle !== 'minimalist' ? 'border: 1px solid '+borderColorDoc+'; border-radius: 6px;' : ''}
+    overflow: hidden;
   `;
   const thStyles = `
-    padding: ${templateStyle === 'compact' ? '6px' : '10px'};
+    padding: ${templateStyle === 'compact' ? '6px' : (templateStyle === 'minimalist' ? '8px 0' : '10px')};
     border-bottom: 1px solid ${borderColorDoc};
-    background-color: ${headerBgColorDoc};
-    font-weight: bold;
+    ${templateStyle === 'minimalist' ? 'border-bottom-width: 2px; border-bottom-color:'+primaryColorDoc+';' : ''}
+    background-color: ${templateStyle === 'minimalist' ? 'transparent' : headerBgColorDoc};
+    font-weight: ${templateStyle === 'minimalist' ? '500' : 'bold'};
     color: ${mutedTextColorDoc};
-    text-transform: uppercase;
-    font-size: ${templateStyle === 'compact' ? '7pt' : '9pt'};
-    ${(templateStyle === 'modern' || templateStyle === 'compact') ? `border-bottom-width:2px; border-bottom-color:${primaryColorDoc};` : ''}
+    text-transform: ${templateStyle === 'minimalist' ? 'none' : 'uppercase'};
+    font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')};
+    ${(templateStyle === 'modern' || templateStyle === 'compact') && templateStyle !== 'minimalist' ? `border-bottom-width:2px; border-bottom-color:${primaryColorDoc};` : ''}
+    text-align: right; /* Default to right for most TH */
   `;
   const totalsTableStyles = `
-    width: ${templateStyle === 'modern' || templateStyle === 'compact' ? '50%' : '45%'};
+    width: ${templateStyle === 'modern' || templateStyle === 'compact' ? '50%' : (templateStyle === 'minimalist' ? '60%' : '45%')};
     margin-left: auto;
     margin-bottom: 25px;
-    font-size: ${templateStyle === 'compact' ? '9pt' : '10pt'};
+    font-size: ${templateStyle === 'compact' ? '9pt' : (templateStyle === 'minimalist' ? '10pt' : '10pt')};
   `;
+
+  const totalsTdStyle = `padding: ${templateStyle === 'minimalist' ? '4px 0' : '8px'};`;
 
   return `
     <html>
@@ -289,18 +324,18 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
         <meta charset="UTF-8">
         <title>Invoice ${invoiceNumber}</title>
         <style>
-          body { font-family: ${fontFamilyDoc}; margin: 0; color: ${textColorDoc}; font-size: ${templateStyle === 'compact' ? '9pt' : '10pt'}; background-color: #FFFFFF; }
-          .invoice-container-doc { max-width: 800px; margin: 20px auto; padding: ${templateStyle === 'compact' ? '20px' : '30px'}; border: 1px solid ${borderColorDoc}; background-color: ${invoiceBgColorDoc}; position: relative; }
+          body { font-family: ${fontFamilyDoc}; margin: 0; color: ${textColorDoc}; font-size: ${templateStyle === 'compact' ? '9pt' : (templateStyle === 'minimalist' ? '10pt' : '10pt')}; background-color: #FFFFFF; }
+          .invoice-container-doc { max-width: 800px; margin: 20px auto; padding: ${templateStyle === 'compact' ? '20px' : (templateStyle === 'minimalist' ? '40px' : '30px')}; ${templateStyle !== 'minimalist' ? 'border: 1px solid '+borderColorDoc+';' : ''} background-color: ${invoiceBgColorDoc}; position: relative; }
           .watermark-wrapper-doc { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-          .watermark-img-doc { max-width: 70%; max-height: 60%; object-fit: contain; opacity: ${displayWatermarkOpacity}; ${templateStyle === 'modern' || templateStyle === 'compact' ? 'filter: grayscale(50%);' : ''} }
+          .watermark-img-doc { max-width: 70%; max-height: 60%; object-fit: contain; opacity: ${displayWatermarkOpacity}; ${templateStyle === 'modern' || templateStyle === 'compact' || templateStyle === 'minimalist' ? 'filter: grayscale(50%);' : ''} }
           .content-wrapper-doc { position:relative; z-index:1; }
           .items-table-doc { ${tableStyles} }
           .items-table-doc th { ${thStyles} }
-          .items-table-doc td { padding: ${templateStyle === 'compact' ? '6px' : '10px'}; border: 1px solid ${borderColorDoc}; vertical-align:top;}
+          .items-table-doc td { /* Handled by itemTdStyle in loop */ }
           .totals-summary-table { ${totalsTableStyles} }
-          .totals-summary-table td { padding: ${templateStyle === 'compact' ? '6px' : '8px'}; }
-          .grand-total-line { font-weight: bold; font-size: ${templateStyle === 'compact' ? '12pt' : '14pt'}; color: ${primaryColorDoc}; background-color: ${primaryColorDoc}1A; padding: ${templateStyle === 'compact' ? '8px 10px' : '10px 12px'}; border-radius: 4px; }
-          .footer-section-doc { text-align: center; font-size: ${templateStyle === 'compact' ? '7pt' : '8pt'}; color: #9ca3af; margin-top: 30px; padding-top: 15px; border-top: 1px solid ${borderColorDoc}; }
+          .totals-summary-table td { ${totalsTdStyle} }
+          .grand-total-line { font-weight: bold; font-size: ${templateStyle === 'compact' ? '12pt' : (templateStyle === 'minimalist' ? '14pt' : '14pt')}; color: ${primaryColorDoc}; ${templateStyle === 'minimalist' ? 'border-top: 2px solid '+primaryColorDoc+'; padding-top: 8px;' : 'background-color: '+primaryColorDoc+'1A; padding: '+(templateStyle === 'compact' ? '8px 10px' : '10px 12px')+'; border-radius: 4px;'} }
+          .footer-section-doc { text-align: center; font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '8pt')}; color: #9ca3af; margin-top: 30px; padding-top: 15px; border-top: 1px solid ${borderColorDoc}; }
         </style>
       </head>
       <body>
@@ -311,12 +346,12 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
             <table class="items-table-doc">
               <thead>
                 <tr>
-                  <th style="text-align: left; width: 40%;">Description</th>
-                  <th style="text-align: right;">Qty/Dur.</th>
-                  <th style="text-align: right;">Unit</th>
-                  <th style="text-align: right;">Rate (${currentCurrency.symbol})</th>
-                  <th style="text-align: right;">Disc (%)</th>
-                  <th style="text-align: right;">Amount (${currentCurrency.symbol})</th>
+                  <th style="text-align: left; width: ${templateStyle === 'minimalist' ? '45%' : '40%'}; ${thStyles}">Description</th>
+                  <th style="${thStyles}">Qty/Dur.</th>
+                  <th style="${thStyles}">Unit</th>
+                  <th style="${thStyles}">Rate (${currentCurrency.symbol})</th>
+                  <th style="${thStyles}">Disc (%)</th>
+                  <th style="${thStyles}">Amount (${currentCurrency.symbol})</th>
                 </tr>
               </thead>
               <tbody>${itemsHtml}</tbody>
@@ -324,13 +359,13 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
             <table class="totals-summary-table">
                 <tbody>
                     <tr>
-                        <td colspan="5" style="text-align: right; font-weight: bold; color: ${mutedTextColorDoc}; border-top: 2px solid ${borderColorDoc};">SUBTOTAL:</td>
-                        <td style="text-align: right; font-weight: bold; color: ${textColorDoc}; border-top: 2px solid ${borderColorDoc};">${fCurrency(subTotal)}</td>
+                        <td colspan="5" style="text-align: right; font-weight: ${templateStyle === 'minimalist' ? '500' : 'bold'}; color: ${mutedTextColorDoc}; ${templateStyle !== 'minimalist' ? 'border-top: 2px solid '+borderColorDoc : ''}; ${totalsTdStyle}">SUBTOTAL:</td>
+                        <td style="text-align: right; font-weight: ${templateStyle === 'minimalist' ? '500' : 'bold'}; color: ${textColorDoc}; ${templateStyle !== 'minimalist' ? 'border-top: 2px solid '+borderColorDoc : ''}; ${totalsTdStyle}">${fCurrency(subTotal)}</td>
                     </tr>
                     ${globalDiscountHtml}
                     <tr class="grand-total-line">
-                         <td colspan="5" style="text-align: right;">TOTAL:</td>
-                        <td style="text-align: right;">${fCurrency(totalFee)}</td>
+                         <td colspan="5" style="text-align: right; ${totalsTdStyle}">TOTAL:</td>
+                        <td style="text-align: right; ${totalsTdStyle}">${fCurrency(totalFee)}</td>
                     </tr>
                 </tbody>
             </table>
@@ -363,25 +398,27 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
       top: elementToCapture.style.top,         
       zIndex: elementToCapture.style.zIndex,     
       backgroundColor: elementToCapture.style.backgroundColor,
+      display: elementToCapture.style.display,
   };
   
+  elementToCapture.style.display = 'block';
   elementToCapture.style.opacity = '1'; 
-  elementToCapture.style.backgroundColor = 'hsl(0 0% 100%)'; // Force white background on capture element
+  elementToCapture.style.backgroundColor = 'hsl(0 0% 100%)'; 
 
   const docElement = document.documentElement;
   const wasDark = docElement.classList.contains('dark');
   if (wasDark) {
-    docElement.classList.remove('dark'); // Force light mode for CSS variable resolution
+    docElement.classList.remove('dark'); 
   }
   
-  await new Promise(resolve => setTimeout(resolve, 100)); // Delay for style changes
+  await new Promise(resolve => setTimeout(resolve, 100)); 
 
   try {
     const canvas = await html2canvas(elementToCapture, {
       scale: 2, 
       useCORS: true,
       logging: false, 
-      backgroundColor: '#FFFFFF', // Explicit white background for canvas
+      backgroundColor: '#FFFFFF', 
       scrollX: -window.scrollX,
       scrollY: -window.scrollY,
       windowWidth: elementToCapture.scrollWidth,
@@ -412,6 +449,7 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
   } finally {
     elementToCapture.style.opacity = originalStyle.opacity;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
+    elementToCapture.style.display = originalStyle.display;
     if (wasDark) {
       docElement.classList.add('dark');
     }
@@ -449,7 +487,9 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   const originalStyle = {
       opacity: elementToCapture.style.opacity,
       backgroundColor: elementToCapture.style.backgroundColor,
+      display: elementToCapture.style.display,
   };
+  elementToCapture.style.display = 'block';
   elementToCapture.style.opacity = '1';
   elementToCapture.style.backgroundColor = 'hsl(0 0% 100%)'; 
 
@@ -488,6 +528,8 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   } finally {
     elementToCapture.style.opacity = originalStyle.opacity;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
+    elementToCapture.style.display = originalStyle.display;
+
     if (wasDark) {
       docElement.classList.add('dark');
     }

@@ -44,7 +44,7 @@ const ClassicHeader: React.FC<Omit<InvoiceTemplateProps, 'forceLightMode'>> = ({
         <div className="flex items-center gap-4 mb-4 sm:mb-0">
           {companyLogoDataUrl && (
             <div className="relative w-20 h-20 sm:w-24 sm:h-24 print:w-16 print:h-16 shrink-0">
-              <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} data-ai-hint="company brand logo"/>
             </div>
           )}
           <div>
@@ -95,7 +95,7 @@ const ModernHeader: React.FC<Omit<InvoiceTemplateProps, 'forceLightMode'>> = ({ 
           <div className="flex items-center gap-3">
             {companyLogoDataUrl && (
               <div className="relative w-16 h-16 sm:w-20 sm:h-20 print:w-12 print:h-12 shrink-0">
-                <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} data-ai-hint="company brand logo"/>
               </div>
             )}
             <h1 className="text-xl sm:text-2xl font-bold text-[var(--invoice-primary-color)] print:text-black">{companyName || "Your Company Name"}</h1>
@@ -141,7 +141,7 @@ const CompactHeader: React.FC<Omit<InvoiceTemplateProps, 'forceLightMode'>> = ({
         <div className="flex justify-between items-center mb-3">
           {companyLogoDataUrl && (
             <div className="relative w-16 h-16 print:w-12 print:h-12 shrink-0">
-              <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} data-ai-hint="company brand logo"/>
             </div>
           )}
           <h2 className="text-2xl font-bold uppercase text-[var(--invoice-primary-color)] print:text-black">INVOICE</h2>
@@ -168,6 +168,54 @@ const CompactHeader: React.FC<Omit<InvoiceTemplateProps, 'forceLightMode'>> = ({
   );
 };
 
+const MinimalistHeader: React.FC<Omit<InvoiceTemplateProps, 'forceLightMode'>> = ({ data }) => {
+  const { companyName, companyLogoDataUrl, customerName, invoiceNumber, invoiceDate, dueDate, currency, customerAddress, customerEmail, customerPhone } = data;
+  const defaultDisplayDate = new Date();
+  const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : defaultDisplayDate;
+  const parsedDueDate = dueDate && isValid(parseISO(dueDate)) ? parseISO(dueDate) : null;
+  const companyProfile = getCompanyProfile();
+  const showClientAddress = companyProfile?.showClientAddressOnInvoice !== false;
+
+  return (
+    <>
+      <header className="pb-8 mb-8">
+        <div className="flex justify-between items-start mb-6">
+          {companyLogoDataUrl ? (
+            <div className="relative w-20 h-20 print:w-16 print:h-16 shrink-0">
+              <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} data-ai-hint="company brand logo"/>
+            </div>
+          ) : (
+             <h1 className="text-3xl font-semibold text-[var(--invoice-primary-color)] print:text-black">{companyName || "Your Company Name"}</h1>
+          )}
+          <div className="text-right">
+            <h2 className="text-xl font-normal uppercase text-[var(--invoice-muted-text)] print:text-gray-700 tracking-wider">INVOICE</h2>
+            <p className="text-xs text-[var(--invoice-muted-text)] mt-0.5 print:text-gray-600">
+              {invoiceNumber}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-8 text-sm">
+          <div>
+            {!companyLogoDataUrl && !companyName && <div className="h-8"></div>} {/* Placeholder if no logo and no name for alignment */}
+            {companyLogoDataUrl && companyName && <h1 className="text-2xl font-semibold text-[var(--invoice-primary-color)] print:text-black mt-2">{companyName}</h1>}
+          </div>
+          <div className="text-right">
+            <p className="text-[var(--invoice-text)] print:text-black"><strong>Date:</strong> {format(parsedInvoiceDate, "MMMM d, yyyy")}</p>
+            {parsedDueDate && <p className="text-[var(--invoice-text)] print:text-black"><strong>Due Date:</strong> {format(parsedDueDate, "MMMM d, yyyy")}</p>}
+          </div>
+        </div>
+      </header>
+      <section className="mb-10 text-sm">
+        <h3 className="text-xs font-medium uppercase text-[var(--invoice-muted-text)] mb-2 print:text-gray-600 tracking-wider">BILLED TO</h3>
+        <p className="text-md font-semibold text-[var(--invoice-text)] print:text-black">{customerName || "Client Name"}</p>
+        {showClientAddress && customerAddress && <p className="text-xs text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600 mt-1">{customerAddress}</p>}
+        {customerEmail && <p className="text-xs text-[var(--invoice-muted-text)] print:text-gray-600 mt-0.5">{customerEmail}</p>}
+        {customerPhone && <p className="text-xs text-[var(--invoice-muted-text)] print:text-gray-600 mt-0.5">{customerPhone}</p>}
+      </section>
+    </>
+  );
+};
+
 
 export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(function InvoiceTemplate({ data, forceLightMode = false }) {
   const {
@@ -184,7 +232,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
     amountInWords,
     themeColor = 'default',
     fontTheme = 'default',
-    templateStyle = 'classic', // Default to classic if undefined
+    templateStyle = 'classic', 
   } = data;
 
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
@@ -207,11 +255,60 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
         return <ModernHeader data={data} />;
       case 'compact':
         return <CompactHeader data={data} />;
+      case 'minimalist':
+        return <MinimalistHeader data={data} />;
       case 'classic':
       default:
         return <ClassicHeader data={data} />;
     }
   };
+
+  const tableClasses = cn(
+    "w-full table-auto",
+    templateStyle === 'minimalist' && "border-y border-[var(--invoice-border-color)]"
+  );
+  const tableWrapperClasses = cn(
+    "overflow-x-auto rounded-md border border-[var(--invoice-border-color)]",
+    (templateStyle === 'compact' || templateStyle === 'minimalist') && "border-0"
+  );
+  const thClasses = cn(
+    "p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600",
+    templateStyle === 'compact' && "p-2 text-[10px]",
+    templateStyle === 'minimalist' && "pb-2 pt-1 border-b-2 border-[var(--invoice-primary-color)] font-medium tracking-normal",
+    templateStyle === 'minimalist' && "first:pl-0 last:pr-0 text-xs",
+  );
+  const tdClasses = cn(
+    "p-3 align-top text-[var(--invoice-text)] print:text-black",
+    templateStyle === 'compact' && "p-2 text-xs",
+    templateStyle === 'minimalist' && "py-3 first:pl-0 last:pr-0 border-b border-[var(--invoice-border-color)]",
+  );
+  const totalsSectionClasses = cn(
+    "w-full sm:w-1/2 md:w-2/5 lg:w-1/3 space-y-2",
+    (templateStyle === 'modern' || templateStyle === 'compact') && "md:w-1/2 lg:w-2/5",
+    templateStyle === 'minimalist' && "w-full sm:w-2/3 md:w-1/2" // Minimalist totals can be wider
+  );
+  const totalLineClasses = cn(
+    "flex justify-between items-center py-3 bg-[var(--invoice-primary-color)]/10 dark:bg-[var(--invoice-primary-color)]/20 px-3 rounded-md",
+    templateStyle === 'minimalist' && "bg-transparent dark:bg-transparent px-0 border-t-2 border-[var(--invoice-primary-color)] pt-3 text-[var(--invoice-primary-color)]"
+  );
+  const notesTermsGridClasses = cn(
+    "grid gap-6",
+    (invoiceNotes && termsAndConditions && (templateStyle === 'classic' || templateStyle === 'compact' || templateStyle === 'minimalist')) && "grid-cols-1",
+    (invoiceNotes && termsAndConditions && templateStyle === 'modern') && "md:grid-cols-2",
+    (!invoiceNotes || !termsAndConditions) && "grid-cols-1"
+  );
+  const termsSectionClasses = cn(
+    "pt-4 border-t border-[var(--invoice-border-color)]",
+    templateStyle === 'compact' && "pt-2 text-xs",
+    (invoiceNotes && templateStyle === 'modern') && "md:border-t-0 md:pt-0 md:pl-6 md:border-l",
+    templateStyle === 'minimalist' && "pt-3 text-xs"
+  );
+  const termsTextClasses = cn(
+    "text-xs text-[var(--invoice-muted-text)]/80 whitespace-pre-line print:text-gray-500 print:text-[10px]",
+    templateStyle === 'compact' && "text-[10px]",
+    templateStyle === 'minimalist' && "text-[10px] leading-relaxed"
+  );
+
 
   return (
     <div
@@ -223,26 +320,27 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
       )}
       style={{
         width: '100%',
-        border: '1px solid var(--invoice-border-color)',
-        borderRadius: '0.5rem',
+        border: (templateStyle === 'minimalist' && !forceLightMode) ? 'none' : '1px solid var(--invoice-border-color)', // No border for minimalist unless forced (e.g. print preview)
+        borderRadius: (templateStyle === 'minimalist' && !forceLightMode) ? '0' : '0.5rem',
+        boxShadow: (templateStyle === 'minimalist' && !forceLightMode) ? 'none' : undefined,
         overflow: 'hidden',
-        position: 'relative' // For z-indexing watermark
+        position: 'relative' 
       }}
     >
       {watermarkDataUrl && (
          <div
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            style={{ zIndex: 0 }} // Watermark layer
+            style={{ zIndex: 0 }} 
          >
             <img
                 src={watermarkDataUrl}
                 alt="Watermark"
                 style={{
-                maxWidth: '80%', // Slightly larger for better coverage
+                maxWidth: '80%', 
                 maxHeight: '70%',
                 objectFit: 'contain',
                 opacity: displayWatermarkOpacity,
-                filter: templateStyle === 'modern' || templateStyle === 'compact' ? 'grayscale(50%)' : 'none', 
+                filter: (templateStyle === 'modern' || templateStyle === 'compact' || templateStyle === 'minimalist') ? 'grayscale(50%)' : 'none', 
                 }}
                 data-ai-hint="background pattern"
             />
@@ -251,33 +349,32 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
 
       <div
         className={cn(
-          "relative p-6 sm:p-8 md:p-10", // Standard padding
-          templateStyle === 'compact' && "p-4 sm:p-6 md:p-8" // Reduced padding for compact
+          "relative p-6 sm:p-8 md:p-10", 
+          templateStyle === 'compact' && "p-4 sm:p-6 md:p-8",
+          templateStyle === 'minimalist' && "p-8 sm:p-10 md:p-12" 
         )}
-        style={{ zIndex: 1 }} // Content layer on top of watermark
+        style={{ zIndex: 1 }} 
       >
         {renderHeader()}
 
         <section className="mb-8">
-          <div className={cn(
-            "overflow-x-auto rounded-md border border-[var(--invoice-border-color)]",
-            templateStyle === 'compact' && "border-0" // No border for table in compact
-            )}>
-            <table className="w-full table-auto">
+          <div className={tableWrapperClasses}>
+            <table className={tableClasses}>
               <thead className={cn(
                 "bg-[var(--invoice-header-bg)] print:bg-gray-100",
-                (templateStyle === 'modern' || templateStyle === 'compact') && "border-b-2 border-[var(--invoice-primary-color)]" // Stronger header line for modern/compact
+                (templateStyle === 'modern' || templateStyle === 'compact') && "border-b-2 border-[var(--invoice-primary-color)]",
+                templateStyle === 'minimalist' && "bg-transparent print:bg-transparent" // Minimalist no header bg
               )}>
                 <tr>
-                  <th className={cn("p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600 w-2/5 sm:w-[40%]", templateStyle === 'compact' && "p-2 text-[10px]")}>Description</th>
-                  <th className={cn("p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600", templateStyle === 'compact' && "p-2 text-[10px]")}>Qty/Dur.</th>
-                  <th className={cn("p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600", templateStyle === 'compact' && "p-2 text-[10px]")}>Unit</th>
-                  <th className={cn("p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600", templateStyle === 'compact' && "p-2 text-[10px]")}>Rate ({currentCurrency.symbol})</th>
-                  <th className={cn("p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600", templateStyle === 'compact' && "p-2 text-[10px]")}>Disc (%)</th>
-                  <th className={cn("p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600", templateStyle === 'compact' && "p-2 text-[10px]")}>Amount ({currentCurrency.symbol})</th>
+                  <th className={cn(thClasses, "w-2/5 sm:w-[40%]", templateStyle === 'minimalist' && "text-left")}>Description</th>
+                  <th className={cn(thClasses, "text-right")}>Qty/Dur.</th>
+                  <th className={cn(thClasses, "text-right")}>Unit</th>
+                  <th className={cn(thClasses, "text-right")}>Rate ({currentCurrency.symbol})</th>
+                  <th className={cn(thClasses, "text-right")}>Disc (%)</th>
+                  <th className={cn(thClasses, "text-right")}>Amount ({currentCurrency.symbol})</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--invoice-border-color)]">
+              <tbody className={cn("divide-y divide-[var(--invoice-border-color)]", templateStyle === 'minimalist' && "divide-y-0")}>
                 {items && items.length > 0 ? (
                   items.map((item, index) => {
                     let displayDurationString = "";
@@ -324,34 +421,34 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
 
                     return (
                     <tr key={item.id || index} className="bg-[var(--invoice-background)] hover:bg-[var(--invoice-header-bg)]/50 print:bg-white">
-                      <td className={cn("p-3 align-top text-[var(--invoice-text)] print:text-black", templateStyle === 'compact' && "p-2 text-xs")}>
+                      <td className={cn(tdClasses, templateStyle === 'minimalist' && "text-left")}>
                         {item.description}
                         {displayDurationString && (
-                          <div className={cn("text-xs text-[var(--invoice-muted-text)] print:text-gray-500 mt-1", templateStyle === 'compact' && "text-[10px]")}>
+                          <div className={cn("text-xs text-[var(--invoice-muted-text)] print:text-gray-500 mt-1", templateStyle === 'compact' && "text-[10px]", templateStyle === 'minimalist' && "text-[11px]")}>
                             {displayDurationString}
                           </div>
                         )}
                       </td>
-                      <td className={cn("p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700", templateStyle === 'compact' && "p-2 text-xs")}>
+                      <td className={cn(tdClasses, "text-right")}>
                         {itemQuantity}
                       </td>
-                      <td className={cn("p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700", templateStyle === 'compact' && "p-2 text-xs")}>
+                      <td className={cn(tdClasses, "text-right")}>
                         {item.unit || '-'}
                       </td>
-                      <td className={cn("p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700", templateStyle === 'compact' && "p-2 text-xs")}>
+                      <td className={cn(tdClasses, "text-right")}>
                         {formatCurrency(itemRate, currentCurrency)}
                       </td>
-                      <td className={cn("p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700", templateStyle === 'compact' && "p-2 text-xs")}>
+                      <td className={cn(tdClasses, "text-right")}>
                         {itemDiscount > 0 ? `${itemDiscount}%` : '-'}
                       </td>
-                      <td className={cn("p-3 text-right align-top text-[var(--invoice-text)] print:text-black", templateStyle === 'compact' && "p-2 text-xs")}>
+                      <td className={cn(tdClasses, "text-right")}>
                         {formatCurrency(discountedAmount, currentCurrency)}
                       </td>
                     </tr>
                   )})
                 ) : (
                   <tr className="bg-[var(--invoice-background)] print:bg-white">
-                    <td colSpan={6} className={cn("p-3 text-center text-[var(--invoice-muted-text)] print:text-gray-500", templateStyle === 'compact' && "p-2 text-xs")}>
+                    <td colSpan={6} className={cn(tdClasses, "text-center text-[var(--invoice-muted-text)] print:text-gray-500")}>
                       No items listed.
                     </td>
                   </tr>
@@ -362,16 +459,13 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
         </section>
 
         <section className="flex justify-end mb-8">
-          <div className={cn(
-              "w-full sm:w-1/2 md:w-2/5 lg:w-1/3 space-y-2",
-              (templateStyle === 'modern' || templateStyle === 'compact') && "md:w-1/2 lg:w-2/5"
-            )}>
-             <div className="flex justify-between items-center py-2 px-3 border-b border-[var(--invoice-border-color)]">
+          <div className={totalsSectionClasses}>
+             <div className={cn("flex justify-between items-center py-2 px-3", templateStyle !== 'minimalist' && "border-b border-[var(--invoice-border-color)]", templateStyle === 'minimalist' && "px-0 py-1")}>
               <span className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">SUBTOTAL:</span>
               <span className="text-sm font-medium text-[var(--invoice-text)] print:text-black">{formatCurrency(subTotal, currentCurrency)}</span>
             </div>
             {globalDiscountAmount > 0 && (
-              <div className="flex justify-between items-center py-2 px-3 border-b border-[var(--invoice-border-color)]">
+              <div className={cn("flex justify-between items-center py-2 px-3", templateStyle !== 'minimalist' && "border-b border-[var(--invoice-border-color)]", templateStyle === 'minimalist' && "px-0 py-1")}>
                 <span className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">
                   DISCOUNT
                   {globalDiscountType === 'percentage' && globalDiscountValue ? ` (${globalDiscountValue}%)` : ''}
@@ -380,15 +474,15 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
                 <span className="text-sm font-medium text-[var(--invoice-text)] print:text-black">- {formatCurrency(globalDiscountAmount, currentCurrency)}</span>
               </div>
             )}
-            <div className="flex justify-between items-center py-3 bg-[var(--invoice-primary-color)]/10 dark:bg-[var(--invoice-primary-color)]/20 px-3 rounded-md">
-              <span className="text-lg font-bold text-[var(--invoice-primary-color)] print:text-black">TOTAL:</span>
-              <span className="text-lg font-bold text-[var(--invoice-primary-color)] print:text-black">{formatCurrency(totalFee, currentCurrency)}</span>
+            <div className={totalLineClasses}>
+              <span className={cn("text-lg font-bold", templateStyle === 'minimalist' ? "text-[var(--invoice-primary-color)] print:text-black" : "text-[var(--invoice-primary-color)] print:text-black")}>TOTAL:</span>
+              <span className={cn("text-lg font-bold", templateStyle === 'minimalist' ? "text-[var(--invoice-primary-color)] print:text-black" : "text-[var(--invoice-primary-color)] print:text-black")}>{formatCurrency(totalFee, currentCurrency)}</span>
             </div>
           </div>
         </section>
         
         {amountInWords && (
-            <section className="mb-6 pt-3 border-t border-[var(--invoice-border-color)]">
+            <section className={cn("mb-6 pt-3", templateStyle !== 'minimalist' && "border-t border-[var(--invoice-border-color)]", templateStyle === 'minimalist' && "mt-10")}>
                 <p className="text-xs text-[var(--invoice-muted-text)] italic print:text-gray-600">
                     <span className="font-semibold">Amount in Words:</span> {amountInWords}
                 </p>
@@ -396,32 +490,23 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
         )}
 
 
-        <div className={cn(
-          "grid gap-6",
-           (invoiceNotes && termsAndConditions && (templateStyle === 'classic' || templateStyle === 'compact')) && "grid-cols-1", // Stack notes and terms for classic/compact
-           (invoiceNotes && termsAndConditions && templateStyle === 'modern') && "md:grid-cols-2", // Side-by-side for modern on medium screens
-           (!invoiceNotes || !termsAndConditions) && "grid-cols-1" // Single column if only one exists
-        )}>
+        <div className={notesTermsGridClasses}>
           {invoiceNotes && (
-            <section className={cn("pt-4 border-t border-[var(--invoice-border-color)]", templateStyle === 'compact' && "pt-2 text-xs")}>
-              <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Notes</h4>
+            <section className={cn("pt-4", templateStyle !== 'minimalist' && "border-t border-[var(--invoice-border-color)]", templateStyle === 'compact' && "pt-2 text-xs", templateStyle === 'minimalist' && "pt-0")}>
+              <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">{templateStyle === 'minimalist' ? 'Additional Notes' : 'Notes'}</h4>
               <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
             </section>
           )}
 
           {termsAndConditions && (
-            <section className={cn(
-              "pt-4 border-t border-[var(--invoice-border-color)]",
-              templateStyle === 'compact' && "pt-2",
-              (invoiceNotes && templateStyle === 'modern') && "md:border-t-0 md:pt-0 md:pl-6 md:border-l" // Modern style: terms beside notes on md+
-            )}>
-              <h4 className={cn("text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600", templateStyle === 'compact' && "text-xs")}>Terms &amp; Conditions</h4>
-              <p className={cn("text-xs text-[var(--invoice-muted-text)]/80 whitespace-pre-line print:text-gray-500 print:text-[10px]", templateStyle === 'compact' && "text-[10px]")}>{termsAndConditions}</p>
+            <section className={termsSectionClasses}>
+              <h4 className={cn("text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600", templateStyle === 'compact' && "text-xs", templateStyle === 'minimalist' && "text-xs")}>Terms &amp; Conditions</h4>
+              <p className={termsTextClasses}>{termsAndConditions}</p>
             </section>
           )}
         </div>
 
-        <footer className={cn("text-center text-xs text-[var(--invoice-muted-text)] pt-6 mt-8 border-t border-[var(--invoice-border-color)] print:text-gray-500", templateStyle === 'compact' && "pt-4 mt-6 text-[10px]")}>
+        <footer className={cn("text-center text-xs text-[var(--invoice-muted-text)] pt-6 mt-8 border-t border-[var(--invoice-border-color)] print:text-gray-500", templateStyle === 'compact' && "pt-4 mt-6 text-[10px]", templateStyle === 'minimalist' && "pt-6 mt-10 text-[10px]")}>
           <p>Thank you for your business!</p>
         </footer>
       </div>

@@ -47,16 +47,16 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
 
   if (themeColor === 'classic-blue') {
     primaryColorDoc = '#2563EB'; 
-    headerBgColorDoc = '#EFF6FF';
-    borderColorDoc = '#D1D5DB';
+    headerBgColorDoc = 'hsl(210 50% 96%)';
+    borderColorDoc = 'hsl(210 30% 80%)';
   } else if (themeColor === 'emerald-green') {
     primaryColorDoc = '#059669';
-    headerBgColorDoc = '#ECFDF5';
-    borderColorDoc = '#A7F3D0';
+    headerBgColorDoc = 'hsl(145 40% 95%)';
+    borderColorDoc = 'hsl(145 30% 80%)';
   } else if (themeColor === 'crimson-red') {
     primaryColorDoc = '#DC2626';
-    headerBgColorDoc = '#FEF2F2';
-    borderColorDoc = '#FECACA';
+    headerBgColorDoc = 'hsl(340 50% 96%)';
+    borderColorDoc = 'hsl(340 40% 85%)';
   }
   const invoiceBgColor = '#FFFFFF';
 
@@ -73,13 +73,24 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     items.forEach(item => {
       const itemStartDate = item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? parseISO(item.itemStartDate) : null;
       const itemEndDate = item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? parseISO(item.itemEndDate) : null;
+      const itemStartTime = item.itemStartTime || null;
+      const itemEndTime = item.itemEndTime || null;
+      
       let displayQuantity = Number(item.quantity) || 0;
-      let dateRangeHtml = '';
+      let dateRangeDetailsHtml = '';
 
       if (itemStartDate && itemEndDate && itemEndDate >= itemStartDate) {
           displayQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
-          dateRangeHtml = `<div style="font-size: 8pt; color: ${mutedTextColorDoc}; margin-top: 3px;">(${format(itemStartDate, "MMM d, yyyy")} - ${format(itemEndDate, "MMM d, yyyy")})</div>`;
+          let startDateDisplay = format(itemStartDate, "MMM d, yyyy");
+          let endDateDisplay = format(itemEndDate, "MMM d, yyyy");
+          if (itemStartTime) startDateDisplay += ` ${itemStartTime}`;
+          if (itemEndTime) endDateDisplay += ` ${itemEndTime}`;
+          dateRangeDetailsHtml = `<div style="font-size: 8pt; color: ${mutedTextColorDoc}; margin-top: 3px;">(${startDateDisplay} - ${endDateDisplay})</div>`;
+      } else if (itemStartDate && itemStartTime) {
+          dateRangeDetailsHtml = `<div style="font-size: 8pt; color: ${mutedTextColorDoc}; margin-top: 3px;">(${format(itemStartDate, "MMM d, yyyy")} ${itemStartTime}${itemEndTime ? ` - ${itemEndTime}` : ''})</div>`;
       }
+
+
       const itemRate = Number(item.rate) || 0;
       const itemDiscount = Number(item.discount) || 0;
       const itemSubtotal = displayQuantity * itemRate;
@@ -87,7 +98,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
 
       itemsHtml += `
         <tr style="background-color: ${invoiceBgColor};">
-          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; color: ${textColorDoc};">${item.description}${dateRangeHtml}</td>
+          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; color: ${textColorDoc};">${item.description}${dateRangeDetailsHtml}</td>
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${displayQuantity}</td>
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${item.unit || '-'}</td>
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${fCurrency(itemRate)}</td>
@@ -131,6 +142,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
           body { font-family: ${fontFamilyDoc}; margin: 0; color: ${textColorDoc}; font-size: 10pt; background-color: #f9fafb; }
           .invoice-container { max-width: 800px; margin: 20px auto; padding: 30px; border: 1px solid ${borderColorDoc}; background-color: ${invoiceBgColor}; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
           .watermark-container-doc { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0; }
+          .watermark-container-doc img { max-width: 80%; max-height: 70%; object-fit: contain; opacity: ${displayWatermarkOpacity}; }
           .content-wrapper { position:relative; z-index:1; }
 
           .header-section { display: table; width: 100%; margin-bottom: 25px; padding-bottom:15px; border-bottom: 1px solid ${borderColorDoc}; }
@@ -157,7 +169,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
           .items-table-doc .amount-col { width: 15%; text-align: right; }
 
 
-          .totals-summary-table { width: 45%; margin-left: auto; margin-bottom: 25px; font-size: 10pt; } /* Adjusted width */
+          .totals-summary-table { width: 45%; margin-left: auto; margin-bottom: 25px; font-size: 10pt; } 
           .totals-summary-table td { padding: 8px; }
           .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColorDoc}; background-color: ${primaryColorDoc}1A; padding: 10px 12px; border-radius: 4px; }
           .grand-total-line td:first-child { color: ${primaryColorDoc}; }
@@ -178,7 +190,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
         <div class="invoice-container">
           ${watermarkDataUrl ? `
           <div class="watermark-container-doc">
-            <img src="${watermarkDataUrl}" style="max-width: 80%; max-height: 70%; object-fit: contain; opacity: ${displayWatermarkOpacity};" alt="Watermark"/>
+            <img src="${watermarkDataUrl}" alt="Watermark"/>
           </div>
           ` : ''}
 
@@ -297,7 +309,7 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
   const computedStyle = getComputedStyle(elementToCapture);
   let docInvoiceBg = computedStyle.getPropertyValue('--invoice-background').trim();
   
-  if (!docInvoiceBg) { 
+  if (!docInvoiceBg || docInvoiceBg === "transparent" || docInvoiceBg === "rgba(0, 0, 0, 0)") { 
     docInvoiceBg = isDarkTheme ? 'hsl(220, 15%, 15%)' : 'hsl(0, 0%, 100%)';
   }
   elementToCapture.style.backgroundColor = docInvoiceBg;
@@ -306,6 +318,7 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
   await new Promise(resolve => setTimeout(resolve, 300)); 
 
   try {
+    console.log(`Capturing element for PDF: ${elementToCapture.offsetWidth}x${elementToCapture.offsetHeight}`);
     const canvas = await html2canvas(elementToCapture, {
       scale: 2, 
       useCORS: true,
@@ -324,7 +337,7 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
     elementToCapture.style.top = originalStyle.top;
     elementToCapture.style.zIndex = originalStyle.zIndex;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
-    if (!hadThemeColorClass) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
+    if (!hadThemeColorClass && (themeColorClass.split(" .")[1] || themeColorClass)) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
     if (!hadFontThemeClass) elementToCapture.classList.remove(fontThemeClass);
 
 
@@ -353,7 +366,7 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
     elementToCapture.style.top = originalStyle.top;
     elementToCapture.style.zIndex = originalStyle.zIndex;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
-    if (!hadThemeColorClass) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
+    if (!hadThemeColorClass && (themeColorClass.split(" .")[1] || themeColorClass)) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
     if (!hadFontThemeClass) elementToCapture.classList.remove(fontThemeClass);
     throw error; 
   }
@@ -413,7 +426,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   const computedStyle = getComputedStyle(elementToCapture);
   let docInvoiceBg = computedStyle.getPropertyValue('--invoice-background').trim();
 
-  if (!docInvoiceBg) {
+  if (!docInvoiceBg || docInvoiceBg === "transparent" || docInvoiceBg === "rgba(0, 0, 0, 0)") {
     docInvoiceBg = isDarkTheme ? 'hsl(220, 15%, 15%)' : 'hsl(0, 0%, 100%)';
   }
   elementToCapture.style.backgroundColor = docInvoiceBg;
@@ -422,6 +435,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   await new Promise(resolve => setTimeout(resolve, 300));
 
   try {
+    console.log(`Capturing element for JPEG: ${elementToCapture.offsetWidth}x${elementToCapture.offsetHeight}`);
     const canvas = await html2canvas(elementToCapture, {
         scale: 1.5, 
         useCORS: true,
@@ -440,7 +454,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
     elementToCapture.style.top = originalStyle.top;
     elementToCapture.style.zIndex = originalStyle.zIndex;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
-    if (!hadThemeColorClass) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
+    if (!hadThemeColorClass && (themeColorClass.split(" .")[1] || themeColorClass)) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
     if (!hadFontThemeClass) elementToCapture.classList.remove(fontThemeClass);
 
 
@@ -461,7 +475,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
     elementToCapture.style.top = originalStyle.top;
     elementToCapture.style.zIndex = originalStyle.zIndex;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
-    if (!hadThemeColorClass) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
+    if (!hadThemeColorClass && (themeColorClass.split(" .")[1] || themeColorClass)) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
     if (!hadFontThemeClass) elementToCapture.classList.remove(fontThemeClass);
     throw error;
   }

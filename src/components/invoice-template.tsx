@@ -21,7 +21,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     customerName,
     invoiceNumber,
     invoiceDate,
-    dueDate, // New
+    dueDate,
     items,
     subTotal, 
     globalDiscountType,
@@ -32,7 +32,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     watermarkDataUrl,
     watermarkOpacity,
     themeColor = 'default',
-    fontTheme = 'default', // New
+    fontTheme = 'default',
   } = data;
 
   const defaultDisplayDate = new Date();
@@ -57,39 +57,37 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
       className={cn(
         "bg-[var(--invoice-background)] text-[var(--invoice-text)] font-sans shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white",
         `theme-${themeColor}`,
-        fontThemeClass // Apply font theme class
+        fontThemeClass
       )}
       style={{
         width: '100%',
         border: '1px solid var(--invoice-border-color)',
         borderRadius: '0.5rem',
         overflow: 'hidden',
-        position: 'relative' // Needed for z-index layering of watermark
+        position: 'relative' 
       }}
     >
-      {/* Watermark Layer: Positioned behind the content */}
       {watermarkDataUrl && (
         <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
-          style={{ zIndex: 0 }} 
+          style={{ zIndex: 0 }}
         >
           <img
             src={watermarkDataUrl}
             alt="Watermark"
             style={{
-              maxWidth: '80%', // Adjusted for better visibility
-              maxHeight: '70%', // Adjusted for better visibility
+              maxWidth: '80%', 
+              maxHeight: '70%', 
               objectFit: 'contain',
-              opacity: displayWatermarkOpacity, // Opacity applied directly to the image
+              opacity: displayWatermarkOpacity,
             }}
             data-ai-hint="abstract pattern"
           />
         </div>
       )}
 
-      {/* Content Layer: Positioned on top of the watermark */}
       <div
-        className="relative p-6 sm:p-8 md:p-10" // Ensure content is relatively positioned for z-index
+        className="relative p-6 sm:p-8 md:p-10"
         style={{ zIndex: 1 }} 
       >
         <header className="flex flex-col sm:flex-row justify-between items-start pb-6 mb-6 border-b border-[var(--invoice-border-color)]">
@@ -144,11 +142,23 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                   items.map((item, index) => {
                     const itemStartDate = item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? parseISO(item.itemStartDate) : null;
                     const itemEndDate = item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? parseISO(item.itemEndDate) : null;
+                    const itemStartTime = item.itemStartTime || null;
+                    const itemEndTime = item.itemEndTime || null;
+                    
                     let displayQuantity = Number(item.quantity) || 0;
+                    let dateRangeDetails = "";
 
                     if (itemStartDate && itemEndDate && itemEndDate >= itemStartDate) {
                         displayQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
+                        let startDateDisplay = format(itemStartDate, "MMM d, yyyy");
+                        let endDateDisplay = format(itemEndDate, "MMM d, yyyy");
+                        if (itemStartTime) startDateDisplay += ` ${itemStartTime}`;
+                        if (itemEndTime) endDateDisplay += ` ${itemEndTime}`;
+                        dateRangeDetails = `(${startDateDisplay} - ${endDateDisplay})`;
+                    } else if (itemStartDate && itemStartTime) { // Case for single day event with time
+                        dateRangeDetails = `(${format(itemStartDate, "MMM d, yyyy")} ${itemStartTime}${itemEndTime ? ` - ${itemEndTime}` : ''})`;
                     }
+
 
                     const itemRate = Number(item.rate) || 0;
                     const itemDiscount = Number(item.discount) || 0;
@@ -159,9 +169,9 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                     <tr key={item.id || index} className="bg-[var(--invoice-background)] hover:bg-[var(--invoice-header-bg)]/50 print:bg-white">
                       <td className="p-3 align-top text-[var(--invoice-text)] print:text-black">
                         {item.description}
-                        {itemStartDate && itemEndDate && (
+                        {dateRangeDetails && (
                           <div className="text-xs text-[var(--invoice-muted-text)] print:text-gray-500 mt-1">
-                            ({format(itemStartDate, "MMM d, yyyy")} - {format(itemEndDate, "MMM d, yyyy")})
+                            {dateRangeDetails}
                           </div>
                         )}
                       </td>

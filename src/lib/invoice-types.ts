@@ -13,7 +13,7 @@ export const lineItemSchema = z.object({
     z.number({ invalid_type_error: "Quantity must be a number.", required_error: "Quantity is required." })
      .min(0, { message: "Quantity must be non-negative." })
   ),
-  unit: z.string().optional(), // New: Unit for line item
+  unit: z.string().optional(),
   rate: z.preprocess(
     (val) => {
       const strVal = String(val).replace(/[^0-9.]+/g, "");
@@ -37,6 +37,8 @@ export const lineItemSchema = z.object({
   ),
   itemStartDate: z.date().optional(),
   itemEndDate: z.date().optional(),
+  itemStartTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Valid 24h time (HH:MM) or empty.").optional().or(z.literal('')),
+  itemEndTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Valid 24h time (HH:MM) or empty.").optional().or(z.literal('')),
 }).refine(data => {
   if (data.itemStartDate && data.itemEndDate) {
     return data.itemEndDate >= data.itemStartDate;
@@ -45,6 +47,31 @@ export const lineItemSchema = z.object({
 }, {
   message: "Item end date must be on or after item start date.",
   path: ["itemEndDate"],
+}).refine(data => {
+  if (data.itemStartTime && !data.itemStartDate) {
+    return false; // Start time requires start date
+  }
+  return true;
+}, {
+  message: "Start time requires a start date.",
+  path: ["itemStartTime"],
+}).refine(data => {
+  if (data.itemEndTime && !data.itemEndDate) {
+    return false; // End time requires end date
+  }
+  return true;
+}, {
+  message: "End time requires an end date.",
+  path: ["itemEndTime"],
+}).refine(data => {
+  if (data.itemStartDate && data.itemEndDate && data.itemStartDate.getTime() === data.itemEndDate.getTime() && data.itemStartTime && data.itemEndTime) {
+    // If same day, end time must be after start time
+    return data.itemEndTime > data.itemStartTime;
+  }
+  return true;
+}, {
+  message: "End time must be after start time on the same day.",
+  path: ["itemEndTime"],
 });
 
 export type LineItem = z.infer<typeof lineItemSchema>;
@@ -62,7 +89,7 @@ export const invoiceFormSchema = z.object({
     .optional(),
 
   invoiceDate: z.date({ required_error: "Invoice date is required." }),
-  dueDate: z.date().optional(), // New: Optional due date
+  dueDate: z.date().optional(),
   items: z.array(lineItemSchema).min(1, "At least one item is required."),
 
   globalDiscountType: z.enum(['percentage', 'fixed']).optional().default('percentage'),
@@ -86,21 +113,23 @@ export const invoiceFormSchema = z.object({
   invoiceNotes: z.string().optional(),
   termsAndConditions: z.string().optional(),
   themeColor: z.string().optional().default('default'),
-  fontTheme: z.string().optional().default('default'), // New: Font theme
+  fontTheme: z.string().optional().default('default'),
 });
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
 
-export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEndDate' | 'discount'> {
+export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEndDate' | 'discount' | 'itemStartTime' | 'itemEndTime'> {
   itemStartDate?: string;
   itemEndDate?: string;
+  itemStartTime?: string;
+  itemEndTime?: string;
   discount?: number;
-  unit?: string; // New: Unit for stored line item
+  unit?: string;
 }
 export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'dueDate' | 'watermarkOpacity' | 'invoiceNotes' | 'termsAndConditions' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor' | 'fontTheme'> {
   id: string;
   invoiceDate: string;
-  dueDate?: string; // New: Stored due date
+  dueDate?: string;
   companyLogoDataUrl?: string | null;
   watermarkDataUrl?: string | null;
   watermarkOpacity: number;
@@ -112,7 +141,7 @@ export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyL
   globalDiscountValue?: number;
   totalFee: number;
   themeColor?: string;
-  fontTheme?: string; // New: Stored font theme
+  fontTheme?: string;
 }
 
 // Settings Page Types
@@ -132,6 +161,6 @@ export interface SavedItemData {
   id: string;
   description: string;
   rate: number;
-  defaultQuantity?: number; // New: Default quantity for saved item
-  defaultUnit?: string;     // New: Default unit for saved item
+  defaultQuantity?: number;
+  defaultUnit?: string;
 }

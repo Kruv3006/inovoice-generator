@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, Type, Shapes, CalendarClock, RotateCcw } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, Type, Shapes, CalendarClock, RotateCcw, Clock } from "lucide-react";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -73,7 +73,9 @@ const defaultItem: LineItem = {
   rate: 0,
   discount: 0,
   itemStartDate: undefined,
-  itemEndDate: undefined
+  itemEndDate: undefined,
+  itemStartTime: '',
+  itemEndTime: '',
 };
 
 const generateDefaultFormValues = (companyProfile?: CompanyProfileData | null): InvoiceFormSchemaType => {
@@ -193,6 +195,8 @@ export function InvoiceForm() {
                 ...item,
                 itemStartDate: item.itemStartDate ? parseISO(item.itemStartDate) : undefined,
                 itemEndDate: item.itemEndDate ? parseISO(item.itemEndDate) : undefined,
+                itemStartTime: item.itemStartTime || '',
+                itemEndTime: item.itemEndTime || '',
                 quantity: Number(item.quantity) || 0,
                 unit: item.unit || '',
                 rate: Number(item.rate) || 0,
@@ -245,6 +249,8 @@ export function InvoiceForm() {
           ...item,
           itemStartDate: item.itemStartDate ? parseISO(item.itemStartDate) : undefined,
           itemEndDate: item.itemEndDate ? parseISO(item.itemEndDate) : undefined,
+          itemStartTime: item.itemStartTime || '',
+          itemEndTime: item.itemEndTime || '',
           quantity: Number(item.quantity) || 0,
           unit: item.unit || '',
           rate: Number(item.rate) || 0,
@@ -406,11 +412,12 @@ export function InvoiceForm() {
           unit: item.unit || '',
           itemStartDate: item.itemStartDate ? item.itemStartDate.toISOString() : undefined,
           itemEndDate: item.itemEndDate ? item.itemEndDate.toISOString() : undefined,
+          itemStartTime: item.itemStartTime || undefined,
+          itemEndTime: item.itemEndTime || undefined,
           discount: Number(item.discount) || 0,
         };
       });
       
-      // Use the memoized values for saving
       const finalSubTotal = calculatedSubTotal;
       const finalTotalFee = calculatedTotalFee;
       
@@ -464,6 +471,7 @@ export function InvoiceForm() {
       setValue(`items.${itemIndex}.rate`, selectedSavedItem.rate);
       setValue(`items.${itemIndex}.quantity`, selectedSavedItem.defaultQuantity ?? 1);
       setValue(`items.${itemIndex}.unit`, selectedSavedItem.defaultUnit ?? '');
+      // Times are not part of saved items for now
       trigger(`items.${itemIndex}.description`);
       trigger(`items.${itemIndex}.rate`);
       trigger(`items.${itemIndex}.quantity`);
@@ -690,7 +698,7 @@ export function InvoiceForm() {
               <div className="flex justify-between items-center mb-1">
                 <FormLabel className="text-xl font-semibold">Invoice Items *</FormLabel>
               </div>
-              <FormDescription className="mb-4">Add items or services provided. For services with a duration, provide start/end dates and a per-day rate; quantity will be calculated as days. Add a unit (e.g., hours, pcs) if applicable. Discounts are per item.</FormDescription>
+              <FormDescription className="mb-4">Add items or services provided. For services with a duration, provide start/end dates and a per-day rate; quantity will be calculated as days. Add a unit (e.g., hours, pcs) if applicable. Start/End times are optional for display. Discounts are per item.</FormDescription>
               <div className="space-y-6 mt-4">
                 {fields.map((item, index) => {
                   const itemStartDate = watch(`items.${index}.itemStartDate`);
@@ -797,6 +805,47 @@ export function InvoiceForm() {
                         )}
                       />
                     </div>
+                    { /* Start and End Time Inputs - Conditionally Rendered */ }
+                    {itemStartDate && (
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={control}
+                            name={`items.${index}.itemStartTime`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Start Time (HH:MM) (Opt.)</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input type="time" placeholder="HH:MM" {...field} value={field.value || ''} className="pl-8"/>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          {itemEndDate && (
+                            <FormField
+                              control={control}
+                              name={`items.${index}.itemEndTime`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>End Time (HH:MM) (Opt.)</FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                      <Input type="time" placeholder="HH:MM" {...field} value={field.value || ''} className="pl-8"/>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+                       </div>
+                    )}
+
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
                        <FormField
                         control={control}

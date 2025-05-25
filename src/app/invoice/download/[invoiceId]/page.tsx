@@ -3,17 +3,25 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic'; // Import dynamic
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, Edit, Loader2, AlertTriangle, Home, Eye, Mail, Share2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { StoredInvoiceData } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
-import { InvoiceTemplate } from '@/components/invoice-template';
+// import { InvoiceTemplate } from '@/components/invoice-template'; // Will be dynamically imported
 import { generatePdf, generateDoc, generateJpeg } from '@/lib/invoice-generator';
 import { format, parseISO, isValid } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+
+// Dynamically import InvoiceTemplate
+const InvoiceTemplate = dynamic(() => import('@/components/invoice-template').then(mod => mod.InvoiceTemplate), {
+  ssr: false, // No need for SSR for a component used for client-side capture
+  loading: () => <p>Loading template...</p>, // Optional loading state
+});
+
 
 export default function InvoiceDownloadPage() {
   const router = useRouter();
@@ -59,7 +67,7 @@ export default function InvoiceDownloadPage() {
       toast({ title: "Error", description: "Invoice data not available for generation.", variant: "destructive" });
       return;
     }
-    
+
     if ((formatName === 'PDF' || formatName === 'JPEG')) {
         if (!invoiceTemplateRef.current) {
              toast({ title: "Error", description: "Invoice template element not ready for generation.", variant: "destructive" });
@@ -72,7 +80,7 @@ export default function InvoiceDownloadPage() {
     try {
       if (formatName === 'PDF' || formatName === 'JPEG') {
         await generator(invoiceData, undefined, invoiceTemplateRef.current);
-      } else { 
+      } else {
         await generator(invoiceData);
       }
       toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
@@ -85,7 +93,7 @@ export default function InvoiceDownloadPage() {
       setIsGenerating(false);
     }
   };
-  
+
   const handleEmailInvoice = async () => {
     if (!invoiceData || !invoiceTemplateRef.current) {
       toast({
@@ -102,14 +110,14 @@ export default function InvoiceDownloadPage() {
     try {
       toast({ title: "Preparing PDF...", description: "The invoice PDF is being generated for your email." });
       // generatePdf will handle its own success/error toasts for the generation part
-      await generatePdf(invoiceData, undefined, invoiceTemplateRef.current); 
+      await generatePdf(invoiceData, undefined, invoiceTemplateRef.current);
       pdfGeneratedSuccessfully = true;
       toast({ title: "PDF Ready for Email", description: "The PDF has been downloaded. Proceeding to open your email client.", variant: "default"});
 
     } catch (e) {
       console.error("Error generating PDF for email:", e);
       // If generatePdf throws and doesn't toast, or for a general fallback:
-      if (!pdfGeneratedSuccessfully) { 
+      if (!pdfGeneratedSuccessfully) {
           toast({ variant: "destructive", title: "PDF Generation Failed", description: "Could not prepare the PDF for your email. Please try downloading manually." });
       }
     } finally {
@@ -129,7 +137,7 @@ export default function InvoiceDownloadPage() {
       title: "Email Client Opened",
       description: "Please find the downloaded PDF and attach it to your email.",
     });
-    
+
     setIsGenerating(false); // Reset loading state after all actions
   };
 
@@ -161,7 +169,7 @@ export default function InvoiceDownloadPage() {
                 await navigator.share({
                     title: `Invoice ${invoiceData.invoiceNumber}`,
                     text: `View invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}. Please download separately.`,
-                    url: window.location.href, 
+                    url: window.location.href,
                 });
                 toast({ title: "Shared link/text successfully!" });
             }
@@ -204,9 +212,9 @@ export default function InvoiceDownloadPage() {
       </Card>
     );
   }
-  
-  const mainInvoiceDateForDisplay = invoiceData.invoiceDate && isValid(parseISO(invoiceData.invoiceDate)) 
-    ? parseISO(invoiceData.invoiceDate) 
+
+  const mainInvoiceDateForDisplay = invoiceData.invoiceDate && isValid(parseISO(invoiceData.invoiceDate))
+    ? parseISO(invoiceData.invoiceDate)
     : new Date();
 
 
@@ -227,11 +235,11 @@ export default function InvoiceDownloadPage() {
             </Button>
           </div>
         </div>
-        
-        <div 
+
+        <div
           className="fixed top-0 left-[-9999px] opacity-0 z-[-100] print:hidden" /* Kept off-screen but renderable by html2canvas */
-          aria-hidden="true" 
-        > 
+          aria-hidden="true"
+        >
             <div ref={invoiceTemplateRef} className="bg-transparent print:bg-white" style={{ width: '800px', padding: '0', margin: '0' }}>
               {invoiceData && <InvoiceTemplate data={invoiceData} />}
             </div>
@@ -244,32 +252,32 @@ export default function InvoiceDownloadPage() {
             <CardDescription>Select your preferred format to download invoice <span className="font-semibold">{invoiceData.invoiceNumber}</span>, or choose a share option.</CardDescription>
           </CardHeader>
           <CardFooter className="flex flex-col sm:flex-row flex-wrap gap-3 pt-2">
-            <Button 
-              onClick={() => handleGenerate(generatePdf, 'PDF')} 
-              disabled={isGenerating} 
+            <Button
+              onClick={() => handleGenerate(generatePdf, 'PDF')}
+              disabled={isGenerating}
               className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground shadow-md"
             >
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Download PDF
             </Button>
-            <Button 
-              onClick={() => handleGenerate(generateDoc, 'DOC')} 
-              disabled={isGenerating} 
+            <Button
+              onClick={() => handleGenerate(generateDoc, 'DOC')}
+              disabled={isGenerating}
               className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground shadow-md"
             >
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Download DOC
             </Button>
-            <Button 
-              onClick={() => handleGenerate(generateJpeg, 'JPEG')} 
-              disabled={isGenerating} 
+            <Button
+              onClick={() => handleGenerate(generateJpeg, 'JPEG')}
+              disabled={isGenerating}
               className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground shadow-md"
             >
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Download JPEG
             </Button>
-            <Button 
-              onClick={handleEmailInvoice} 
+            <Button
+              onClick={handleEmailInvoice}
               disabled={isGenerating}
               variant="outline"
               className="w-full sm:w-auto shadow-md"
@@ -277,8 +285,8 @@ export default function InvoiceDownloadPage() {
              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
               Email Invoice
             </Button>
-             <Button 
-              onClick={handleShareInvoice} 
+             <Button
+              onClick={handleShareInvoice}
               disabled={isGenerating}
               variant="outline"
               className="w-full sm:w-auto shadow-md"
@@ -288,7 +296,7 @@ export default function InvoiceDownloadPage() {
             </Button>
           </CardFooter>
         </Card>
-        
+
         <Card className="mt-8 shadow-md rounded-lg">
           <CardHeader>
             <CardTitle className="text-lg">Invoice Summary</CardTitle>
@@ -306,5 +314,3 @@ export default function InvoiceDownloadPage() {
     </div>
   );
 }
-
-    

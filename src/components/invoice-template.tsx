@@ -4,6 +4,7 @@
 import type { StoredInvoiceData } from "@/lib/invoice-types";
 import { format, parseISO, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
+import React from 'react'; // Import React for React.memo
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
@@ -14,7 +15,8 @@ const formatCurrency = (amount?: number) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 };
 
-export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
+// Wrap InvoiceTemplate with React.memo
+export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(function InvoiceTemplate({ data }) {
   const {
     companyName,
     companyLogoDataUrl,
@@ -23,10 +25,10 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     invoiceDate,
     dueDate,
     items,
-    subTotal, 
+    subTotal,
     globalDiscountType,
     globalDiscountValue,
-    totalFee, 
+    totalFee,
     invoiceNotes,
     termsAndConditions,
     watermarkDataUrl,
@@ -51,7 +53,6 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
 
   const fontThemeClass = `font-theme-${fontTheme}`;
 
-
   return (
     <div
       className={cn(
@@ -64,13 +65,14 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
         border: '1px solid var(--invoice-border-color)',
         borderRadius: '0.5rem',
         overflow: 'hidden',
-        position: 'relative' 
+        position: 'relative'
       }}
     >
+      {/* Watermark Layer - positioned absolutely, behind content */}
       {watermarkDataUrl && (
-         <div 
+         <div
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            style={{ zIndex: 0 }} 
+            style={{ zIndex: 0 }}
          >
             <img
                 src={watermarkDataUrl}
@@ -81,19 +83,19 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                 objectFit: 'contain',
                 opacity: displayWatermarkOpacity,
                 }}
-                data-ai-hint="abstract pattern"
             />
         </div>
       )}
 
+      {/* Content Layer - relatively positioned with higher z-index */}
       <div
         className="relative p-6 sm:p-8 md:p-10"
-        style={{ zIndex: 1 }} 
+        style={{ zIndex: 1 }}
       >
         <header className="flex flex-col sm:flex-row justify-between items-start pb-6 mb-6 border-b border-[var(--invoice-border-color)]">
           <div className="flex items-center gap-4 mb-4 sm:mb-0">
             {companyLogoDataUrl && (
-              <div className="relative w-20 h-20 sm:w-24 sm:h-24 print:w-16 print:h-16 shrink-0" data-ai-hint="company brand">
+              <div className="relative w-20 h-20 sm:w-24 sm:h-24 print:w-16 print:h-16 shrink-0">
                 <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{width: '100%', height: '100%', objectFit: 'contain'}} />
               </div>
             )}
@@ -156,7 +158,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                                 const diffMs = endDateTime.getTime() - startDateTime.getTime();
                                 const totalMinutes = Math.floor(diffMs / (1000 * 60));
                                 const totalHoursDecimal = totalMinutes / 60;
-                                
+
                                 const fullDays = Math.floor(totalHoursDecimal / 24);
                                 const remainingHoursAfterFullDays = Math.floor(totalHoursDecimal % 24);
                                 const remainingMinutesAfterFullHours = Math.round(totalMinutes % 60);
@@ -167,15 +169,15 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
                                 if (remainingMinutesAfterFullHours > 0 && (fullDays > 0 || remainingHoursAfterFullDays > 0)) {
                                     durationParts.push(`${remainingMinutesAfterFullHours} min${remainingMinutesAfterFullHours > 1 ? 's' : ''}`);
                                 } else if (fullDays === 0 && remainingHoursAfterFullDays === 0 && remainingMinutesAfterFullHours > 0) {
-                                    durationParts.push(`${remainingMinutesAfterFullHours} min${remainingMinutesAfterFullHours > 1 ? 's' : ''}`);
+                                     durationParts.push(`${remainingMinutesAfterFullHours} min${remainingMinutesAfterFullHours > 1 ? 's' : ''}`);
                                 }
+
                                 if (durationParts.length > 0) {
                                     displayDurationString = `(Duration: ${durationParts.join(', ')})`;
                                 }
                             }
                         } catch (e) { console.error("Error formatting duration string:", e); }
                     } else if (item.itemStartDate && item.itemEndDate && isValid(parseISO(item.itemStartDate)) && isValid(parseISO(item.itemEndDate))) {
-                        // Only dates, no times
                          displayDurationString = `(${format(parseISO(item.itemStartDate), "MMM d, yyyy")} - ${format(parseISO(item.itemEndDate), "MMM d, yyyy")})`;
                     }
 
@@ -234,7 +236,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
             {globalDiscountAmount > 0 && (
               <div className="flex justify-between items-center py-2 px-3 border-b border-[var(--invoice-border-color)]">
                 <span className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">
-                  DISCOUNT 
+                  DISCOUNT
                   {globalDiscountType === 'percentage' && globalDiscountValue ? ` (${globalDiscountValue}%)` : ''}
                   :
                 </span>
@@ -254,7 +256,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
             <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
           </section>
         )}
-        
+
         {termsAndConditions && (
           <section className="mb-8 pt-4 border-t border-[var(--invoice-border-color)]">
             <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Terms &amp; Conditions</h4>
@@ -269,6 +271,4 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
       </div>
     </div>
   );
-};
-
-    
+});

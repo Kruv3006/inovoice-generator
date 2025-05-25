@@ -119,7 +119,7 @@ export function InvoiceForm() {
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
-  
+
   const [clients, setClients] = useState<ClientData[]>([]);
   const [savedItems, setSavedItems] = useState<SavedItemData[]>([]);
 
@@ -194,7 +194,7 @@ export function InvoiceForm() {
     const invoiceIdToEdit = searchParams.get('id');
     const companyProfile = getCompanyProfile();
     let baseFormValues = generateDefaultFormValues(companyProfile);
-    
+
     const duplicateId = searchParams.get('duplicate');
     if (duplicateId && !initialDataLoaded) {
         const sourceInvoice = getInvoiceData(duplicateId);
@@ -212,15 +212,15 @@ export function InvoiceForm() {
             })) || [defaultItem];
 
             const formData: InvoiceFormSchemaType = {
-                ...baseFormValues, 
-                ...sourceInvoice, 
-                invoiceNumber: `COPY-${sourceInvoice.invoiceNumber}-${String(Date.now()).slice(-4)}`, 
-                invoiceDate: new Date(), 
+                ...baseFormValues,
+                ...sourceInvoice,
+                invoiceNumber: `COPY-${sourceInvoice.invoiceNumber}-${String(Date.now()).slice(-4)}`,
+                invoiceDate: new Date(),
                 dueDate: sourceInvoice.dueDate ? parseISO(sourceInvoice.dueDate) : undefined,
                 items: duplicatedItems.length > 0 ? duplicatedItems : [defaultItem],
-                companyLogoFile: undefined, 
-                watermarkFile: undefined,  
-                companyName: sourceInvoice.companyName || baseFormValues.companyName, 
+                companyLogoFile: undefined,
+                watermarkFile: undefined,
+                companyName: sourceInvoice.companyName || baseFormValues.companyName,
                 invoiceNotes: sourceInvoice.invoiceNotes || baseFormValues.invoiceNotes,
                 termsAndConditions: sourceInvoice.termsAndConditions || baseFormValues.termsAndConditions,
                 watermarkOpacity: sourceInvoice.watermarkOpacity ?? baseFormValues.watermarkOpacity,
@@ -306,7 +306,7 @@ export function InvoiceForm() {
       setWatermarkPreview(null);
       setInitialDataLoaded(true);
     }
-  }, [searchParams, reset, toast, initialDataLoaded, router]); 
+  }, [searchParams, reset, toast, initialDataLoaded, router]);
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -333,20 +333,20 @@ export function InvoiceForm() {
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setCompanyLogoPreview(dataUrl);
-        } else { 
+        } else {
           setValue('companyLogoFile', undefined, { shouldValidate: true });
-          setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null); 
+          setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
         }
       });
     } else {
-      const currentLogoFileValue = getValues('companyLogoFile'); 
-      if (!currentLogoFileValue || currentLogoFileValue.length === 0) { 
+      const currentLogoFileValue = getValues('companyLogoFile');
+      if (!currentLogoFileValue || currentLogoFileValue.length === 0) {
         if (existingData?.companyLogoDataUrl) {
           setCompanyLogoPreview(existingData.companyLogoDataUrl);
         } else if (profileData?.companyLogoDataUrl) {
           setCompanyLogoPreview(profileData.companyLogoDataUrl);
         } else {
-          setCompanyLogoPreview(null); 
+          setCompanyLogoPreview(null);
         }
       }
     }
@@ -358,28 +358,28 @@ export function InvoiceForm() {
 
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
-      if (file.size > 5 * 1024 * 1024) { 
+      if (file.size > 5 * 1024 * 1024) {
         toast({ variant: "destructive", title: "Watermark File Too Large", description: "Watermark must be less than 5MB." });
-        setValue('watermarkFile', undefined, { shouldValidate: true }); 
-        setWatermarkPreview(existingData?.watermarkDataUrl || null); 
+        setValue('watermarkFile', undefined, { shouldValidate: true });
+        setWatermarkPreview(existingData?.watermarkDataUrl || null);
         return;
       }
-      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) { 
+      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
         toast({ variant: "destructive", title: "Invalid Watermark File Type", description: "Watermark must be PNG, JPEG, or GIF." });
-        setValue('watermarkFile', undefined, { shouldValidate: true }); 
-        setWatermarkPreview(existingData?.watermarkDataUrl || null); 
+        setValue('watermarkFile', undefined, { shouldValidate: true });
+        setWatermarkPreview(existingData?.watermarkDataUrl || null);
         return;
       }
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setWatermarkPreview(dataUrl);
-        } else { 
-          setValue('watermarkFile', undefined, { shouldValidate: true }); 
-          setWatermarkPreview(existingData?.watermarkDataUrl || null); 
+        } else {
+          setValue('watermarkFile', undefined, { shouldValidate: true });
+          setWatermarkPreview(existingData?.watermarkDataUrl || null);
         }
       });
     } else {
-      const currentWatermarkFileValue = getValues('watermarkFile'); 
+      const currentWatermarkFileValue = getValues('watermarkFile');
        if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
         setWatermarkPreview(existingData.watermarkDataUrl);
       } else if (!existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
@@ -392,7 +392,7 @@ export function InvoiceForm() {
     setIsSubmitting(true);
     try {
       const invoiceIdToEdit = searchParams.get('id');
-      const isDuplicating = searchParams.get('duplicate'); 
+      const isDuplicating = searchParams.get('duplicate');
       const invoiceId = (invoiceIdToEdit && !isDuplicating) ? invoiceIdToEdit : `inv_${Date.now()}`;
 
 
@@ -422,10 +422,10 @@ export function InvoiceForm() {
           discount: Number(item.discount) || 0,
         };
       });
-      
+
       const finalSubTotal = calculatedSubTotal;
       const finalTotalFee = calculatedTotalFee;
-      
+
 
       const storedData: StoredInvoiceData = {
         id: invoiceId,
@@ -713,7 +713,7 @@ export function InvoiceForm() {
               </FormDescription>
               <div className="space-y-6 mt-4">
                 {fields.map((item, index) => {
-                  const itemIndex = index; 
+                  const itemIndex = index;
 
                   const itemStartDate = watch(`items.${itemIndex}.itemStartDate`);
                   const itemEndDate = watch(`items.${itemIndex}.itemEndDate`);
@@ -722,28 +722,28 @@ export function InvoiceForm() {
 
                   useEffect(() => {
                     let newQuantity: number | undefined = undefined;
-                    let newUnit: string = getValues(`items.${itemIndex}.unit`) || ''; 
+                    let newUnit: string = getValues(`items.${itemIndex}.unit`) || '';
                     let quantityIsAutoCalculated = false;
                     let unitIsAutoCalculated = false;
-                
+
                     if (itemStartDate && itemEndDate && itemStartTime && itemEndTime &&
                         isValid(itemStartDate) && isValid(itemEndDate) &&
                         /^\d{2}:\d{2}$/.test(itemStartTime) && /^\d{2}:\d{2}$/.test(itemEndTime)) {
-                        
+
                         const startH = parseInt(itemStartTime.split(':')[0], 10);
                         const startM = parseInt(itemStartTime.split(':')[1], 10);
                         const endH = parseInt(itemEndTime.split(':')[0], 10);
                         const endM = parseInt(itemEndTime.split(':')[1], 10);
-                
+
                         if (startH >= 0 && startH <= 23 && startM >= 0 && startM <= 59 &&
                             endH >= 0 && endH <= 23 && endM >= 0 && endM <= 59) {
-                
+
                             const startDateObj = new Date(itemStartDate);
                             startDateObj.setHours(startH, startM, 0, 0);
-                
+
                             const endDateObj = new Date(itemEndDate);
                             endDateObj.setHours(endH, endM, 0, 0);
-                
+
                             if (endDateObj.getTime() > startDateObj.getTime()) {
                                 const diffMs = endDateObj.getTime() - startDateObj.getTime();
                                 newQuantity = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
@@ -760,12 +760,12 @@ export function InvoiceForm() {
                         quantityIsAutoCalculated = true;
                         unitIsAutoCalculated = true;
                     }
-                
+
                     const currentFormQuantity = getValues(`items.${itemIndex}.quantity`);
                     if (quantityIsAutoCalculated && newQuantity !== undefined && newQuantity !== currentFormQuantity) {
                         setValue(`items.${itemIndex}.quantity`, newQuantity, { shouldValidate: true, shouldDirty: true });
                     }
-                
+
                     const currentFormUnit = getValues(`items.${itemIndex}.unit`);
                     if (unitIsAutoCalculated && newUnit !== currentFormUnit) {
                         setValue(`items.${itemIndex}.unit`, newUnit, { shouldValidate: true, shouldDirty: true });
@@ -777,7 +777,7 @@ export function InvoiceForm() {
                   let rateLabel = "Rate (₹) *";
                   let isQuantityReadOnly = false;
                   let isUnitReadOnly = false;
-                  
+
                   if (itemStartDate && itemEndDate && itemStartTime && itemEndTime &&
                       isValid(itemStartDate) && isValid(itemEndDate) &&
                       /^\d{2}:\d{2}$/.test(itemStartTime) && /^\d{2}:\d{2}$/.test(itemEndTime)) {
@@ -785,7 +785,7 @@ export function InvoiceForm() {
                       const startM_render = parseInt(itemStartTime.split(':')[1], 10);
                       const endH_render = parseInt(itemEndTime.split(':')[0], 10);
                       const endM_render = parseInt(itemEndTime.split(':')[1], 10);
-                      
+
                       if (startH_render >= 0 && startH_render <= 23 && startM_render >= 0 && startM_render <= 59 &&
                           endH_render >= 0 && endH_render <= 23 && endM_render >= 0 && endM_render <= 59) {
                           const startDateObj_render = new Date(itemStartDate);
@@ -806,7 +806,7 @@ export function InvoiceForm() {
                       isQuantityReadOnly = true;
                       isUnitReadOnly = true;
                   }
-                  
+
                   const currentQuantity = getValues(`items.${itemIndex}.quantity`) || 0;
                   const currentRate = getValues(`items.${itemIndex}.rate`) || 0;
                   const currentDiscount = getValues(`items.${itemIndex}.discount`) || 0;
@@ -899,8 +899,8 @@ export function InvoiceForm() {
                         )}
                       />
                     </div>
-                    
-                    {(itemStartDate || itemEndDate) && ( 
+
+                    {(itemStartDate || itemEndDate) && (
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
                             control={control}
@@ -950,7 +950,7 @@ export function InvoiceForm() {
                                 type="number"
                                 placeholder="1"
                                 {...field}
-                                value={field.value ?? ''} 
+                                value={field.value ?? ''}
                                 readOnly={isQuantityReadOnly}
                                 onChange={e => {
                                   if (!isQuantityReadOnly) {
@@ -973,10 +973,10 @@ export function InvoiceForm() {
                             <FormControl>
                              <div className="relative">
                                 <Shapes className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input 
-                                  placeholder="e.g. hrs, pcs, day" 
-                                  {...field} 
-                                  value={field.value || ''} 
+                                <Input
+                                  placeholder="e.g. hrs, pcs, day"
+                                  {...field}
+                                  value={field.value || ''}
                                   className={`pl-8 ${isUnitReadOnly ? "bg-muted/50" : ""}`}
                                   readOnly={isUnitReadOnly}
                                   onChange={e => {
@@ -1062,7 +1062,7 @@ export function InvoiceForm() {
             </div>
 
             <Separator className="my-6" />
-            
+
             <div>
                 <FormLabel className="text-xl font-semibold">Global Discount (Optional)</FormLabel>
                  <FormDescription className="mb-4">Apply a discount to the subtotal of all items. This is on top of any per-item discounts.</FormDescription>
@@ -1105,7 +1105,7 @@ export function InvoiceForm() {
                                 <FormLabel>Discount Value</FormLabel>
                                 <FormControl>
                                      <div className="relative">
-                                         {watch("globalDiscountType") === 'percentage' ? 
+                                         {watch("globalDiscountType") === 'percentage' ?
                                             <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /> :
                                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
                                          }
@@ -1137,10 +1137,10 @@ export function InvoiceForm() {
                 <h3 className="text-lg text-muted-foreground">Subtotal (All Items): <span className="font-semibold">₹{calculatedSubTotal.toFixed(2)}</span></h3>
                 { (Number(watchedGlobalDiscountValue) || 0) > 0 &&
                   <h3 className="text-lg text-muted-foreground">
-                    Global Discount: 
+                    Global Discount:
                     <span className="font-semibold">
                        -₹{
-                         watchedGlobalDiscountType === 'percentage' 
+                         watchedGlobalDiscountType === 'percentage'
                            ? (calculatedSubTotal * (Number(watchedGlobalDiscountValue) || 0) / 100).toFixed(2)
                            : (Number(watchedGlobalDiscountValue) || 0).toFixed(2)
                        }
@@ -1161,8 +1161,8 @@ export function InvoiceForm() {
                 render={({ field }) => (
                     <FormItem>
                     <FormLabel className="flex items-center"><Palette className="mr-2 h-4 w-4"/> Invoice Color Theme</FormLabel>
-                    <Select 
-                        onValueChange={field.onChange} 
+                    <Select
+                        onValueChange={field.onChange}
                         value={field.value}
                     >
                         <FormControl>
@@ -1188,8 +1188,8 @@ export function InvoiceForm() {
                     render={({ field }) => (
                         <FormItem>
                         <FormLabel className="flex items-center"><Type className="mr-2 h-4 w-4"/> Invoice Font Style</FormLabel>
-                        <Select 
-                            onValueChange={field.onChange} 
+                        <Select
+                            onValueChange={field.onChange}
                             value={field.value}
                         >
                             <FormControl>
@@ -1310,7 +1310,7 @@ export function InvoiceForm() {
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="termsAndConditions"
@@ -1358,4 +1358,3 @@ export function InvoiceForm() {
     </Card>
   );
 }
-    

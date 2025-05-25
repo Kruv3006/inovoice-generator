@@ -16,7 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import type { CompanyProfileData, ClientData, SavedItemData } from '@/lib/invoice-types';
-import { 
+import {
   saveCompanyProfile, getCompanyProfile,
   getClients, addClient, removeClient,
   getSavedItems, addSavedItem, removeSavedItem
@@ -113,8 +113,8 @@ export function SettingsForm() {
   }, [companyProfileForm]);
 
   const handleCompanyProfileSubmit = async (data: CompanyProfileFormValues) => {
-    let logoDataUrl = companyLogoPreview; 
-    
+    let logoDataUrl = companyLogoPreview;
+
     const newLogoFile = companyProfileForm.getValues("companyLogoFile");
 
     if (newLogoFile && newLogoFile.length > 0) {
@@ -129,10 +129,10 @@ export function SettingsForm() {
       }
       logoDataUrl = await fileToDataUrl(file);
       if (logoDataUrl) {
-        setCompanyLogoPreview(logoDataUrl); 
+        setCompanyLogoPreview(logoDataUrl);
       } else {
-        logoDataUrl = getCompanyProfile()?.companyLogoDataUrl || null; 
-        setCompanyLogoPreview(logoDataUrl); 
+        logoDataUrl = getCompanyProfile()?.companyLogoDataUrl || null;
+        setCompanyLogoPreview(logoDataUrl);
         toast({ variant: "destructive", title: "Logo Upload Failed", description: "Could not process the logo file." });
       }
     } else if (data.companyLogoFile === undefined && companyLogoPreview) {
@@ -176,7 +176,7 @@ export function SettingsForm() {
     setSavedItems(updatedItems);
     toast({ title: "Item Removed", variant: "default" });
   };
-  
+
   const watchedCompanyLogoFile = companyProfileForm.watch("companyLogoFile");
 
   useEffect(() => {
@@ -189,12 +189,12 @@ export function SettingsForm() {
       fileToDataUrl(file).then(dataUrl => {
         if (dataUrl) setCompanyLogoPreview(dataUrl);
       });
-    } else if (!watchedCompanyLogoFile && !companyProfileForm.formState.isDirty) { 
+    } else if (!watchedCompanyLogoFile && !companyProfileForm.formState.isDirty) {
         const profile = getCompanyProfile();
         if (profile?.companyLogoDataUrl) {
             setCompanyLogoPreview(profile.companyLogoDataUrl);
         } else {
-            setCompanyLogoPreview(null); 
+            setCompanyLogoPreview(null);
         }
     }
   }, [watchedCompanyLogoFile, companyProfileForm.formState.isDirty]);
@@ -229,7 +229,7 @@ export function SettingsForm() {
                         type="file"
                         accept="image/png, image/jpeg, image/gif"
                         className="hidden"
-                        ref={companyLogoFileRef} 
+                        ref={companyLogoFileRef}
                         name={name}
                         onBlur={onBlur}
                         onChange={(e) => {
@@ -251,7 +251,7 @@ export function SettingsForm() {
               <p className="text-xs text-muted-foreground mt-1">Your company logo. It will appear on your invoices.</p>
               {companyLogoPreview && (
                 <div className="mt-2 p-2 border rounded-md aspect-square relative w-24 h-24 bg-muted overflow-hidden">
-                  <Image src={companyLogoPreview} alt="Company logo preview" layout="fill" objectFit="contain" data-ai-hint="company brand logo" />
+                  <Image src={companyLogoPreview} alt="Company logo preview" layout="fill" objectFit="contain" data-ai-hint="company brand logo"/>
                 </div>
               )}
             </div>

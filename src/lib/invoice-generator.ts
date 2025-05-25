@@ -39,14 +39,14 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     ? `<img src="${companyLogoDataUrl}" style="max-height: 70px; max-width: 180px; margin-bottom: 10px; object-fit: contain;" alt="Company Logo"/>`
     : '';
 
-  let primaryColorDoc = '#1D4ED8'; 
+  let primaryColorDoc = '#1D4ED8';
   let headerBgColorDoc = '#F3F4F6';
   let borderColorDoc = '#E5E7EB';
   let textColorDoc = '#1F2937';
   let mutedTextColorDoc = '#6B7280';
 
   if (themeColor === 'classic-blue') {
-    primaryColorDoc = '#2563EB'; 
+    primaryColorDoc = '#2563EB';
     headerBgColorDoc = 'hsl(210, 50%, 96%)';
     borderColorDoc = 'hsl(210, 30%, 80%)';
   } else if (themeColor === 'emerald-green') {
@@ -87,7 +87,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
                   const diffMs = endDateTime.getTime() - startDateTime.getTime();
                   const totalMinutes = Math.floor(diffMs / (1000 * 60));
                   const totalHoursDecimal = totalMinutes / 60;
-                  
+
                   const fullDays = Math.floor(totalHoursDecimal / 24);
                   const remainingHoursAfterFullDays = Math.floor(totalHoursDecimal % 24);
                   const remainingMinutesAfterFullHours = Math.round(totalMinutes % 60);
@@ -130,7 +130,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   } else {
     itemsHtml = `<tr><td colspan="6" style="text-align:center; padding: 20px; border: 1px solid ${borderColorDoc}; color: ${mutedTextColorDoc};">No items listed.</td></tr>`;
   }
-  
+
   let globalDiscountHtml = '';
   if (globalDiscountValue && globalDiscountValue > 0 && subTotal) {
     let discountAmountDisplay = 0;
@@ -189,7 +189,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
           .items-table-doc .amount-col { width: 15%; text-align: right; }
 
 
-          .totals-summary-table { width: 45%; margin-left: auto; margin-bottom: 25px; font-size: 10pt; } 
+          .totals-summary-table { width: 45%; margin-left: auto; margin-bottom: 25px; font-size: 10pt; }
           .totals-summary-table td { padding: 8px; }
           .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColorDoc}; background-color: ${primaryColorDoc}1A; padding: 10px 12px; border-radius: 4px; }
           .grand-total-line td:first-child { color: ${primaryColorDoc}; }
@@ -198,7 +198,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
 
           .notes-section { margin-top: 25px; padding-top:15px; border-top: 1px solid ${borderColorDoc}; font-size: 9pt; color: ${mutedTextColorDoc}; }
           .notes-section h4 { font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0; }
-          
+
           .terms-section { margin-top: 20px; padding-top:10px; border-top: 1px solid ${borderColorDoc}; font-size: 7pt; color: ${mutedTextColorDoc}; }
           .terms-section h4 { font-size: 8pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:0; }
 
@@ -250,7 +250,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
                 ${itemsHtml}
               </tbody>
             </table>
-            
+
             <table class="totals-summary-table">
                 <tbody>
                     <tr>
@@ -296,7 +296,6 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
   }
 
   if (elementToCapture.offsetWidth === 0 || elementToCapture.offsetHeight === 0) {
-      console.error("Element to capture (PDF) has zero dimensions. Is it visible and rendered?", elementToCapture);
       toast({ variant: "destructive", title: "PDF Error", description: "Capture element has no dimensions." });
       throw new Error("Capture element (PDF) has no dimensions.");
   }
@@ -310,15 +309,15 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
       backgroundColor: elementToCapture.style.backgroundColor,
   };
   elementToCapture.style.opacity = '1';
-  elementToCapture.style.position = 'fixed'; 
-  elementToCapture.style.left = '0px'; 
+  elementToCapture.style.position = 'fixed';
+  elementToCapture.style.left = '0px';
   elementToCapture.style.top = '0px';
-  elementToCapture.style.zIndex = '10000'; 
-  
+  elementToCapture.style.zIndex = '10000';
+
   const isDarkTheme = document.documentElement.classList.contains('dark');
   let themeColorClass = `theme-${data.themeColor || 'default'}`;
   let fontThemeClass = `font-theme-${data.fontTheme || 'default'}`;
-  
+
   const hadThemeColorClass = elementToCapture.classList.contains(themeColorClass.split(" .")[1] || themeColorClass);
   const hadFontThemeClass = elementToCapture.classList.contains(fontThemeClass);
 
@@ -328,27 +327,26 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
 
   const computedStyle = getComputedStyle(elementToCapture);
   let docInvoiceBg = computedStyle.getPropertyValue('--invoice-background').trim();
-  
-  if (!docInvoiceBg || docInvoiceBg === "transparent" || docInvoiceBg === "rgba(0, 0, 0, 0)") { 
+
+  if (!docInvoiceBg || docInvoiceBg === "transparent" || docInvoiceBg === "rgba(0, 0, 0, 0)") {
     docInvoiceBg = isDarkTheme ? 'hsl(220, 15%, 15%)' : 'hsl(0, 0%, 100%)';
   }
   elementToCapture.style.backgroundColor = docInvoiceBg;
 
 
-  await new Promise(resolve => setTimeout(resolve, 300)); 
+  await new Promise(resolve => setTimeout(resolve, 300));
 
   try {
-    console.log(`Capturing element for PDF: ${elementToCapture.offsetWidth}x${elementToCapture.offsetHeight}`);
     const canvas = await html2canvas(elementToCapture, {
-      scale: 2, 
+      scale: 2,
       useCORS: true,
-      logging: true,
-      backgroundColor: null, 
+      logging: false, // Keep logging off for production, turn on for debugging
+      backgroundColor: null,
       scrollX: -window.scrollX,
       scrollY: -window.scrollY,
       windowWidth: elementToCapture.scrollWidth,
       windowHeight: elementToCapture.scrollHeight,
-      removeContainer: true, 
+      removeContainer: true,
     });
 
     elementToCapture.style.opacity = originalStyle.opacity;
@@ -388,7 +386,7 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
     if (!hadThemeColorClass && (themeColorClass.split(" .")[1] || themeColorClass)) elementToCapture.classList.remove(themeColorClass.split(" .")[1] || themeColorClass);
     if (!hadFontThemeClass) elementToCapture.classList.remove(fontThemeClass);
-    throw error; 
+    throw error;
   }
 };
 
@@ -414,7 +412,6 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   }
 
    if (elementToCapture.offsetWidth === 0 || elementToCapture.offsetHeight === 0) {
-      console.error("Element to capture (JPEG) has zero dimensions. Is it visible and rendered?", elementToCapture);
       toast({ variant: "destructive", title: "JPEG Error", description: "Capture element has no dimensions." });
       throw new Error("Capture element (JPEG) has no dimensions.");
   }
@@ -432,7 +429,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   elementToCapture.style.left = '0px';
   elementToCapture.style.top = '0px';
   elementToCapture.style.zIndex = '10000';
-  
+
   const isDarkTheme = document.documentElement.classList.contains('dark');
   let themeColorClass = `theme-${data.themeColor || 'default'}`;
   let fontThemeClass = `font-theme-${data.fontTheme || 'default'}`;
@@ -442,7 +439,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
 
   if (!hadThemeColorClass) elementToCapture.classList.add(themeColorClass.split(" .")[1] || themeColorClass);
   if (!hadFontThemeClass) elementToCapture.classList.add(fontThemeClass);
-  
+
   const computedStyle = getComputedStyle(elementToCapture);
   let docInvoiceBg = computedStyle.getPropertyValue('--invoice-background').trim();
 
@@ -455,12 +452,11 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   await new Promise(resolve => setTimeout(resolve, 300));
 
   try {
-    console.log(`Capturing element for JPEG: ${elementToCapture.offsetWidth}x${elementToCapture.offsetHeight}`);
     const canvas = await html2canvas(elementToCapture, {
-        scale: 1.5, 
+        scale: 1.5,
         useCORS: true,
-        logging: true,
-        backgroundColor: docInvoiceBg, 
+        logging: false, // Keep logging off for production
+        backgroundColor: docInvoiceBg,
         scrollX: -window.scrollX,
         scrollY: -window.scrollY,
         windowWidth: elementToCapture.scrollWidth,
@@ -483,12 +479,12 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
         throw new Error("Canvas capture failed for JPEG (empty canvas)");
     }
 
-    const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9); 
+    const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9);
     simulateDownload(`invoice_${data.invoiceNumber}.jpeg`, jpegDataUrl, 'image/jpeg', true);
   } catch (error) {
     console.error("Error generating JPEG with html2canvas:", error);
     toast({ variant: "destructive", title: "JPEG Generation Error", description: "Could not generate JPEG. Check console." });
-    
+
     elementToCapture.style.opacity = originalStyle.opacity;
     elementToCapture.style.position = originalStyle.position;
     elementToCapture.style.left = originalStyle.left;
@@ -500,4 +496,3 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
     throw error;
   }
 };
-    

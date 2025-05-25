@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
 import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, Type, Shapes, CalendarClock, RotateCcw } from "lucide-react";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -131,28 +131,8 @@ export function InvoiceForm() {
   const watchedGlobalDiscountType = watch("globalDiscountType");
   const watchedGlobalDiscountValue = watch("globalDiscountValue");
 
-  const [calculatedSubTotal, setCalculatedSubTotal] = useState<number>(0);
-  const [calculatedTotalFee, setCalculatedTotalFee] = useState<number>(0);
 
-  useEffect(() => {
-    setClients(getClients());
-    setSavedItems(getSavedItems());
-  }, []);
-
-  const resetFormToDefaults = () => {
-    const profile = getCompanyProfile();
-    const defaults = generateDefaultFormValues(profile);
-    reset(defaults);
-    setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
-    setWatermarkPreview(null);
-    // Optionally clear URL params if they dictated a specific state like 'edit' or 'duplicate'
-    // For now, just resets fields. If router.replace is needed, ensure it doesn't cause loops with other useEffects.
-    // router.replace('/invoice/details', { scroll: false }); // Example, be cautious
-    toast({ title: "Form Reset", description: "Invoice details have been reset to defaults.", variant: "default" });
-  };
-
-
-  useEffect(() => {
+  const { calculatedSubTotal, calculatedTotalFee } = useMemo(() => {
     let subTotal = 0;
     if (watchedItems) {
       watchedItems.forEach((item) => {
@@ -168,7 +148,6 @@ export function InvoiceForm() {
         subTotal += itemSubtotal * (1 - discount / 100);
       });
     }
-    setCalculatedSubTotal(subTotal);
 
     let finalTotal = subTotal;
     const discountValue = Number(watchedGlobalDiscountValue) || 0;
@@ -182,9 +161,23 @@ export function InvoiceForm() {
         finalTotal = Math.max(0, subTotal - discountValue);
       }
     }
-    setCalculatedTotalFee(finalTotal);
-
+    return { calculatedSubTotal: subTotal, calculatedTotalFee: finalTotal };
   }, [watchedItems, watchedGlobalDiscountType, watchedGlobalDiscountValue]);
+
+
+  useEffect(() => {
+    setClients(getClients());
+    setSavedItems(getSavedItems());
+  }, []);
+
+  const resetFormToDefaults = () => {
+    const profile = getCompanyProfile();
+    const defaults = generateDefaultFormValues(profile);
+    reset(defaults);
+    setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
+    setWatermarkPreview(null);
+    toast({ title: "Form Reset", description: "Invoice details have been reset to defaults.", variant: "default" });
+  };
 
 
   useEffect(() => {
@@ -192,7 +185,6 @@ export function InvoiceForm() {
     const companyProfile = getCompanyProfile();
     let baseFormValues = generateDefaultFormValues(companyProfile);
     
-    // Handle "duplicate" action parameter
     const duplicateId = searchParams.get('duplicate');
     if (duplicateId && !initialDataLoaded) {
         const sourceInvoice = getInvoiceData(duplicateId);
@@ -208,20 +200,22 @@ export function InvoiceForm() {
             })) || [defaultItem];
 
             const formData: InvoiceFormSchemaType = {
-                ...baseFormValues, // Start with current defaults (includes profile)
-                ...sourceInvoice, // Override with source invoice data
-                invoiceNumber: `COPY-${sourceInvoice.invoiceNumber}-${String(Date.now()).slice(-4)}`, // New invoice number
-                invoiceDate: new Date(), // Set to today
+                ...baseFormValues, 
+                ...sourceInvoice, 
+                invoiceNumber: `COPY-${sourceInvoice.invoiceNumber}-${String(Date.now()).slice(-4)}`, 
+                invoiceDate: new Date(), 
                 dueDate: sourceInvoice.dueDate ? parseISO(sourceInvoice.dueDate) : undefined,
                 items: duplicatedItems.length > 0 ? duplicatedItems : [defaultItem],
-                companyLogoFile: undefined, // Don't carry over file objects
-                watermarkFile: undefined,  // Don't carry over file objects
-                companyName: sourceInvoice.companyName || baseFormValues.companyName, // Prioritize source, then profile
+                companyLogoFile: undefined, 
+                watermarkFile: undefined,  
+                companyName: sourceInvoice.companyName || baseFormValues.companyName, 
                 invoiceNotes: sourceInvoice.invoiceNotes || baseFormValues.invoiceNotes,
                 termsAndConditions: sourceInvoice.termsAndConditions || baseFormValues.termsAndConditions,
                 watermarkOpacity: sourceInvoice.watermarkOpacity ?? baseFormValues.watermarkOpacity,
                 themeColor: sourceInvoice.themeColor ?? baseFormValues.themeColor,
                 fontTheme: sourceInvoice.fontTheme ?? baseFormValues.fontTheme,
+                globalDiscountType: sourceInvoice.globalDiscountType ?? baseFormValues.globalDiscountType,
+                globalDiscountValue: sourceInvoice.globalDiscountValue ?? baseFormValues.globalDiscountValue,
             };
             reset(formData);
             if (sourceInvoice.watermarkDataUrl) setWatermarkPreview(sourceInvoice.watermarkDataUrl);
@@ -324,25 +318,22 @@ export function InvoiceForm() {
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setCompanyLogoPreview(dataUrl);
-        } else { // File read error or null result
+        } else { 
           setValue('companyLogoFile', undefined, { shouldValidate: true });
-          setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null); // Revert to existing
+          setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null); 
         }
       });
     } else {
-      // This handles the case where a file might have been selected and then cleared,
-      // or if we are initializing the form for an existing invoice without a new file upload.
-      const currentLogoFileValue = getValues('companyLogoFile'); // Check RHF's current value
-      if (!currentLogoFileValue || currentLogoFileValue.length === 0) { // No new file pending in RHF
+      const currentLogoFileValue = getValues('companyLogoFile'); 
+      if (!currentLogoFileValue || currentLogoFileValue.length === 0) { 
         if (existingData?.companyLogoDataUrl) {
           setCompanyLogoPreview(existingData.companyLogoDataUrl);
         } else if (profileData?.companyLogoDataUrl) {
           setCompanyLogoPreview(profileData.companyLogoDataUrl);
         } else {
-          setCompanyLogoPreview(null); // No existing, no profile, no new file
+          setCompanyLogoPreview(null); 
         }
       }
-      // If currentLogoFileValue exists, it means a file is staged in RHF, and its preview is handled by the above block.
     }
   }, [watchedCompanyLogoFile, searchParams, setValue, toast, getValues]);
 
@@ -352,38 +343,33 @@ export function InvoiceForm() {
 
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
-      if (file.size > 5 * 1024 * 1024) { // Check file size
+      if (file.size > 5 * 1024 * 1024) { 
         toast({ variant: "destructive", title: "Watermark File Too Large", description: "Watermark must be less than 5MB." });
-        setValue('watermarkFile', undefined, { shouldValidate: true }); // Clear invalid file from RHF
-        setWatermarkPreview(existingData?.watermarkDataUrl || null); // Revert to existing preview
+        setValue('watermarkFile', undefined, { shouldValidate: true }); 
+        setWatermarkPreview(existingData?.watermarkDataUrl || null); 
         return;
       }
-      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) { // Check file type
+      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) { 
         toast({ variant: "destructive", title: "Invalid Watermark File Type", description: "Watermark must be PNG, JPEG, or GIF." });
-        setValue('watermarkFile', undefined, { shouldValidate: true }); // Clear invalid file from RHF
-        setWatermarkPreview(existingData?.watermarkDataUrl || null); // Revert to existing preview
+        setValue('watermarkFile', undefined, { shouldValidate: true }); 
+        setWatermarkPreview(existingData?.watermarkDataUrl || null); 
         return;
       }
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setWatermarkPreview(dataUrl);
-        } else { // File read error or null result
-          setValue('watermarkFile', undefined, { shouldValidate: true }); // Clear failed file from RHF
-          setWatermarkPreview(existingData?.watermarkDataUrl || null); // Revert to existing preview
+        } else { 
+          setValue('watermarkFile', undefined, { shouldValidate: true }); 
+          setWatermarkPreview(existingData?.watermarkDataUrl || null); 
         }
       });
     } else {
-      // This handles the case where a file might have been selected and then cleared,
-      // or if we are initializing the form for an existing invoice without a new file upload.
-      const currentWatermarkFileValue = getValues('watermarkFile'); // Check RHF's current value
+      const currentWatermarkFileValue = getValues('watermarkFile'); 
        if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
-        // If editing an invoice that had a watermark, and no new file is staged in RHF
         setWatermarkPreview(existingData.watermarkDataUrl);
       } else if (!existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
-        // If it's a new invoice or an existing one without a watermark, and no new file is staged
         setWatermarkPreview(null);
       }
-      // If currentWatermarkFileValue exists, it means a file is staged, and its preview is handled by the above block.
     }
   }, [watchedWatermarkFile, searchParams, setValue, toast, getValues]);
 
@@ -391,21 +377,18 @@ export function InvoiceForm() {
     setIsSubmitting(true);
     try {
       const invoiceIdToEdit = searchParams.get('id');
-      const isDuplicating = searchParams.get('duplicate'); // Check if we were duplicating
+      const isDuplicating = searchParams.get('duplicate'); 
       const invoiceId = (invoiceIdToEdit && !isDuplicating) ? invoiceIdToEdit : `inv_${Date.now()}`;
 
 
       let companyLogoDataUrlToStore: string | null = companyLogoPreview;
-      // Only convert if a new file was actually provided in the form data and hasn't been cleared due to validation
       if (data.companyLogoFile && data.companyLogoFile.length > 0) {
          const newLogoUrl = await fileToDataUrl(data.companyLogoFile[0], toast);
-         // Only update if conversion was successful, otherwise keep existing (or null)
          if (newLogoUrl) companyLogoDataUrlToStore = newLogoUrl;
       }
 
 
       let watermarkDataUrlToStore: string | null = watermarkPreview;
-      // Only convert if a new file was actually provided and hasn't been cleared
        if (data.watermarkFile && data.watermarkFile.length > 0) {
          const newWatermarkUrl = await fileToDataUrl(data.watermarkFile[0], toast);
          if (newWatermarkUrl) watermarkDataUrlToStore = newWatermarkUrl;
@@ -426,22 +409,10 @@ export function InvoiceForm() {
           discount: Number(item.discount) || 0,
         };
       });
-
-      const subTotal = itemsToStore.reduce((sum, item) => {
-        const quantity = Number(item.quantity) || 0;
-        const rate = Number(item.rate) || 0;
-        const discount = Number(item.discount) || 0;
-        const itemSubtotal = quantity * rate;
-        return sum + (itemSubtotal * (1 - (discount / 100)));
-      }, 0);
-
-      let totalFee = subTotal;
-      const discountValue = Number(data.globalDiscountValue) || 0;
-      if (data.globalDiscountType === 'percentage' && discountValue > 0 && discountValue <= 100) {
-        totalFee = subTotal * (1 - discountValue / 100);
-      } else if (data.globalDiscountType === 'fixed' && discountValue > 0) {
-        totalFee = Math.max(0, subTotal - discountValue);
-      }
+      
+      // Use the memoized values for saving
+      const finalSubTotal = calculatedSubTotal;
+      const finalTotalFee = calculatedTotalFee;
       
 
       const storedData: StoredInvoiceData = {
@@ -453,10 +424,10 @@ export function InvoiceForm() {
         companyName: data.companyName,
         companyLogoDataUrl: companyLogoDataUrlToStore,
         items: itemsToStore,
-        subTotal: subTotal,
+        subTotal: finalSubTotal,
         globalDiscountType: data.globalDiscountType,
         globalDiscountValue: data.globalDiscountValue,
-        totalFee: totalFee,
+        totalFee: finalTotalFee,
         invoiceNotes: data.invoiceNotes,
         termsAndConditions: data.termsAndConditions,
         watermarkDataUrl: watermarkDataUrlToStore,

@@ -1,11 +1,12 @@
 
 "use client";
 
-import type { CompanyProfileData, ClientData, SavedItemData } from './invoice-types';
+import type { CompanyProfileData, ClientData, SavedItemData, AvailableCurrency } from './invoice-types';
+import { availableCurrencies } from './invoice-types';
 
-const COMPANY_PROFILE_KEY = 'companyProfileData_v1';
-const CLIENT_LIST_KEY = 'clientListData_v1';
-const SAVED_ITEMS_KEY = 'savedItemsData_v1';
+const COMPANY_PROFILE_KEY = 'companyProfileData_v2'; // Incremented version
+const CLIENT_LIST_KEY = 'clientListData_v2'; // Incremented version
+const SAVED_ITEMS_KEY = 'savedItemsData_v1'; // No change here yet for direct fields
 
 // Company Profile
 export const saveCompanyProfile = (data: CompanyProfileData): void => {
@@ -13,6 +14,8 @@ export const saveCompanyProfile = (data: CompanyProfileData): void => {
     const profileToSave: CompanyProfileData = {
       ...data,
       defaultTemplateStyle: data.defaultTemplateStyle || 'classic',
+      currency: data.currency || availableCurrencies[0], // Default to INR
+      showClientAddressOnInvoice: data.showClientAddressOnInvoice === undefined ? true : data.showClientAddressOnInvoice,
     };
     localStorage.setItem(COMPANY_PROFILE_KEY, JSON.stringify(profileToSave));
   }
@@ -26,9 +29,19 @@ export const getCompanyProfile = (): CompanyProfileData | null => {
       return {
         ...profile,
         defaultTemplateStyle: profile.defaultTemplateStyle || 'classic',
+        currency: profile.currency || availableCurrencies[0],
+        showClientAddressOnInvoice: profile.showClientAddressOnInvoice === undefined ? true : profile.showClientAddressOnInvoice,
       };
     }
-    return null;
+    return { // Return a default profile if none exists
+        companyName: '',
+        companyLogoDataUrl: null,
+        defaultInvoiceNotes: '',
+        defaultTermsAndConditions: '',
+        defaultTemplateStyle: 'classic',
+        currency: availableCurrencies[0],
+        showClientAddressOnInvoice: true,
+    };
   }
   return null;
 };
@@ -48,13 +61,21 @@ export const saveClients = (clients: ClientData[]): void => {
   }
 };
 
-export const addClient = (name: string): ClientData[] => {
+export const addClient = (clientData: Omit<ClientData, 'id'>): ClientData[] => {
   const clients = getClients();
-  const newClient = { id: `client_${Date.now()}`, name };
+  const newClient = { ...clientData, id: `client_${Date.now()}` };
   const updatedClients = [...clients, newClient];
   saveClients(updatedClients);
   return updatedClients;
 };
+
+export const updateClient = (updatedClient: ClientData): ClientData[] => {
+  let clients = getClients();
+  clients = clients.map(client => client.id === updatedClient.id ? updatedClient : client);
+  saveClients(clients);
+  return clients;
+};
+
 
 export const removeClient = (id: string): ClientData[] => {
   let clients = getClients();
@@ -69,7 +90,6 @@ export const getSavedItems = (): SavedItemData[] => {
     const dataString = localStorage.getItem(SAVED_ITEMS_KEY);
     if (dataString) {
       const items = JSON.parse(dataString) as SavedItemData[];
-      // Ensure defaultQuantity and defaultUnit are numbers/strings or undefined
       return items.map(item => ({
         ...item,
         defaultQuantity: item.defaultQuantity != null ? Number(item.defaultQuantity) : undefined,
@@ -107,3 +127,5 @@ export const removeSavedItem = (id: string): SavedItemData[] => {
   saveSavedItems(items);
   return items;
 };
+
+    

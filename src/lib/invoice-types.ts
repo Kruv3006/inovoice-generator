@@ -1,6 +1,16 @@
 
 import { z } from 'zod';
 
+export const availableCurrencies = [
+  { symbol: '₹', code: 'INR', name: 'Indian Rupee' },
+  { symbol: '$', code: 'USD', name: 'US Dollar' },
+  { symbol: '€', code: 'EUR', name: 'Euro' },
+  { symbol: '£', code: 'GBP', name: 'British Pound' },
+  { symbol: '¥', code: 'JPY', name: 'Japanese Yen' },
+] as const;
+
+export type AvailableCurrency = typeof availableCurrencies[number];
+
 export const lineItemSchema = z.object({
   id: z.string().optional(),
   description: z.string().min(1, "Description is required."),
@@ -79,6 +89,11 @@ export type LineItem = z.infer<typeof lineItemSchema>;
 export const invoiceFormSchema = z.object({
   invoiceNumber: z.string().min(1, "Invoice number is required."),
   customerName: z.string().min(1, "Customer name is required"),
+  // Client details are now sourced from selected client or typed directly
+  customerAddress: z.string().optional(),
+  customerEmail: z.string().email("Invalid email address").optional().or(z.literal('')),
+  customerPhone: z.string().optional(),
+
   companyName: z.string().min(1, "Your company name is required."),
   companyLogoFile: z.custom<FileList>((val) => val === undefined || (val instanceof FileList && val.length > 0), "Please upload a logo or ensure no file is selected")
     .refine((files) => files === undefined || !files || files.length === 0 || files[0].size <= 2 * 1024 * 1024, `Max file size is 2MB.`)
@@ -114,12 +129,13 @@ export const invoiceFormSchema = z.object({
   termsAndConditions: z.string().optional(),
   themeColor: z.string().optional().default('default'),
   fontTheme: z.string().optional().default('default'),
-  templateStyle: z.enum(['classic', 'modern']).optional().default('classic'),
+  templateStyle: z.enum(['classic', 'modern', 'compact']).optional().default('classic'),
+  // Currency will be derived from settings or defaults
 });
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
 
-export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEndDate' | 'discount' | 'itemStartTime' | 'itemEndTime'> {
+export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEndDate' | 'discount' | 'itemStartTime' | 'itemEndTime' | 'unit'> {
   itemStartDate?: string;
   itemEndDate?: string;
   itemStartTime?: string;
@@ -127,10 +143,13 @@ export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEn
   discount?: number;
   unit?: string;
 }
-export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'dueDate' | 'watermarkOpacity' | 'invoiceNotes' | 'termsAndConditions' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor' | 'fontTheme' | 'templateStyle'> {
+export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'dueDate' | 'watermarkOpacity' | 'invoiceNotes' | 'termsAndConditions' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor' | 'fontTheme' | 'templateStyle' | 'customerAddress' | 'customerEmail' | 'customerPhone'> {
   id: string;
   invoiceDate: string;
   dueDate?: string;
+  customerAddress?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   companyLogoDataUrl?: string | null;
   watermarkDataUrl?: string | null;
   watermarkOpacity: number;
@@ -141,9 +160,11 @@ export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyL
   globalDiscountType?: 'percentage' | 'fixed';
   globalDiscountValue?: number;
   totalFee: number;
+  currency: AvailableCurrency; // Added currency
+  amountInWords?: string; // Added for amount in words
   themeColor?: string;
   fontTheme?: string;
-  templateStyle?: 'classic' | 'modern';
+  templateStyle?: 'classic' | 'modern' | 'compact';
 }
 
 // Settings Page Types
@@ -152,12 +173,17 @@ export interface CompanyProfileData {
   companyLogoDataUrl?: string | null;
   defaultInvoiceNotes?: string;
   defaultTermsAndConditions?: string;
-  defaultTemplateStyle?: 'classic' | 'modern';
+  defaultTemplateStyle?: 'classic' | 'modern' | 'compact';
+  currency?: AvailableCurrency;
+  showClientAddressOnInvoice?: boolean;
 }
 
 export interface ClientData {
   id: string;
   name: string;
+  address?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface SavedItemData {
@@ -167,3 +193,13 @@ export interface SavedItemData {
   defaultQuantity?: number;
   defaultUnit?: string;
 }
+
+// For Backup/Restore
+export interface AppBackupData {
+  companyProfile?: CompanyProfileData | null;
+  clients?: ClientData[];
+  savedItems?: SavedItemData[];
+  invoices?: StoredInvoiceData[];
+}
+
+    

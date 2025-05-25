@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, Type, Shapes, CalendarClock, RotateCcw, Clock, LayoutTemplate } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, Type, Shapes, CalendarClock, RotateCcw, Clock, LayoutTemplate, DollarSign, Eye, EyeOff, MapPin, Mail, Phone } from "lucide-react";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -39,10 +39,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { InvoiceFormSchemaType, StoredInvoiceData, LineItem, StoredLineItem, ClientData, SavedItemData, CompanyProfileData } from "@/lib/invoice-types";
-import { invoiceFormSchema } from "@/lib/invoice-types";
+import type { InvoiceFormSchemaType, StoredInvoiceData, LineItem, StoredLineItem, ClientData, SavedItemData, CompanyProfileData, AvailableCurrency } from "@/lib/invoice-types";
+import { invoiceFormSchema, availableCurrencies } from "@/lib/invoice-types";
 import { getInvoiceData, saveInvoiceData } from "@/lib/invoice-store";
 import { getCompanyProfile, getClients, getSavedItems } from "@/lib/settings-store";
 import { Label } from "@/components/ui/label";
@@ -90,23 +91,27 @@ const defaultItem: LineItem = {
 };
 
 const generateDefaultFormValues = (companyProfile?: CompanyProfileData | null): InvoiceFormSchemaType => {
+  const profile = companyProfile || getCompanyProfile() || { currency: availableCurrencies[0], defaultTemplateStyle: 'classic', showClientAddressOnInvoice: true};
   return {
     invoiceNumber: String(Date.now()).slice(-6),
     customerName: "",
-    companyName: companyProfile?.companyName || "",
+    customerAddress: "",
+    customerEmail: "",
+    customerPhone: "",
+    companyName: profile?.companyName || "",
     invoiceDate: new Date(),
     dueDate: undefined,
     items: [defaultItem],
     globalDiscountType: 'percentage',
     globalDiscountValue: 0,
-    invoiceNotes: companyProfile?.defaultInvoiceNotes || "",
-    termsAndConditions: companyProfile?.defaultTermsAndConditions || "",
+    invoiceNotes: profile?.defaultInvoiceNotes || "",
+    termsAndConditions: profile?.defaultTermsAndConditions || "",
     companyLogoFile: undefined,
     watermarkFile: undefined,
     watermarkOpacity: 0.05,
     themeColor: 'default',
     fontTheme: 'default',
-    templateStyle: companyProfile?.defaultTemplateStyle || 'classic',
+    templateStyle: profile?.defaultTemplateStyle || 'classic',
   };
 };
 
@@ -123,13 +128,24 @@ export function InvoiceForm() {
 
   const [clients, setClients] = useState<ClientData[]>([]);
   const [savedItems, setSavedItems] = useState<SavedItemData[]>([]);
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfileData | null>(null);
+  const [currentCurrency, setCurrentCurrency] = useState<AvailableCurrency>(availableCurrencies[0]);
 
   const watermarkFileRef = useRef<HTMLInputElement | null>(null);
   const companyLogoFileRef = useRef<HTMLInputElement | null>(null);
 
+  useEffect(() => {
+    const profile = getCompanyProfile();
+    setCompanyProfile(profile);
+    setCurrentCurrency(profile?.currency || availableCurrencies[0]);
+    setClients(getClients());
+    setSavedItems(getSavedItems());
+  }, []);
+
+
   const form = useForm<InvoiceFormSchemaType>({
     resolver: zodResolver(invoiceFormSchema),
-    defaultValues: generateDefaultFormValues(getCompanyProfile()),
+    defaultValues: generateDefaultFormValues(companyProfile),
     mode: "onChange",
   });
 
@@ -144,6 +160,19 @@ export function InvoiceForm() {
   const watchedWatermarkOpacity = watch("watermarkOpacity");
   const watchedGlobalDiscountType = watch("globalDiscountType");
   const watchedGlobalDiscountValue = watch("globalDiscountValue");
+  const watchedCustomerName = watch("customerName"); // To react to client selection
+
+  // Update client details when a saved client is selected
+  useEffect(() => {
+    if (watchedCustomerName) {
+        const selectedClient = clients.find(c => c.name === watchedCustomerName);
+        if (selectedClient) {
+            setValue('customerAddress', selectedClient.address || '');
+            setValue('customerEmail', selectedClient.email || '');
+            setValue('customerPhone', selectedClient.phone || '');
+        }
+    }
+  }, [watchedCustomerName, clients, setValue]);
 
 
   const { calculatedSubTotal, calculatedTotalFee } = useMemo(() => {
@@ -152,7 +181,7 @@ export function InvoiceForm() {
       watchedItems.forEach((item) => {
         const quantity = Number(item.quantity) || 0;
         const rate = Number(item.rate) || 0;
-        const itemDiscountForItem = Number(item.discount) || 0; // per-item discount
+        const itemDiscountForItem = Number(item.discount) || 0; 
 
         const itemSubtotal = quantity * rate;
         subTotal += itemSubtotal * (1 - itemDiscountForItem / 100);
@@ -175,13 +204,10 @@ export function InvoiceForm() {
   }, [watchedItems, watchedGlobalDiscountType, watchedGlobalDiscountValue]);
 
 
-  useEffect(() => {
-    setClients(getClients());
-    setSavedItems(getSavedItems());
-  }, []);
-
   const resetFormToDefaults = () => {
     const profile = getCompanyProfile();
+    setCompanyProfile(profile);
+    setCurrentCurrency(profile?.currency || availableCurrencies[0]);
     const defaults = generateDefaultFormValues(profile);
     reset(defaults);
     setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
@@ -192,8 +218,11 @@ export function InvoiceForm() {
 
   useEffect(() => {
     const invoiceIdToEdit = searchParams.get('id');
-    const companyProfile = getCompanyProfile();
-    let baseFormValues = generateDefaultFormValues(companyProfile);
+    const profile = getCompanyProfile(); // Re-fetch for latest defaults
+    setCompanyProfile(profile);
+    setCurrentCurrency(profile?.currency || availableCurrencies[0]);
+
+    let baseFormValues = generateDefaultFormValues(profile);
 
     const duplicateId = searchParams.get('duplicate');
     if (duplicateId && !initialDataLoaded) {
@@ -212,13 +241,13 @@ export function InvoiceForm() {
             })) || [defaultItem];
 
             const formData: InvoiceFormSchemaType = {
-                ...baseFormValues,
-                ...sourceInvoice,
+                ...baseFormValues, // Start with current defaults
+                ...sourceInvoice, // Override with source invoice data
                 invoiceNumber: `COPY-${sourceInvoice.invoiceNumber}-${String(Date.now()).slice(-4)}`,
-                invoiceDate: new Date(),
+                invoiceDate: new Date(), // New date for duplicated invoice
                 dueDate: sourceInvoice.dueDate ? parseISO(sourceInvoice.dueDate) : undefined,
                 items: duplicatedItems.length > 0 ? duplicatedItems : [defaultItem],
-                companyLogoFile: undefined,
+                companyLogoFile: undefined, // Don't carry over file objects
                 watermarkFile: undefined,
                 companyName: sourceInvoice.companyName || baseFormValues.companyName,
                 invoiceNotes: sourceInvoice.invoiceNotes || baseFormValues.invoiceNotes,
@@ -229,21 +258,21 @@ export function InvoiceForm() {
                 templateStyle: sourceInvoice.templateStyle ?? baseFormValues.templateStyle,
                 globalDiscountType: sourceInvoice.globalDiscountType ?? baseFormValues.globalDiscountType,
                 globalDiscountValue: sourceInvoice.globalDiscountValue ?? baseFormValues.globalDiscountValue,
+                // Client specific details from source
+                customerName: sourceInvoice.customerName,
+                customerAddress: sourceInvoice.customerAddress || '',
+                customerEmail: sourceInvoice.customerEmail || '',
+                customerPhone: sourceInvoice.customerPhone || '',
             };
             reset(formData);
             if (sourceInvoice.watermarkDataUrl) setWatermarkPreview(sourceInvoice.watermarkDataUrl);
-            if (sourceInvoice.companyLogoDataUrl) {
-              setCompanyLogoPreview(sourceInvoice.companyLogoDataUrl);
-            } else if (companyProfile?.companyLogoDataUrl) {
-              setCompanyLogoPreview(companyProfile.companyLogoDataUrl);
-            } else {
-              setCompanyLogoPreview(null);
-            }
+            // Set company logo: 1. From source invoice, 2. From current profile, 3. Null
+            setCompanyLogoPreview(sourceInvoice.companyLogoDataUrl || profile?.companyLogoDataUrl || null);
             toast({ title: "Invoice Duplicated", description: "Review and update the details below.", variant: "default" });
         } else {
             toast({ title: "Duplication Error", description: "Could not load source invoice for duplication. Using defaults.", variant: "destructive" });
             reset(baseFormValues);
-            setCompanyLogoPreview(baseFormValues.companyLogoFile ? URL.createObjectURL(baseFormValues.companyLogoFile[0]) : companyProfile?.companyLogoDataUrl || null);
+            setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
             setWatermarkPreview(null);
         }
         setInitialDataLoaded(true);
@@ -267,11 +296,11 @@ export function InvoiceForm() {
         })) || [defaultItem];
 
         const formData: InvoiceFormSchemaType = {
-          ...baseFormValues,
-          ...data,
+          ...baseFormValues, // Start with defaults
+          ...data, // Override with stored invoice data
           invoiceNumber: data.invoiceNumber || baseFormValues.invoiceNumber,
-          invoiceDate: data.invoiceDate ? (parseISO(data.invoiceDate) instanceof Date && !isNaN(parseISO(data.invoiceDate).valueOf()) ? parseISO(data.invoiceDate) : new Date()) : new Date(),
-          dueDate: data.dueDate ? (parseISO(data.dueDate) instanceof Date && !isNaN(parseISO(data.dueDate).valueOf()) ? parseISO(data.dueDate) : undefined) : undefined,
+          invoiceDate: data.invoiceDate ? (isValid(parseISO(data.invoiceDate)) ? parseISO(data.invoiceDate) : new Date()) : new Date(),
+          dueDate: data.dueDate ? (isValid(parseISO(data.dueDate)) ? parseISO(data.dueDate) : undefined) : undefined,
           items: formItems.length > 0 ? formItems : [defaultItem],
           companyLogoFile: undefined,
           watermarkFile: undefined,
@@ -284,31 +313,31 @@ export function InvoiceForm() {
           themeColor: data.themeColor ?? baseFormValues.themeColor,
           fontTheme: data.fontTheme ?? baseFormValues.fontTheme,
           templateStyle: data.templateStyle ?? baseFormValues.templateStyle,
+          // Client specific details
+          customerName: data.customerName,
+          customerAddress: data.customerAddress || '',
+          customerEmail: data.customerEmail || '',
+          customerPhone: data.customerPhone || '',
         };
         reset(formData);
 
         if (data.watermarkDataUrl) setWatermarkPreview(data.watermarkDataUrl);
-        if (data.companyLogoDataUrl) {
-          setCompanyLogoPreview(data.companyLogoDataUrl);
-        } else if (companyProfile?.companyLogoDataUrl) {
-          setCompanyLogoPreview(companyProfile.companyLogoDataUrl);
-        } else {
-          setCompanyLogoPreview(null);
-        }
+        setCompanyLogoPreview(data.companyLogoDataUrl || profile?.companyLogoDataUrl || null);
       } else {
         toast({ title: "Edit Error", description: "Could not load invoice data for editing. Using defaults.", variant: "destructive" });
         reset(baseFormValues);
-        setCompanyLogoPreview(baseFormValues.companyLogoFile ? URL.createObjectURL(baseFormValues.companyLogoFile[0]) : companyProfile?.companyLogoDataUrl || null);
+        setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
         setWatermarkPreview(null);
       }
       setInitialDataLoaded(true);
     } else if (!initialDataLoaded) {
       reset(baseFormValues);
-      setCompanyLogoPreview(baseFormValues.companyLogoFile ? URL.createObjectURL(baseFormValues.companyLogoFile[0]) : companyProfile?.companyLogoDataUrl || null);
+      setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
       setWatermarkPreview(null);
       setInitialDataLoaded(true);
     }
-  }, [searchParams, reset, toast, initialDataLoaded, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, reset, toast, initialDataLoaded, router, companyProfile]); // Added companyProfile to deps
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -335,21 +364,24 @@ export function InvoiceForm() {
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setCompanyLogoPreview(dataUrl);
-        } else {
+        } else { // File read error, revert
           setValue('companyLogoFile', undefined, { shouldValidate: true });
           setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
         }
       });
     } else {
+      // If file input is cleared (watchedCompanyLogoFile becomes undefined or empty array)
+      // or if it was never set (e.g., on initial load of an existing invoice with a logo)
       const currentLogoFileValue = getValues('companyLogoFile');
       if (!currentLogoFileValue || currentLogoFileValue.length === 0) {
-        if (existingData?.companyLogoDataUrl) {
-          setCompanyLogoPreview(existingData.companyLogoDataUrl);
-        } else if (profileData?.companyLogoDataUrl) {
-          setCompanyLogoPreview(profileData.companyLogoDataUrl);
-        } else {
-          setCompanyLogoPreview(null);
-        }
+          // Prioritize existing invoice logo, then profile logo
+          if (existingData?.companyLogoDataUrl) {
+              setCompanyLogoPreview(existingData.companyLogoDataUrl);
+          } else if (profileData?.companyLogoDataUrl) {
+              setCompanyLogoPreview(profileData.companyLogoDataUrl);
+          } else {
+              setCompanyLogoPreview(null);
+          }
       }
     }
   }, [watchedCompanyLogoFile, searchParams, setValue, toast, getValues]);
@@ -360,7 +392,7 @@ export function InvoiceForm() {
 
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
-      if (file.size > 5 * 1024 * 1024) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
         toast({ variant: "destructive", title: "Watermark File Too Large", description: "Watermark must be less than 5MB." });
         setValue('watermarkFile', undefined, { shouldValidate: true });
         setWatermarkPreview(existingData?.watermarkDataUrl || null);
@@ -375,28 +407,30 @@ export function InvoiceForm() {
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setWatermarkPreview(dataUrl);
-        } else {
-          setValue('watermarkFile', undefined, { shouldValidate: true });
-          setWatermarkPreview(existingData?.watermarkDataUrl || null);
+        } else { // File read error, revert
+            setValue('watermarkFile', undefined, { shouldValidate: true });
+            setWatermarkPreview(existingData?.watermarkDataUrl || null);
         }
       });
     } else {
+      // If file input is cleared or on initial load for an existing invoice
       const currentWatermarkFileValue = getValues('watermarkFile');
-       if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
+      if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
         setWatermarkPreview(existingData.watermarkDataUrl);
       } else if (!existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
+        // No existing watermark and no file selected, ensure preview is null
         setWatermarkPreview(null);
       }
     }
   }, [watchedWatermarkFile, searchParams, setValue, toast, getValues]);
 
+
   async function onSubmit(data: InvoiceFormSchemaType) {
     setIsSubmitting(true);
     try {
       const invoiceIdToEdit = searchParams.get('id');
-      const isDuplicating = searchParams.get('duplicate');
+      const isDuplicating = searchParams.get('duplicate'); // This should be cleared by now, but check defensively
       const invoiceId = (invoiceIdToEdit && !isDuplicating) ? invoiceIdToEdit : `inv_${Date.now()}`;
-
 
       let companyLogoDataUrlToStore: string | null = companyLogoPreview;
       if (data.companyLogoFile && data.companyLogoFile.length > 0) {
@@ -404,19 +438,17 @@ export function InvoiceForm() {
          if (newLogoUrl) companyLogoDataUrlToStore = newLogoUrl;
       }
 
-
       let watermarkDataUrlToStore: string | null = watermarkPreview;
        if (data.watermarkFile && data.watermarkFile.length > 0) {
          const newWatermarkUrl = await fileToDataUrl(data.watermarkFile[0], toast);
          if (newWatermarkUrl) watermarkDataUrlToStore = newWatermarkUrl;
       }
 
-
       const itemsToStore: StoredLineItem[] = data.items.map(item => {
         return {
           ...item,
           quantity: Number(item.quantity) || 0,
-          unit: item.unit || '',
+          unit: item.unit || '', // Ensure unit is always a string
           itemStartDate: item.itemStartDate ? item.itemStartDate.toISOString() : undefined,
           itemEndDate: item.itemEndDate ? item.itemEndDate.toISOString() : undefined,
           itemStartTime: item.itemStartTime || undefined,
@@ -427,7 +459,10 @@ export function InvoiceForm() {
 
       const finalSubTotal = calculatedSubTotal;
       const finalTotalFee = calculatedTotalFee;
+      const currentProfile = getCompanyProfile(); // Use current profile for currency
 
+      // Placeholder for amount in words
+      const amountInWordsPlaceholder = `[Total ${currentProfile?.currency?.symbol || '₹'}${finalTotalFee.toFixed(2)} in words - Placeholder]`;
 
       const storedData: StoredInvoiceData = {
         id: invoiceId,
@@ -435,6 +470,9 @@ export function InvoiceForm() {
         invoiceDate: data.invoiceDate.toISOString(),
         dueDate: data.dueDate ? data.dueDate.toISOString() : undefined,
         customerName: data.customerName,
+        customerAddress: data.customerAddress,
+        customerEmail: data.customerEmail,
+        customerPhone: data.customerPhone,
         companyName: data.companyName,
         companyLogoDataUrl: companyLogoDataUrlToStore,
         items: itemsToStore,
@@ -442,6 +480,8 @@ export function InvoiceForm() {
         globalDiscountType: data.globalDiscountType,
         globalDiscountValue: data.globalDiscountValue,
         totalFee: finalTotalFee,
+        currency: currentProfile?.currency || availableCurrencies[0],
+        amountInWords: amountInWordsPlaceholder,
         invoiceNotes: data.invoiceNotes,
         termsAndConditions: data.termsAndConditions,
         watermarkDataUrl: watermarkDataUrlToStore,
@@ -479,6 +519,7 @@ export function InvoiceForm() {
       setValue(`items.${itemIndex}.rate`, selectedSavedItem.rate);
       setValue(`items.${itemIndex}.quantity`, selectedSavedItem.defaultQuantity ?? 1);
       setValue(`items.${itemIndex}.unit`, selectedSavedItem.defaultUnit ?? '');
+      // Clear date/time fields when loading a generic saved item
       setValue(`items.${itemIndex}.itemStartDate`, undefined);
       setValue(`items.${itemIndex}.itemEndDate`, undefined);
       setValue(`items.${itemIndex}.itemStartTime`, '');
@@ -564,7 +605,7 @@ export function InvoiceForm() {
                   name="dueDate"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Due Date (Optional)</FormLabel>
+                      <FormLabel className="flex items-center"><CalendarClock className="mr-1 h-4 w-4 text-muted-foreground" /> Due Date (Optional)</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -580,7 +621,7 @@ export function InvoiceForm() {
                               ) : (
                                 <span>Pick a due date</span>
                               )}
-                              <CalendarClock className="ml-auto h-4 w-4 opacity-50" />
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
@@ -677,7 +718,22 @@ export function InvoiceForm() {
                   <FormItem>
                     <FormLabel>Customer Name *</FormLabel>
                     {clients.length > 0 ? (
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <Select 
+                        onValueChange={(value) => {
+                            field.onChange(value);
+                            const selectedClient = clients.find(c => c.name === value);
+                            if (selectedClient) {
+                                setValue('customerAddress', selectedClient.address || '');
+                                setValue('customerEmail', selectedClient.email || '');
+                                setValue('customerPhone', selectedClient.phone || '');
+                            } else { // Clear fields if typed name doesn't match a saved client
+                                setValue('customerAddress', '');
+                                setValue('customerEmail', '');
+                                setValue('customerPhone', '');
+                            }
+                        }} 
+                        value={field.value || ""}
+                       >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select or type a customer name" />
@@ -701,6 +757,48 @@ export function InvoiceForm() {
                   </FormItem>
                 )}
               />
+              <FormField
+                  control={form.control}
+                  name="customerAddress"
+                  render={({ field }) => (
+                  <FormItem>
+                      <FormLabel className="flex items-center"><MapPin className="mr-1 h-4 w-4 text-muted-foreground" /> Client Address (Optional)</FormLabel>
+                      <FormControl>
+                      <Textarea placeholder="123 Tech Park, Info City" {...field} rows={2} />
+                      </FormControl>
+                      <FormMessage />
+                  </FormItem>
+                  )}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                    control={form.control}
+                    name="customerEmail"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel className="flex items-center"><Mail className="mr-1 h-4 w-4 text-muted-foreground" /> Client Email (Optional)</FormLabel>
+                        <FormControl>
+                        <Input type="email" placeholder="client@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="customerPhone"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel className="flex items-center"><Phone className="mr-1 h-4 w-4 text-muted-foreground" /> Client Phone (Optional)</FormLabel>
+                        <FormControl>
+                        <Input type="tel" placeholder="+91 1234567890" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+              </div>
+
 
             <Separator className="my-6" />
 
@@ -777,7 +875,7 @@ export function InvoiceForm() {
 
 
                   let quantityLabel = "Quantity *";
-                  let rateLabel = "Rate (₹) *";
+                  let rateLabel = `Rate (${currentCurrency.symbol}) *`;
                   let isQuantityReadOnly = false;
                   let isUnitReadOnly = false;
 
@@ -798,14 +896,14 @@ export function InvoiceForm() {
 
                           if (endDateObj_render.getTime() > startDateObj_render.getTime()) {
                               quantityLabel = "Hours (Auto)";
-                              rateLabel = "Rate/Hour (₹) *";
+                              rateLabel = `Rate/Hour (${currentCurrency.symbol}) *`;
                               isQuantityReadOnly = true;
                               isUnitReadOnly = true;
                           }
                       }
                   } else if (itemStartDate && itemEndDate && isValid(itemStartDate) && isValid(itemEndDate) && itemEndDate >= itemStartDate) {
                       quantityLabel = "Days (Auto)";
-                      rateLabel = "Rate/Day (₹) *";
+                      rateLabel = `Rate/Day (${currentCurrency.symbol}) *`;
                       isQuantityReadOnly = true;
                       isUnitReadOnly = true;
                   }
@@ -845,7 +943,7 @@ export function InvoiceForm() {
                             </SelectTrigger>
                             <SelectContent>
                                 {savedItems.map(si => (
-                                    <SelectItem key={si.id} value={si.id}>{si.description} (₹{si.rate})</SelectItem>
+                                    <SelectItem key={si.id} value={si.id}>{si.description} ({currentCurrency.symbol}{si.rate})</SelectItem>
                                 ))}
                             </SelectContent>
                            </Select>
@@ -957,7 +1055,8 @@ export function InvoiceForm() {
                                 readOnly={isQuantityReadOnly}
                                 onChange={e => {
                                   if (!isQuantityReadOnly) {
-                                    field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value));
+                                    const val = e.target.value;
+                                    field.onChange(val === '' ? '' : parseFloat(val));
                                   }
                                 }}
                                 className={isQuantityReadOnly ? "bg-muted/50" : ""}
@@ -1007,7 +1106,10 @@ export function InvoiceForm() {
                                 placeholder="100.00"
                                 {...field}
                                 value={field.value ?? ''}
-                                onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    field.onChange(val === '' ? '' : parseFloat(val));
+                                }}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1042,7 +1144,7 @@ export function InvoiceForm() {
                         )}
                       />
                        <div className="text-sm text-muted-foreground whitespace-nowrap pb-2">
-                            Amount: ₹{itemAmount}
+                            Amount: {currentCurrency.symbol}{itemAmount}
                        </div>
                     </div>
                     {fields.length > 1 && (
@@ -1092,7 +1194,7 @@ export function InvoiceForm() {
                                             <FormControl>
                                                 <RadioGroupItem value="fixed" />
                                             </FormControl>
-                                            <FormLabel className="font-normal">Fixed Amount (₹)</FormLabel>
+                                            <FormLabel className="font-normal">Fixed Amount ({currentCurrency.symbol})</FormLabel>
                                         </FormItem>
                                     </RadioGroup>
                                 </FormControl>
@@ -1110,7 +1212,7 @@ export function InvoiceForm() {
                                      <div className="relative">
                                          {watch("globalDiscountType") === 'percentage' ?
                                             <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /> :
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{currentCurrency.symbol}</span>
                                          }
                                         <Input
                                             type="number"
@@ -1137,12 +1239,12 @@ export function InvoiceForm() {
             </div>
 
             <div className="text-right space-y-1">
-                <h3 className="text-lg text-muted-foreground">Subtotal (All Items): <span className="font-semibold">₹{calculatedSubTotal.toFixed(2)}</span></h3>
+                <h3 className="text-lg text-muted-foreground">Subtotal (All Items): <span className="font-semibold">{currentCurrency.symbol}{calculatedSubTotal.toFixed(2)}</span></h3>
                 { (Number(watchedGlobalDiscountValue) || 0) > 0 &&
                   <h3 className="text-lg text-muted-foreground">
                     Global Discount:
                     <span className="font-semibold">
-                       -₹{
+                       - {currentCurrency.symbol}{
                          watchedGlobalDiscountType === 'percentage'
                            ? (calculatedSubTotal * (Number(watchedGlobalDiscountValue) || 0) / 100).toFixed(2)
                            : (Number(watchedGlobalDiscountValue) || 0).toFixed(2)
@@ -1150,7 +1252,7 @@ export function InvoiceForm() {
                     </span>
                   </h3>
                 }
-                <h3 className="text-2xl font-bold">Total Amount Due: <span className="text-primary">₹{calculatedTotalFee.toFixed(2)}</span></h3>
+                <h3 className="text-2xl font-bold">Total Amount Due: <span className="text-primary">{currentCurrency.symbol}{calculatedTotalFee.toFixed(2)}</span></h3>
             </div>
 
 
@@ -1173,9 +1275,10 @@ export function InvoiceForm() {
                         <SelectContent>
                           <SelectItem value="classic">Classic - Traditional and professional</SelectItem>
                           <SelectItem value="modern">Modern - Sleek and contemporary</SelectItem>
+                          <SelectItem value="compact">Compact - Minimalist and space-saving</SelectItem>
                         </SelectContent>
                       </Select>
-                      <FormDescription>Choose a visual style for your invoice.</FormDescription>
+                      <FormDescription>Choose a visual style for your invoice. Default from Settings.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1196,10 +1299,13 @@ export function InvoiceForm() {
                         </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                        <SelectItem value="default">Default</SelectItem>
+                        <SelectItem value="default">Default Blue</SelectItem>
                         <SelectItem value="classic-blue">Classic Blue</SelectItem>
                         <SelectItem value="emerald-green">Emerald Green</SelectItem>
                         <SelectItem value="crimson-red">Crimson Red</SelectItem>
+                        <SelectItem value="slate-gray">Slate Gray</SelectItem>
+                        <SelectItem value="deep-purple">Deep Purple</SelectItem>
+                        <SelectItem value="monochrome">Monochrome (B&amp;W)</SelectItem>
                         </SelectContent>
                     </Select>
                     <FormDescription>Choose a color palette for your invoice.</FormDescription>
@@ -1304,7 +1410,7 @@ export function InvoiceForm() {
                       </div>
                       <FormControl>
                         <Slider
-                          value={[ (field.value ?? generateDefaultFormValues().watermarkOpacity ?? 0.05) * 100 ]}
+                          value={[ (field.value ?? generateDefaultFormValues(companyProfile).watermarkOpacity ?? 0.05) * 100 ]}
                           onValueChange={(value) => field.onChange(value[0] / 100)}
                           max={100}
                           step={1}
@@ -1383,3 +1489,5 @@ export function InvoiceForm() {
     </Card>
   );
 }
+
+    

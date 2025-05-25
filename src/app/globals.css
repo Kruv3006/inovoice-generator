@@ -44,7 +44,7 @@
     --invoice-background: hsl(0 0% 100%);
     --invoice-text: hsl(220 15% 20%);
     --invoice-muted-text: hsl(220 10% 40%);
-    --invoice-primary-color-hsl: 217 91% 55%;
+    --invoice-primary-color-hsl: 217 91% 55%; /* Default Theme Blue */
     --invoice-primary-color: hsl(var(--invoice-primary-color-hsl));
     --invoice-border-color: hsl(220 15% 85%);
     --invoice-header-bg: hsl(220 20% 95%);
@@ -96,7 +96,7 @@
     --invoice-background: hsl(220 15% 15%);
     --invoice-text: hsl(220 15% 92%);
     --invoice-muted-text: hsl(220 10% 60%);
-    --invoice-primary-color-hsl: 217 91% 65%;
+    --invoice-primary-color-hsl: 217 91% 65%; /* Default Theme Blue (Dark) */
     --invoice-primary-color: hsl(var(--invoice-primary-color-hsl));
     --invoice-border-color: hsl(220 15% 35%);
     --invoice-header-bg: hsl(220 15% 20%);
@@ -104,7 +104,6 @@
 
   /* Invoice Color Themes - Light Mode Definitions */
   .theme-default { /* Uses root variables by default for invoice light */ }
-
   .theme-classic-blue {
     --invoice-primary-color-hsl: 210 80% 50%;
     --invoice-header-bg: hsl(210 50% 96%);
@@ -120,8 +119,27 @@
     --invoice-header-bg: hsl(340 50% 96%);
     --invoice-border-color: hsl(340 40% 85%);
   }
+  .theme-slate-gray {
+    --invoice-primary-color-hsl: 220 10% 40%;
+    --invoice-header-bg: hsl(220 10% 95%);
+    --invoice-border-color: hsl(220 10% 80%);
+  }
+  .theme-deep-purple {
+    --invoice-primary-color-hsl: 260 50% 55%;
+    --invoice-header-bg: hsl(260 30% 95%);
+    --invoice-border-color: hsl(260 25% 80%);
+  }
+  .theme-monochrome {
+    --invoice-primary-color-hsl: 0 0% 20%; /* Dark gray for primary */
+    --invoice-header-bg: hsl(0 0% 95%); /* Very light gray */
+    --invoice-border-color: hsl(0 0% 80%); /* Light gray */
+    --invoice-text: hsl(0 0% 10%); /* Almost black text */
+    --invoice-muted-text: hsl(0 0% 40%); /* Medium gray */
+  }
+
 
   /* Invoice Color Themes - Dark Mode Overrides */
+  .dark .theme-default { /* Uses dark root variables by default */ }
   .dark .theme-classic-blue {
     --invoice-primary-color-hsl: 210 75% 60%;
     --invoice-header-bg: hsl(210 30% 22%);
@@ -137,6 +155,24 @@
     --invoice-header-bg: hsl(340 30% 20%);
     --invoice-border-color: hsl(340 25% 40%);
   }
+  .dark .theme-slate-gray {
+    --invoice-primary-color-hsl: 220 10% 70%;
+    --invoice-header-bg: hsl(220 10% 20%);
+    --invoice-border-color: hsl(220 10% 35%);
+  }
+  .dark .theme-deep-purple {
+    --invoice-primary-color-hsl: 260 50% 70%;
+    --invoice-header-bg: hsl(260 25% 22%);
+    --invoice-border-color: hsl(260 20% 40%);
+  }
+  .dark .theme-monochrome {
+    --invoice-primary-color-hsl: 0 0% 80%; /* Light gray for primary in dark */
+    --invoice-header-bg: hsl(0 0% 18%); /* Darker gray */
+    --invoice-border-color: hsl(0 0% 35%); /* Medium-dark gray */
+    --invoice-text: hsl(0 0% 92%); /* Off-white text */
+    --invoice-muted-text: hsl(0 0% 60%); /* Lighter gray */
+  }
+
 
   /* Class to force invoice to render with light theme variables */
   .invoice-render-light {
@@ -165,6 +201,23 @@
     --invoice-primary-color-hsl: 340 70% 45% !important;
     --invoice-header-bg: hsl(340 50% 96%) !important;
     --invoice-border-color: hsl(340 40% 85%) !important;
+  }
+  .invoice-render-light.theme-slate-gray {
+    --invoice-primary-color-hsl: 220 10% 40% !important;
+    --invoice-header-bg: hsl(220 10% 95%) !important;
+    --invoice-border-color: hsl(220 10% 80%) !important;
+  }
+  .invoice-render-light.theme-deep-purple {
+    --invoice-primary-color-hsl: 260 50% 55% !important;
+    --invoice-header-bg: hsl(260 30% 95%) !important;
+    --invoice-border-color: hsl(260 25% 80%) !important;
+  }
+  .invoice-render-light.theme-monochrome {
+    --invoice-primary-color-hsl: 0 0% 20% !important;
+    --invoice-header-bg: hsl(0 0% 95%) !important;
+    --invoice-border-color: hsl(0 0% 80%) !important;
+    --invoice-text: hsl(0 0% 10%) !important;
+    --invoice-muted-text: hsl(0 0% 40%) !important;
   }
 
 

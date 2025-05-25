@@ -8,17 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, Edit, Loader2, AlertTriangle, Home, Eye, Mail, Share2, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { StoredInvoiceData } from '@/lib/invoice-types';
+import type { StoredInvoiceData, AvailableCurrency } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
-import { generatePdf as generatePdfFile, generateDoc, generateJpeg } from '@/lib/invoice-generator'; // Renamed to avoid conflict
+import { generatePdf as generatePdfFile, generateDoc, generateJpeg } from '@/lib/invoice-generator';
 import { format, parseISO, isValid } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { availableCurrencies } from '@/lib/invoice-types';
 
 
 const InvoiceTemplate = dynamic(() => import('@/components/invoice-template').then(mod => mod.InvoiceTemplate), {
   ssr: false,
-  loading: () => <p>Loading template...</p>,
+  loading: () => <div className="flex justify-center items-center min-h-[200px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-2">Loading template preview...</p></div>,
 });
 
 
@@ -82,7 +83,8 @@ export default function InvoiceDownloadPage() {
       } else {
         await generator(invoiceData);
       }
-      toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
+      // Generator functions should show their own success toasts now
+      // toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
     } catch (e) {
       console.error(`Error generating ${formatName}:`, e);
       // The generator functions themselves should show specific toasts for errors
@@ -106,22 +108,19 @@ export default function InvoiceDownloadPage() {
 
     try {
       toast({ title: "Preparing PDF...", description: "The invoice PDF is being generated for your email." });
-      // Use the main generatePdfFile which handles toasting on its own
       await generatePdfFile(invoiceData, undefined, invoiceTemplateRef.current);
-      pdfGeneratedSuccessfully = true; // Assume success if no error is thrown by generatePdfFile
-      // generatePdfFile will show success toast.
+      pdfGeneratedSuccessfully = true; 
+      // generatePdfFile handles its own success toast
     } catch (e) {
       console.error("Error generating PDF for email:", e);
       // generatePdfFile should have shown an error toast.
-      // If we reach here, it means generatePdfFile threw an error.
     } finally {
-      setIsGenerating(false); // Ensure this is always reset
+      setIsGenerating(false); 
       if (!pdfGeneratedSuccessfully) {
         return;
       }
     }
 
-    // Proceed to mail if PDF generation was attempted and didn't throw an error that prevented this line.
     const subject = encodeURIComponent(`Invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}`);
     const body = encodeURIComponent(
       `Hello ${invoiceData.customerName || 'Client'},\n\nPlease find attached invoice ${invoiceData.invoiceNumber}.pdf, which should have just downloaded to your computer.\n\nIf you don't see it, please ensure pop-ups are allowed and check your downloads folder.\n\nThank you for your business!\n\nBest regards,\n${invoiceData.companyName || 'Your Company'}`
@@ -148,12 +147,8 @@ export default function InvoiceDownloadPage() {
     setIsGenerating(true);
     toast({ title: "Preparing PDF for sharing..." });
 
-    const docElement = document.documentElement;
-    const wasDark = docElement.classList.contains('dark');
-    if (wasDark) docElement.classList.remove('dark');
-    
-    // Ensure the element being captured is visible and has a light background
     const targetElement = invoiceTemplateRef.current;
+     // Store original styles that might be temporarily changed for capture
     const originalTargetStyle = {
         opacity: targetElement.style.opacity,
         display: targetElement.style.display,
@@ -163,15 +158,18 @@ export default function InvoiceDownloadPage() {
         zIndex: targetElement.style.zIndex,
         backgroundColor: targetElement.style.backgroundColor,
     };
-
-    targetElement.style.display = 'block'; // Ensure it's displayed
+    
+    // Ensure the element being captured is visible and has a light background
+    targetElement.style.display = 'block'; // Ensure it's displayed for html2canvas
     targetElement.style.opacity = '1';
-    targetElement.style.position = 'relative'; // Or 'absolute' if needed, ensure it's in flow for capture
-    targetElement.style.left = '0';
-    targetElement.style.top = '0';
-    targetElement.style.zIndex = 'auto';
     targetElement.style.backgroundColor = 'white'; // Force white background on the container
+    // If it's off-screen, position it onscreen temporarily (could be tricky if layout is complex)
+    // For now, assuming CSS for .printable-invoice-wrapper handles visibility correctly.
 
+    const docElement = document.documentElement;
+    const wasDark = docElement.classList.contains('dark');
+    if (wasDark) docElement.classList.remove('dark');
+    
     await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay for styles
 
     try {
@@ -183,9 +181,9 @@ export default function InvoiceDownloadPage() {
         const canvas = await html2canvas(targetElement, {
             scale: 2,
             useCORS: true,
-            logging: false, // Set to true for debugging
-            backgroundColor: '#FFFFFF', // Explicit white background for canvas
-            scrollX: -window.scrollX, // Capture from top-left
+            logging: false, 
+            backgroundColor: '#FFFFFF', 
+            scrollX: -window.scrollX, 
             scrollY: -window.scrollY,
             windowWidth: targetElement.scrollWidth,
             windowHeight: targetElement.scrollHeight,
@@ -216,12 +214,13 @@ export default function InvoiceDownloadPage() {
             });
             toast({ title: "Shared successfully!" });
         } else {
-            await navigator.share({
+            // Fallback for browsers that support navigator.share but not sharing files directly
+             await navigator.share({
                 title: `Invoice ${invoiceData.invoiceNumber}`,
                 text: `View invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}. Please download separately.`,
-                url: window.location.href,
+                url: window.location.href, // Share link to the current page
             });
-            toast({ title: "Shared link/text successfully!" });
+            toast({ title: "Shared link/text successfully! File sharing not fully supported." });
         }
     } catch (error) {
         console.error('Error sharing invoice:', error);
@@ -229,12 +228,13 @@ export default function InvoiceDownloadPage() {
     } finally {
         // Restore original styles for the target element
         targetElement.style.opacity = originalTargetStyle.opacity;
-        targetElement.style.display = originalTargetStyle.display;
-        targetElement.style.position = originalTargetStyle.position;
-        targetElement.style.left = originalTargetStyle.left;
-        targetElement.style.top = originalTargetStyle.top;
-        targetElement.style.zIndex = originalTargetStyle.zIndex;
+        targetElement.style.display = originalTargetStyle.display; // Important to restore if changed
         targetElement.style.backgroundColor = originalTargetStyle.backgroundColor;
+        // If other styles like position, left, top, zIndex were changed, restore them too.
+        // targetElement.style.position = originalTargetStyle.position;
+        // targetElement.style.left = originalTargetStyle.left;
+        // targetElement.style.top = originalTargetStyle.top;
+        // targetElement.style.zIndex = originalTargetStyle.zIndex;
 
         if (wasDark) docElement.classList.add('dark');
         setIsGenerating(false);
@@ -248,11 +248,9 @@ export default function InvoiceDownloadPage() {
     }
     document.body.classList.add('print-active');
     window.print();
-    // Using a timeout as there's no direct event for print dialog close
-    // Consider using window.onafterprint if broader browser support is acceptable later
     setTimeout(() => {
       document.body.classList.remove('print-active');
-    }, 1000); // Give it a second for the print dialog to usually close
+    }, 1000); 
   };
 
 
@@ -287,13 +285,22 @@ export default function InvoiceDownloadPage() {
   const mainInvoiceDateForDisplay = invoiceData.invoiceDate && isValid(parseISO(invoiceData.invoiceDate))
     ? parseISO(invoiceData.invoiceDate)
     : new Date();
+  
+  const currentCurrency = invoiceData.currency || availableCurrencies[0];
+  const formatCurrencyLocal = (amount?: number) => {
+    if (typeof amount !== 'number') return `${currentCurrency.symbol}0.00`;
+    try {
+        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: currentCurrency.code, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+    } catch (e) {
+        return `${currentCurrency.symbol}${amount.toFixed(2)}`;
+    }
+  };
 
 
   return (
     <div className="py-8 bg-muted/40 dark:bg-muted/20 min-h-[calc(100vh-4rem)]">
-      {/* Off-screen invoice template for generation and printing */}
-      <div className="printable-invoice-wrapper"> {/* This wrapper is controlled by print CSS */}
-        <div ref={invoiceTemplateRef} id="invoice-capture-area" className="bg-white"> {/* Ensure this div itself has a white background for capture consistency */}
+      <div className="printable-invoice-wrapper"> 
+        <div ref={invoiceTemplateRef} id="invoice-capture-area" className="bg-white"> 
           {invoiceData && <InvoiceTemplate data={invoiceData} forceLightMode={true} />}
         </div>
       </div>
@@ -381,8 +388,11 @@ export default function InvoiceDownloadPage() {
             <p><strong>Invoice Number:</strong> {invoiceData.invoiceNumber}</p>
             <p><strong>Company:</strong> {invoiceData.companyName}</p>
             <p><strong>Customer:</strong> {invoiceData.customerName}</p>
-            <p><strong>Total Amount:</strong> {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(invoiceData.totalFee || 0)}</p>
+            <p><strong>Total Amount:</strong> {formatCurrencyLocal(invoiceData.totalFee || 0)}</p>
             <p><strong>Invoice Date:</strong> {format(mainInvoiceDateForDisplay, "MMMM d, yyyy")}</p>
+            {invoiceData.dueDate && isValid(parseISO(invoiceData.dueDate)) && 
+                <p><strong>Due Date:</strong> {format(parseISO(invoiceData.dueDate), "MMMM d, yyyy")}</p>
+            }
           </CardContent>
         </Card>
       </div>

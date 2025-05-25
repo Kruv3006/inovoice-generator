@@ -1,9 +1,17 @@
 
-import type { StoredInvoiceData } from './invoice-types';
+import type { StoredInvoiceData, AvailableCurrency } from './invoice-types';
 import { format, parseISO, isValid } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { toast } from '@/hooks/use-toast';
+// Placeholder for number to words - replace with actual implementation if needed
+// import { numberToWords } from './number-to-words'; 
+
+const formatCurrencyForDoc = (amount?: number, currency?: AvailableCurrency) => {
+  if (typeof amount !== 'number') return `${currency?.symbol || '₹'}0.00`;
+  const currentCurrency = currency || { symbol: '₹', code: 'INR', name: 'Indian Rupee' };
+  return `${currentCurrency.symbol}${amount.toFixed(2)}`;
+};
 
 const simulateDownload = (filename: string, dataUrlOrContent: string, mimeType: string, isDataUrl: boolean = false) => {
   const link = document.createElement('a');
@@ -26,32 +34,29 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   const {
     companyName, customerName, invoiceNumber, invoiceDate, dueDate,
     items, subTotal, globalDiscountType, globalDiscountValue, totalFee, invoiceNotes, termsAndConditions,
-    companyLogoDataUrl, watermarkDataUrl, watermarkOpacity, themeColor = 'default', fontTheme = 'default', templateStyle = 'classic'
+    companyLogoDataUrl, watermarkDataUrl, watermarkOpacity, currency, amountInWords,
+    themeColor = 'default', fontTheme = 'default', templateStyle = 'classic',
+    customerAddress, customerEmail, customerPhone,
   } = data;
 
-  // For DOC, always use light theme values
+  const currentCurrency = currency || { symbol: '₹', code: 'INR', name: 'Indian Rupee' };
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
   const invoiceBgColorDoc = 'hsl(0 0% 100%)';
-  const textColorDoc = 'hsl(220 15% 20%)';
-  const mutedTextColorDoc = 'hsl(220 10% 40%)';
-  let primaryColorDoc = 'hsl(217 91% 55%)'; // Default light primary
+  const textColorDoc = 'hsl(0 0% 10%)'; // Adjusted for B/W theme potential
+  const mutedTextColorDoc = 'hsl(0 0% 40%)';
+  let primaryColorDoc = 'hsl(217 91% 55%)'; 
   let headerBgColorDoc = 'hsl(220 20% 95%)';
   let borderColorDoc = 'hsl(220 15% 85%)';
 
 
-  if (themeColor === 'classic-blue') {
-    primaryColorDoc = 'hsl(210 80% 50%)';
-    headerBgColorDoc = 'hsl(210 50% 96%)';
-    borderColorDoc = 'hsl(210 30% 80%)';
-  } else if (themeColor === 'emerald-green') {
-    primaryColorDoc = 'hsl(145 63% 40%)';
-    headerBgColorDoc = 'hsl(145 40% 95%)';
-    borderColorDoc = 'hsl(145 30% 80%)';
-  } else if (themeColor === 'crimson-red') {
-    primaryColorDoc = 'hsl(340 70% 45%)';
-    headerBgColorDoc = 'hsl(340 50% 96%)';
-    borderColorDoc = 'hsl(340 40% 85%)';
-  }
+  // Apply Theme Colors (Light Mode Version)
+  if (themeColor === 'classic-blue') { primaryColorDoc = 'hsl(210 80% 50%)'; headerBgColorDoc = 'hsl(210 50% 96%)'; borderColorDoc = 'hsl(210 30% 80%)'; } 
+  else if (themeColor === 'emerald-green') { primaryColorDoc = 'hsl(145 63% 40%)'; headerBgColorDoc = 'hsl(145 40% 95%)'; borderColorDoc = 'hsl(145 30% 80%)'; }
+  else if (themeColor === 'crimson-red') { primaryColorDoc = 'hsl(340 70% 45%)'; headerBgColorDoc = 'hsl(340 50% 96%)'; borderColorDoc = 'hsl(340 40% 85%)'; }
+  else if (themeColor === 'slate-gray') { primaryColorDoc = 'hsl(220 10% 40%)'; headerBgColorDoc = 'hsl(220 10% 95%)'; borderColorDoc = 'hsl(220 10% 80%)'; }
+  else if (themeColor === 'deep-purple') { primaryColorDoc = 'hsl(260 50% 55%)'; headerBgColorDoc = 'hsl(260 30% 95%)'; borderColorDoc = 'hsl(260 25% 80%)'; }
+  else if (themeColor === 'monochrome') { primaryColorDoc = 'hsl(0 0% 20%)'; headerBgColorDoc = 'hsl(0 0% 95%)'; borderColorDoc = 'hsl(0 0% 80%)'; }
+
 
   let fontFamilyDoc = 'Arial, sans-serif';
   if (fontTheme === 'serif') fontFamilyDoc = 'Georgia, Times New Roman, Times, serif';
@@ -61,10 +66,10 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : new Date();
   const parsedDueDate = dueDate && isValid(parseISO(dueDate)) ? parseISO(dueDate) : null;
   
-  const fCurrency = (val?: number) => val != null ? `₹${val.toFixed(2)}` : '₹0.00';
+  const fCurrency = (val?: number) => formatCurrencyForDoc(val, currentCurrency);
 
   const companyLogoHtml = companyLogoDataUrl
-    ? `<img src="${companyLogoDataUrl}" style="max-height: ${templateStyle === 'modern' ? '50px' : '70px'}; max-width: ${templateStyle === 'modern' ? '150px' : '180px'}; object-fit: contain;" alt="Company Logo"/>`
+    ? `<img src="${companyLogoDataUrl}" style="max-height: ${templateStyle === 'modern' || templateStyle === 'compact' ? '50px' : '70px'}; max-width: ${templateStyle === 'modern' || templateStyle === 'compact' ? '150px' : '180px'}; object-fit: contain;" alt="Company Logo"/>`
     : '';
 
   let itemsHtml = '';
@@ -147,6 +152,13 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     `;
   }
 
+  const clientDetailsHtml = `
+    <p style="margin: 0; color: ${textColorDoc}; font-weight: bold;">${customerName}</p>
+    ${(getCompanyProfile()?.showClientAddressOnInvoice !== false && customerAddress) ? `<p style="margin: 2px 0; white-space: pre-line; color: ${mutedTextColorDoc};">${customerAddress}</p>` : ''}
+    ${customerEmail ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc};">Email: ${customerEmail}</p>` : ''}
+    ${customerPhone ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc};">Phone: ${customerPhone}</p>` : ''}
+  `;
+
   const classicHeaderHtml = `
     <div style="display: table; width: 100%; margin-bottom: 25px; padding-bottom:15px; border-bottom: 1px solid ${borderColorDoc};">
       <div style="display: table-cell; vertical-align: middle; width: 60%;">
@@ -162,7 +174,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     </div>
     <div style="margin-bottom: 25px; font-size: 9.5pt;">
       <h3 style="font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Bill To</h3>
-      <p style="margin: 0; color: ${textColorDoc};">${customerName}</p>
+      ${clientDetailsHtml}
     </div>
   `;
 
@@ -182,25 +194,65 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
         </div>
         <div style="margin-top: 15px; padding-top:10px; border-top: 1px solid ${borderColorDoc}; font-size: 9.5pt;">
             <h3 style="font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">BILL TO:</h3>
-            <p style="margin: 0; color: ${textColorDoc};">${customerName}</p>
+            ${clientDetailsHtml}
         </div>
     </div>
   `;
+
+  const compactHeaderHtml = `
+    <div style="padding-bottom:10px; margin-bottom:15px; border-bottom: 2px solid ${primaryColorDoc};">
+        <table style="width:100%; border-collapse:collapse;">
+            <tr>
+                <td style="width:20%; vertical-align:top;">
+                    ${companyLogoHtml ? `<div>${companyLogoHtml}</div>` : ''}
+                </td>
+                <td style="width:80%; text-align:right; vertical-align:top;">
+                    <div style="font-size:18px; font-weight:bold; color:${primaryColorDoc}; text-transform:uppercase; margin-bottom:5px;">INVOICE</div>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding-top:5px; font-size:8pt;">
+                    <div style="font-weight:bold; color:${textColorDoc};">${companyName || 'Your Company'}</div>
+                </td>
+                <td style="padding-top:5px; text-align:right; font-size:8pt; color:${mutedTextColorDoc};">
+                    <div><strong style="color:${textColorDoc};">Invoice #:</strong> ${invoiceNumber}</div>
+                    <div><strong style="color:${textColorDoc};">Date:</strong> ${format(parsedInvoiceDate, "dd/MM/yyyy")}</div>
+                    ${parsedDueDate ? `<div><strong style="color:${textColorDoc};">Due:</strong> ${format(parsedDueDate, "dd/MM/yyyy")}</div>` : ''}
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div style="margin-bottom:15px; font-size:8pt;">
+        <h3 style="font-size:8pt; font-weight:bold; color:${mutedTextColorDoc}; text-transform:uppercase; margin-bottom:2px; margin-top:0;">BILLED TO:</h3>
+        ${clientDetailsHtml}
+    </div>
+  `;
   
-  const selectedHeaderHtml = templateStyle === 'modern' ? modernHeaderHtml : classicHeaderHtml;
+  let selectedHeaderHtml;
+  switch(templateStyle) {
+    case 'modern': selectedHeaderHtml = modernHeaderHtml; break;
+    case 'compact': selectedHeaderHtml = compactHeaderHtml; break;
+    case 'classic':
+    default: selectedHeaderHtml = classicHeaderHtml;
+  }
 
   const notesAndTermsLayout = (templateStyle === 'modern' && invoiceNotes && termsAndConditions) 
     ? `<tr>
         <td style="vertical-align:top; width:50%; padding-right:10px;">${invoiceNotes ? `<h4 style="font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4><p style="white-space: pre-line; margin-top:0;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>` : ''}</td>
         <td style="vertical-align:top; width:50%; padding-left:10px; border-left: 1px solid ${borderColorDoc};">${termsAndConditions ? `<h4 style="font-size: 8pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:0;">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: 7pt; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>` : ''}</td>
        </tr>`
-    : `<tr><td colspan="2">${invoiceNotes ? `<h4 style="font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4><p style="white-space: pre-line; margin-top:0; margin-bottom:10px;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>` : ''}${termsAndConditions ? `<h4 style="font-size: 8pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:${invoiceNotes ? '10px' : '0'}; border-top:${invoiceNotes ? '1px solid '+borderColorDoc : 'none'}; padding-top:${invoiceNotes ? '10px' : '0'};">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: 7pt; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>` : ''}</td></tr>`;
-
+    : `<tr><td colspan="2">${invoiceNotes ? `<h4 style="font-size: ${templateStyle === 'compact' ? '7pt' : '9pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4><p style="white-space: pre-line; margin-top:0; margin-bottom:10px;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>` : ''}${termsAndConditions ? `<h4 style="font-size: ${templateStyle === 'compact' ? '6pt' : '8pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:${invoiceNotes ? '10px' : '0'}; border-top:${invoiceNotes ? '1px solid '+borderColorDoc : 'none'}; padding-top:${invoiceNotes ? '10px' : '0'};">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'compact' ? '6pt' : '7pt'}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>` : ''}</td></tr>`;
 
   const notesAndTermsHtml = (invoiceNotes || termsAndConditions) ? `
-    <table style="width:100%; margin-top: 25px; padding-top:15px; border-top: 1px solid ${borderColorDoc}; font-size: 9pt; color: ${mutedTextColorDoc};">
+    <table style="width:100%; margin-top: 25px; padding-top:15px; border-top: 1px solid ${borderColorDoc}; font-size: ${templateStyle === 'compact' ? '7pt' : '9pt'}; color: ${mutedTextColorDoc};">
       ${notesAndTermsLayout}
     </table>
+  ` : '';
+
+  const amountInWordsHtml = amountInWords ? `
+    <div style="margin-top:15px; padding-top:10px; border-top: 1px solid ${borderColorDoc}; font-size:${templateStyle === 'compact' ? '7pt' : '8pt'}; color:${mutedTextColorDoc}; font-style: italic;">
+        <strong>Amount in Words:</strong> ${amountInWords}
+    </div>
   ` : '';
 
   return `
@@ -209,17 +261,18 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
         <meta charset="UTF-8">
         <title>Invoice ${invoiceNumber}</title>
         <style>
-          body { font-family: ${fontFamilyDoc}; margin: 0; color: ${textColorDoc}; font-size: 10pt; background-color: #FFFFFF; } /* Ensure body bg is white for DOC */
-          .invoice-container-doc { max-width: 800px; margin: 20px auto; padding: 30px; border: 1px solid ${borderColorDoc}; background-color: ${invoiceBgColorDoc}; position: relative; }
-          .watermark-wrapper-doc { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; overflow: hidden; }
-          .watermark-img-doc { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 70%; max-height: 60%; object-fit: contain; opacity: ${displayWatermarkOpacity}; ${templateStyle === 'modern' ? 'filter: grayscale(50%);' : ''} }
+          body { font-family: ${fontFamilyDoc}; margin: 0; color: ${textColorDoc}; font-size: ${templateStyle === 'compact' ? '9pt' : '10pt'}; background-color: #FFFFFF; }
+          .invoice-container-doc { max-width: 800px; margin: 20px auto; padding: ${templateStyle === 'compact' ? '20px' : '30px'}; border: 1px solid ${borderColorDoc}; background-color: ${invoiceBgColorDoc}; position: relative; }
+          .watermark-wrapper-doc { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; overflow: hidden; display: flex; align-items: center; justify-content: center;}
+          .watermark-img-doc { max-width: 70%; max-height: 60%; object-fit: contain; opacity: ${displayWatermarkOpacity}; ${templateStyle === 'modern' || templateStyle === 'compact' ? 'filter: grayscale(50%);' : ''} }
           .content-wrapper-doc { position:relative; z-index:1; }
-          .items-table-doc { width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 5px; font-size: 9.5pt; border: 1px solid ${borderColorDoc}; border-radius: 6px; overflow: hidden; }
-          .items-table-doc th { padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; ${templateStyle === 'modern' ? 'border-bottom-width:2px; border-bottom-color:'+primaryColorDoc+';' : ''}}
-          .totals-summary-table { width: ${templateStyle === 'modern' ? '50%' : '45%'}; margin-left: auto; margin-bottom: 25px; font-size: 10pt; }
-          .totals-summary-table td { padding: 8px; }
-          .grand-total-line { font-weight: bold; font-size: 14pt; color: ${primaryColorDoc}; background-color: ${primaryColorDoc}1A; padding: 10px 12px; border-radius: 4px; }
-          .footer-section-doc { text-align: center; font-size: 8pt; color: #9ca3af; margin-top: 30px; padding-top: 15px; border-top: 1px solid ${borderColorDoc}; }
+          .items-table-doc { width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 5px; font-size: ${templateStyle === 'compact' ? '8pt' : '9.5pt'}; border: 1px solid ${borderColorDoc}; border-radius: 6px; overflow: hidden; }
+          .items-table-doc th { padding: ${templateStyle === 'compact' ? '6px' : '10px'}; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: ${templateStyle === 'compact' ? '7pt' : '9pt'}; ${templateStyle === 'modern' || templateStyle === 'compact' ? 'border-bottom-width:2px; border-bottom-color:'+primaryColorDoc+';' : ''}}
+          .items-table-doc td { padding: ${templateStyle === 'compact' ? '6px' : '10px'}; border: 1px solid ${borderColorDoc}; vertical-align:top;}
+          .totals-summary-table { width: ${templateStyle === 'modern' || templateStyle === 'compact' ? '50%' : '45%'}; margin-left: auto; margin-bottom: 25px; font-size: ${templateStyle === 'compact' ? '9pt' : '10pt'}; }
+          .totals-summary-table td { padding: ${templateStyle === 'compact' ? '6px' : '8px'}; }
+          .grand-total-line { font-weight: bold; font-size: ${templateStyle === 'compact' ? '12pt' : '14pt'}; color: ${primaryColorDoc}; background-color: ${primaryColorDoc}1A; padding: ${templateStyle === 'compact' ? '8px 10px' : '10px 12px'}; border-radius: 4px; }
+          .footer-section-doc { text-align: center; font-size: ${templateStyle === 'compact' ? '7pt' : '8pt'}; color: #9ca3af; margin-top: 30px; padding-top: 15px; border-top: 1px solid ${borderColorDoc}; }
         </style>
       </head>
       <body>
@@ -230,12 +283,12 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
             <table class="items-table-doc">
               <thead>
                 <tr>
-                  <th style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: left; width: 40%;">Description</th>
-                  <th style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Qty/Dur.</th>
-                  <th style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Unit</th>
-                  <th style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Rate (₹)</th>
-                  <th style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Disc (%)</th>
-                  <th style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Amount (₹)</th>
+                  <th style="text-align: left; width: 40%;">Description</th>
+                  <th style="text-align: right;">Qty/Dur.</th>
+                  <th style="text-align: right;">Unit</th>
+                  <th style="text-align: right;">Rate (${currentCurrency.symbol})</th>
+                  <th style="text-align: right;">Disc (%)</th>
+                  <th style="text-align: right;">Amount (${currentCurrency.symbol})</th>
                 </tr>
               </thead>
               <tbody>${itemsHtml}</tbody>
@@ -243,16 +296,17 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
             <table class="totals-summary-table">
                 <tbody>
                     <tr>
-                        <td colspan="5" style="padding: 8px; text-align: right; font-weight: bold; color: ${mutedTextColorDoc}; border-top: 2px solid ${borderColorDoc};">SUBTOTAL:</td>
-                        <td style="padding: 8px; text-align: right; font-weight: bold; color: ${textColorDoc}; border-top: 2px solid ${borderColorDoc};">${fCurrency(subTotal)}</td>
+                        <td colspan="5" style="text-align: right; font-weight: bold; color: ${mutedTextColorDoc}; border-top: 2px solid ${borderColorDoc};">SUBTOTAL:</td>
+                        <td style="text-align: right; font-weight: bold; color: ${textColorDoc}; border-top: 2px solid ${borderColorDoc};">${fCurrency(subTotal)}</td>
                     </tr>
                     ${globalDiscountHtml}
                     <tr class="grand-total-line">
-                         <td colspan="5" style="padding: 10px 12px; text-align: right; font-weight: bold; font-size: 14pt; color: ${primaryColorDoc};">TOTAL:</td>
-                        <td style="padding: 10px 12px; text-align: right; font-weight: bold; font-size: 14pt; color: ${primaryColorDoc};">${fCurrency(totalFee)}</td>
+                         <td colspan="5" style="text-align: right;">TOTAL:</td>
+                        <td style="text-align: right;">${fCurrency(totalFee)}</td>
                     </tr>
                 </tbody>
             </table>
+            ${amountInWordsHtml}
             ${notesAndTermsHtml}
             <div class="footer-section-doc"><p>Thank you for your business!</p></div>
           </div>
@@ -269,42 +323,42 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
   }
 
   if (elementToCapture.offsetWidth === 0 || elementToCapture.offsetHeight === 0) {
+      console.warn("PDF Capture element has no dimensions (0x0). Capture might fail or be empty.", elementToCapture);
       toast({ variant: "destructive", title: "PDF Error", description: "Capture element has no dimensions." });
       throw new Error("Capture element (PDF) has no dimensions.");
   }
-
+  
   const originalStyle = {
       opacity: elementToCapture.style.opacity,
-      position: elementToCapture.style.position,
-      left: elementToCapture.style.left,
-      top: elementToCapture.style.top,
-      zIndex: elementToCapture.style.zIndex,
+      position: elementToCapture.style.position, // Only if you plan to change it for capture
+      left: elementToCapture.style.left,       // Only if you plan to change it for capture
+      top: elementToCapture.style.top,         // Only if you plan to change it for capture
+      zIndex: elementToCapture.style.zIndex,     // Only if you plan to change it for capture
       backgroundColor: elementToCapture.style.backgroundColor,
   };
   
-  elementToCapture.style.opacity = '1'; // Make fully visible for capture
-  elementToCapture.style.backgroundColor = 'hsl(0 0% 100%)'; // Force white background for capture
+  elementToCapture.style.opacity = '1'; 
+  elementToCapture.style.backgroundColor = 'hsl(0 0% 100%)'; 
 
   const docElement = document.documentElement;
   const wasDark = docElement.classList.contains('dark');
   if (wasDark) {
     docElement.classList.remove('dark');
   }
-  // Allow a very brief moment for styles to re-evaluate based on removed .dark class
-  await new Promise(resolve => setTimeout(resolve, 50));
-
+  
+  await new Promise(resolve => setTimeout(resolve, 100)); // Increased delay slightly
 
   try {
     const canvas = await html2canvas(elementToCapture, {
       scale: 2, 
       useCORS: true,
-      logging: false, // Keep false unless debugging
-      backgroundColor: '#FFFFFF', // Explicit white background for canvas
+      logging: true, // Enable for debugging if issues persist
+      backgroundColor: '#FFFFFF', 
       scrollX: -window.scrollX,
       scrollY: -window.scrollY,
       windowWidth: elementToCapture.scrollWidth,
       windowHeight: elementToCapture.scrollHeight,
-      removeContainer: true,
+      removeContainer: true, // This helps if the library clones the element
     });
 
     if (canvas.width === 0 || canvas.height === 0) {
@@ -325,12 +379,16 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
   } catch (error) {
     console.error("Error generating PDF with html2canvas:", error);
     toast({ variant: "destructive", title: "PDF Generation Error", description: "Could not generate PDF. Check console." });
-    throw error; // Re-throw to be caught by handleGenerate
+    throw error; 
   } finally {
     // Restore original styles and dark mode
     elementToCapture.style.opacity = originalStyle.opacity;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
-    // Note: other styles like position, left, top, zIndex are not restored here as they are part of the off-screen div's fixed setup
+    // Note: Position, left, top, zIndex are only restored if they were part of originalStyle and changed for capture
+    // elementToCapture.style.position = originalStyle.position; 
+    // elementToCapture.style.left = originalStyle.left;
+    // elementToCapture.style.top = originalStyle.top;
+    // elementToCapture.style.zIndex = originalStyle.zIndex;
     if (wasDark) {
       docElement.classList.add('dark');
     }
@@ -359,6 +417,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   }
 
    if (elementToCapture.offsetWidth === 0 || elementToCapture.offsetHeight === 0) {
+      console.warn("JPEG Capture element has no dimensions (0x0). Capture might fail or be empty.", elementToCapture);
       toast({ variant: "destructive", title: "JPEG Error", description: "Capture element has no dimensions." });
       throw new Error("Capture element (JPEG) has no dimensions.");
   }
@@ -375,13 +434,13 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   if (wasDark) {
     docElement.classList.remove('dark');
   }
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await new Promise(resolve => setTimeout(resolve, 100)); // Increased delay
 
   try {
     const canvas = await html2canvas(elementToCapture, {
         scale: 1.5, 
         useCORS: true,
-        logging: false,
+        logging: true, // Enable for debugging
         backgroundColor: '#FFFFFF',
         scrollX: -window.scrollX,
         scrollY: -window.scrollY,
@@ -400,7 +459,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   } catch (error) {
     console.error("Error generating JPEG with html2canvas:", error);
     toast({ variant: "destructive", title: "JPEG Generation Error", description: "Could not generate JPEG. Check console." });
-    throw error; // Re-throw
+    throw error; 
   } finally {
     elementToCapture.style.opacity = originalStyle.opacity;
     elementToCapture.style.backgroundColor = originalStyle.backgroundColor;
@@ -409,3 +468,5 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
     }
   }
 };
+
+    

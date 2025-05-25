@@ -2,7 +2,7 @@
 "use client";
 
 import type { StoredInvoiceData } from "@/lib/invoice-types";
-import { format, parseISO, isValid, differenceInCalendarDays } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface InvoiceTemplateProps {
@@ -55,7 +55,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
   return (
     <div
       className={cn(
-        "bg-[var(--invoice-background)] text-[var(--invoice-text)] font-sans shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white",
+        "bg-[var(--invoice-background)] text-[var(--invoice-text)] shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white",
         `theme-${themeColor}`,
         fontThemeClass
       )}
@@ -68,21 +68,21 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
       }}
     >
       {watermarkDataUrl && (
-        <div
-          className="absolute inset-0 flex items-center justify-center pointer-events-none"
-          style={{ zIndex: 0 }}
-        >
-          <img
-            src={watermarkDataUrl}
-            alt="Watermark"
-            style={{
-              maxWidth: '80%', 
-              maxHeight: '70%', 
-              objectFit: 'contain',
-              opacity: displayWatermarkOpacity,
-            }}
-            data-ai-hint="abstract pattern"
-          />
+         <div 
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            style={{ zIndex: 0 }} 
+         >
+            <img
+                src={watermarkDataUrl}
+                alt="Watermark"
+                style={{
+                maxWidth: '80%',
+                maxHeight: '70%',
+                objectFit: 'contain',
+                opacity: displayWatermarkOpacity,
+                }}
+                data-ai-hint="abstract pattern"
+            />
         </div>
       )}
 
@@ -130,7 +130,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
               <thead className="bg-[var(--invoice-header-bg)] print:bg-gray-100">
                 <tr>
                   <th className="p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600 w-2/5 sm:w-[40%]">Description</th>
-                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Qty/Days</th>
+                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Qty</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Unit</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Rate (₹)</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Disc (%)</th>
@@ -140,43 +140,64 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
               <tbody className="divide-y divide-[var(--invoice-border-color)]">
                 {items && items.length > 0 ? (
                   items.map((item, index) => {
-                    const itemStartDate = item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? parseISO(item.itemStartDate) : null;
-                    const itemEndDate = item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? parseISO(item.itemEndDate) : null;
-                    const itemStartTime = item.itemStartTime || null;
-                    const itemEndTime = item.itemEndTime || null;
-                    
-                    let displayQuantity = Number(item.quantity) || 0;
-                    let dateRangeDetails = "";
+                    let displayDurationString = "";
+                    if (item.itemStartDate && item.itemEndDate && item.itemStartTime && item.itemEndTime &&
+                        isValid(parseISO(item.itemStartDate)) && isValid(parseISO(item.itemEndDate))) {
+                        try {
+                            const startDateTime = new Date(parseISO(item.itemStartDate));
+                            const [startH, startM] = item.itemStartTime.split(':').map(Number);
+                            startDateTime.setHours(startH, startM, 0, 0);
 
-                    if (itemStartDate && itemEndDate && itemEndDate >= itemStartDate) {
-                        displayQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
-                        let startDateDisplay = format(itemStartDate, "MMM d, yyyy");
-                        let endDateDisplay = format(itemEndDate, "MMM d, yyyy");
-                        if (itemStartTime) startDateDisplay += ` ${itemStartTime}`;
-                        if (itemEndTime) endDateDisplay += ` ${itemEndTime}`;
-                        dateRangeDetails = `(${startDateDisplay} - ${endDateDisplay})`;
-                    } else if (itemStartDate && itemStartTime) { // Case for single day event with time
-                        dateRangeDetails = `(${format(itemStartDate, "MMM d, yyyy")} ${itemStartTime}${itemEndTime ? ` - ${itemEndTime}` : ''})`;
+                            const endDateTime = new Date(parseISO(item.itemEndDate));
+                            const [endH, endM] = item.itemEndTime.split(':').map(Number);
+                            endDateTime.setHours(endH, endM, 0, 0);
+
+                            if (endDateTime.getTime() > startDateTime.getTime()) {
+                                const diffMs = endDateTime.getTime() - startDateTime.getTime();
+                                const totalMinutes = Math.floor(diffMs / (1000 * 60));
+                                const totalHoursDecimal = totalMinutes / 60;
+                                
+                                const fullDays = Math.floor(totalHoursDecimal / 24);
+                                const remainingHoursAfterFullDays = Math.floor(totalHoursDecimal % 24);
+                                const remainingMinutesAfterFullHours = Math.round(totalMinutes % 60);
+
+                                let durationParts = [];
+                                if (fullDays > 0) durationParts.push(`${fullDays} day${fullDays > 1 ? 's' : ''}`);
+                                if (remainingHoursAfterFullDays > 0) durationParts.push(`${remainingHoursAfterFullDays} hour${remainingHoursAfterFullDays > 1 ? 's' : ''}`);
+                                if (remainingMinutesAfterFullHours > 0 && (fullDays > 0 || remainingHoursAfterFullDays > 0)) {
+                                    durationParts.push(`${remainingMinutesAfterFullHours} min${remainingMinutesAfterFullHours > 1 ? 's' : ''}`);
+                                } else if (fullDays === 0 && remainingHoursAfterFullDays === 0 && remainingMinutesAfterFullHours > 0) {
+                                    durationParts.push(`${remainingMinutesAfterFullHours} min${remainingMinutesAfterFullHours > 1 ? 's' : ''}`);
+                                }
+                                if (durationParts.length > 0) {
+                                    displayDurationString = `(Duration: ${durationParts.join(', ')})`;
+                                }
+                            }
+                        } catch (e) { console.error("Error formatting duration string:", e); }
+                    } else if (item.itemStartDate && item.itemEndDate && isValid(parseISO(item.itemStartDate)) && isValid(parseISO(item.itemEndDate))) {
+                        // Only dates, no times
+                         displayDurationString = `(${format(parseISO(item.itemStartDate), "MMM d, yyyy")} - ${format(parseISO(item.itemEndDate), "MMM d, yyyy")})`;
                     }
 
 
+                    const itemQuantity = Number(item.quantity) || 0;
                     const itemRate = Number(item.rate) || 0;
                     const itemDiscount = Number(item.discount) || 0;
-                    const itemSubtotal = displayQuantity * itemRate;
+                    const itemSubtotal = itemQuantity * itemRate;
                     const discountedAmount = itemSubtotal * (1 - itemDiscount / 100);
 
                     return (
                     <tr key={item.id || index} className="bg-[var(--invoice-background)] hover:bg-[var(--invoice-header-bg)]/50 print:bg-white">
                       <td className="p-3 align-top text-[var(--invoice-text)] print:text-black">
                         {item.description}
-                        {dateRangeDetails && (
+                        {displayDurationString && (
                           <div className="text-xs text-[var(--invoice-muted-text)] print:text-gray-500 mt-1">
-                            {dateRangeDetails}
+                            {displayDurationString}
                           </div>
                         )}
                       </td>
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700">
-                        {displayQuantity}
+                        {itemQuantity}
                       </td>
                       <td className="p-3 text-right align-top text-[var(--invoice-text)] print:text-gray-700">
                         {item.unit || '-'}
@@ -249,3 +270,5 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data }) => {
     </div>
   );
 };
+
+    

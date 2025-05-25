@@ -47,16 +47,16 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
 
   if (themeColor === 'classic-blue') {
     primaryColorDoc = '#2563EB'; 
-    headerBgColorDoc = 'hsl(210 50% 96%)';
-    borderColorDoc = 'hsl(210 30% 80%)';
+    headerBgColorDoc = 'hsl(210, 50%, 96%)';
+    borderColorDoc = 'hsl(210, 30%, 80%)';
   } else if (themeColor === 'emerald-green') {
     primaryColorDoc = '#059669';
-    headerBgColorDoc = 'hsl(145 40% 95%)';
-    borderColorDoc = 'hsl(145 30% 80%)';
+    headerBgColorDoc = 'hsl(145, 40%, 95%)';
+    borderColorDoc = 'hsl(145, 30%, 80%)';
   } else if (themeColor === 'crimson-red') {
     primaryColorDoc = '#DC2626';
-    headerBgColorDoc = 'hsl(340 50% 96%)';
-    borderColorDoc = 'hsl(340 40% 85%)';
+    headerBgColorDoc = 'hsl(340, 50%, 96%)';
+    borderColorDoc = 'hsl(340, 40%, 85%)';
   }
   const invoiceBgColor = '#FFFFFF';
 
@@ -71,35 +71,55 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   let itemsHtml = '';
   if (items && items.length > 0) {
     items.forEach(item => {
-      const itemStartDate = item.itemStartDate && isValid(parseISO(item.itemStartDate)) ? parseISO(item.itemStartDate) : null;
-      const itemEndDate = item.itemEndDate && isValid(parseISO(item.itemEndDate)) ? parseISO(item.itemEndDate) : null;
-      const itemStartTime = item.itemStartTime || null;
-      const itemEndTime = item.itemEndTime || null;
-      
-      let displayQuantity = Number(item.quantity) || 0;
-      let dateRangeDetailsHtml = '';
+      let displayDurationStringDoc = "";
+      if (item.itemStartDate && item.itemEndDate && item.itemStartTime && item.itemEndTime &&
+          isValid(parseISO(item.itemStartDate)) && isValid(parseISO(item.itemEndDate))) {
+          try {
+              const startDateTime = new Date(parseISO(item.itemStartDate));
+              const [startH, startM] = item.itemStartTime.split(':').map(Number);
+              startDateTime.setHours(startH, startM, 0, 0);
 
-      if (itemStartDate && itemEndDate && itemEndDate >= itemStartDate) {
-          displayQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
-          let startDateDisplay = format(itemStartDate, "MMM d, yyyy");
-          let endDateDisplay = format(itemEndDate, "MMM d, yyyy");
-          if (itemStartTime) startDateDisplay += ` ${itemStartTime}`;
-          if (itemEndTime) endDateDisplay += ` ${itemEndTime}`;
-          dateRangeDetailsHtml = `<div style="font-size: 8pt; color: ${mutedTextColorDoc}; margin-top: 3px;">(${startDateDisplay} - ${endDateDisplay})</div>`;
-      } else if (itemStartDate && itemStartTime) {
-          dateRangeDetailsHtml = `<div style="font-size: 8pt; color: ${mutedTextColorDoc}; margin-top: 3px;">(${format(itemStartDate, "MMM d, yyyy")} ${itemStartTime}${itemEndTime ? ` - ${itemEndTime}` : ''})</div>`;
+              const endDateTime = new Date(parseISO(item.itemEndDate));
+              const [endH, endM] = item.itemEndTime.split(':').map(Number);
+              endDateTime.setHours(endH, endM, 0, 0);
+
+              if (endDateTime.getTime() > startDateTime.getTime()) {
+                  const diffMs = endDateTime.getTime() - startDateTime.getTime();
+                  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+                  const totalHoursDecimal = totalMinutes / 60;
+                  
+                  const fullDays = Math.floor(totalHoursDecimal / 24);
+                  const remainingHoursAfterFullDays = Math.floor(totalHoursDecimal % 24);
+                  const remainingMinutesAfterFullHours = Math.round(totalMinutes % 60);
+
+                  let durationParts = [];
+                  if (fullDays > 0) durationParts.push(`${fullDays} day${fullDays > 1 ? 's' : ''}`);
+                  if (remainingHoursAfterFullDays > 0) durationParts.push(`${remainingHoursAfterFullDays} hour${remainingHoursAfterFullDays > 1 ? 's' : ''}`);
+                  if (remainingMinutesAfterFullHours > 0 && (fullDays > 0 || remainingHoursAfterFullDays > 0)) {
+                      durationParts.push(`${remainingMinutesAfterFullHours} min${remainingMinutesAfterFullHours > 1 ? 's' : ''}`);
+                  } else if (fullDays === 0 && remainingHoursAfterFullDays === 0 && remainingMinutesAfterFullHours > 0) {
+                       durationParts.push(`${remainingMinutesAfterFullHours} min${remainingMinutesAfterFullHours > 1 ? 's' : ''}`);
+                  }
+
+                  if (durationParts.length > 0) {
+                    displayDurationStringDoc = `<div style="font-size: 8pt; color: ${mutedTextColorDoc}; margin-top: 3px;">(Duration: ${durationParts.join(', ')})</div>`;
+                  }
+              }
+          } catch (e) { /* ignore parsing error for doc generation */ }
+      } else if (item.itemStartDate && item.itemEndDate && isValid(parseISO(item.itemStartDate)) && isValid(parseISO(item.itemEndDate))) {
+          displayDurationStringDoc = `<div style="font-size: 8pt; color: ${mutedTextColorDoc}; margin-top: 3px;">(${format(parseISO(item.itemStartDate), "MMM d, yyyy")} - ${format(parseISO(item.itemEndDate), "MMM d, yyyy")})</div>`;
       }
 
-
+      const itemQuantity = Number(item.quantity) || 0;
       const itemRate = Number(item.rate) || 0;
       const itemDiscount = Number(item.discount) || 0;
-      const itemSubtotal = displayQuantity * itemRate;
+      const itemSubtotal = itemQuantity * itemRate;
       const discountedAmount = itemSubtotal * (1 - itemDiscount / 100);
 
       itemsHtml += `
         <tr style="background-color: ${invoiceBgColor};">
-          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; color: ${textColorDoc};">${item.description}${dateRangeDetailsHtml}</td>
-          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${displayQuantity}</td>
+          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; color: ${textColorDoc};">${item.description}${displayDurationStringDoc}</td>
+          <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${itemQuantity}</td>
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${item.unit || '-'}</td>
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${fCurrency(itemRate)}</td>
           <td style="padding: 10px; border: 1px solid ${borderColorDoc}; vertical-align: top; text-align: right; color: ${mutedTextColorDoc};">${itemDiscount > 0 ? `${itemDiscount}%` : '-'}</td>
@@ -219,7 +239,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
               <thead>
                 <tr>
                   <th class="description-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: left;">Description</th>
-                  <th class="qty-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Qty / Days</th>
+                  <th class="qty-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Qty</th>
                   <th class="unit-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Unit</th>
                   <th class="rate-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Rate (₹)</th>
                   <th class="discount-col" style="padding: 10px; border-bottom: 1px solid ${borderColorDoc}; background-color: ${headerBgColorDoc}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; font-size: 9pt; text-align: right;">Disc (%)</th>
@@ -276,7 +296,7 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
   }
 
   if (elementToCapture.offsetWidth === 0 || elementToCapture.offsetHeight === 0) {
-      console.error("Element to capture (PDF) has zero dimensions. Is it visible and rendered?");
+      console.error("Element to capture (PDF) has zero dimensions. Is it visible and rendered?", elementToCapture);
       toast({ variant: "destructive", title: "PDF Error", description: "Capture element has no dimensions." });
       throw new Error("Capture element (PDF) has no dimensions.");
   }
@@ -394,7 +414,7 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
   }
 
    if (elementToCapture.offsetWidth === 0 || elementToCapture.offsetHeight === 0) {
-      console.error("Element to capture (JPEG) has zero dimensions. Is it visible and rendered?");
+      console.error("Element to capture (JPEG) has zero dimensions. Is it visible and rendered?", elementToCapture);
       toast({ variant: "destructive", title: "JPEG Error", description: "Capture element has no dimensions." });
       throw new Error("Capture element (JPEG) has no dimensions.");
   }
@@ -480,3 +500,4 @@ export const generateJpeg = async (data: StoredInvoiceData, _watermarkIgnored?: 
     throw error;
   }
 };
+    

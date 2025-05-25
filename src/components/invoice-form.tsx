@@ -149,12 +149,13 @@ export function InvoiceForm() {
     let subTotal = 0;
     if (watchedItems) {
       watchedItems.forEach((item) => {
-        const quantity = Number(item.quantity) || 0; // Quantity is now set by useEffect if auto-calculated
+        const quantity = Number(item.quantity) || 0;
         const rate = Number(item.rate) || 0;
         const discount = Number(item.discount) || 0;
+        const itemDiscountForItem = Number(item.discount) || 0; // per-item discount
 
         const itemSubtotal = quantity * rate;
-        subTotal += itemSubtotal * (1 - discount / 100);
+        subTotal += itemSubtotal * (1 - itemDiscountForItem / 100);
       });
     }
 
@@ -267,6 +268,7 @@ export function InvoiceForm() {
         const formData: InvoiceFormSchemaType = {
           ...baseFormValues,
           ...data,
+          invoiceNumber: data.invoiceNumber || baseFormValues.invoiceNumber,
           invoiceDate: data.invoiceDate ? (parseISO(data.invoiceDate) instanceof Date && !isNaN(parseISO(data.invoiceDate).valueOf()) ? parseISO(data.invoiceDate) : new Date()) : new Date(),
           dueDate: data.dueDate ? (parseISO(data.dueDate) instanceof Date && !isNaN(parseISO(data.dueDate).valueOf()) ? parseISO(data.dueDate) : undefined) : undefined,
           items: formItems.length > 0 ? formItems : [defaultItem],
@@ -409,10 +411,9 @@ export function InvoiceForm() {
 
 
       const itemsToStore: StoredLineItem[] = data.items.map(item => {
-        // Quantity is already correctly set in the form state by the auto-calculation logic
         return {
           ...item,
-          quantity: Number(item.quantity) || 0, // Ensure it's a number
+          quantity: Number(item.quantity) || 0,
           unit: item.unit || '',
           itemStartDate: item.itemStartDate ? item.itemStartDate.toISOString() : undefined,
           itemEndDate: item.itemEndDate ? item.itemEndDate.toISOString() : undefined,
@@ -475,7 +476,6 @@ export function InvoiceForm() {
       setValue(`items.${itemIndex}.rate`, selectedSavedItem.rate);
       setValue(`items.${itemIndex}.quantity`, selectedSavedItem.defaultQuantity ?? 1);
       setValue(`items.${itemIndex}.unit`, selectedSavedItem.defaultUnit ?? '');
-      // Reset dates and times as they are not part of saved items
       setValue(`items.${itemIndex}.itemStartDate`, undefined);
       setValue(`items.${itemIndex}.itemEndDate`, undefined);
       setValue(`items.${itemIndex}.itemStartTime`, '');
@@ -707,15 +707,14 @@ export function InvoiceForm() {
               </div>
               <FormDescription className="mb-4">
                 Add items or services. For services with a duration:
-                <br />- Provide start/end dates &amp; times for hourly calculation (Quantity becomes hours, Rate is per hour).
-                <br />- Provide start/end dates (no times) for daily calculation (Quantity becomes days, Rate is per day).
-                <br />- Otherwise, enter Quantity and Rate manually.
+                <br />- Provide start/end dates &amp; times for **hourly calculation** (Quantity becomes total hours, Rate is per hour, Unit is 'hours').
+                <br />- Provide start/end dates (no times) for **daily calculation** (Quantity becomes total days, Rate is per day, Unit is 'days').
+                <br />- Otherwise, enter Quantity, Unit, and Rate manually.
               </FormDescription>
               <div className="space-y-6 mt-4">
                 {fields.map((item, index) => {
-                  const itemIndex = index; // Closure for useEffect
+                  const itemIndex = index; 
 
-                  // Watch individual fields for dynamic updates
                   const itemStartDate = watch(`items.${itemIndex}.itemStartDate`);
                   const itemEndDate = watch(`items.${itemIndex}.itemEndDate`);
                   const itemStartTime = watch(`items.${itemIndex}.itemStartTime`);
@@ -723,7 +722,9 @@ export function InvoiceForm() {
 
                   useEffect(() => {
                     let newQuantity: number | undefined = undefined;
-                    let isAutoCalculated = false;
+                    let newUnit: string = getValues(`items.${itemIndex}.unit`) || ''; 
+                    let quantityIsAutoCalculated = false;
+                    let unitIsAutoCalculated = false;
                 
                     if (itemStartDate && itemEndDate && itemStartTime && itemEndTime &&
                         isValid(itemStartDate) && isValid(itemEndDate) &&
@@ -746,29 +747,37 @@ export function InvoiceForm() {
                             if (endDateObj.getTime() > startDateObj.getTime()) {
                                 const diffMs = endDateObj.getTime() - startDateObj.getTime();
                                 newQuantity = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
-                                isAutoCalculated = true;
+                                newUnit = 'hours';
+                                quantityIsAutoCalculated = true;
+                                unitIsAutoCalculated = true;
                             }
                         }
                     } else if (itemStartDate && itemEndDate &&
                                isValid(itemStartDate) && isValid(itemEndDate) &&
                                itemEndDate >= itemStartDate) {
                         newQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
-                        isAutoCalculated = true;
+                        newUnit = 'days';
+                        quantityIsAutoCalculated = true;
+                        unitIsAutoCalculated = true;
                     }
                 
                     const currentFormQuantity = getValues(`items.${itemIndex}.quantity`);
-                    if (isAutoCalculated && newQuantity !== undefined && newQuantity !== currentFormQuantity) {
+                    if (quantityIsAutoCalculated && newQuantity !== undefined && newQuantity !== currentFormQuantity) {
                         setValue(`items.${itemIndex}.quantity`, newQuantity, { shouldValidate: true, shouldDirty: true });
                     }
-                    // If not auto-calculated, quantity remains as manually entered or default.
+                
+                    const currentFormUnit = getValues(`items.${itemIndex}.unit`);
+                    if (unitIsAutoCalculated && newUnit !== currentFormUnit) {
+                        setValue(`items.${itemIndex}.unit`, newUnit, { shouldValidate: true, shouldDirty: true });
+                    }
                   }, [itemStartDate, itemEndDate, itemStartTime, itemEndTime, setValue, getValues, itemIndex]);
 
 
-                  // Determine labels and readOnly status based on watched values for rendering
                   let quantityLabel = "Quantity *";
                   let rateLabel = "Rate (₹) *";
                   let isQuantityReadOnly = false;
-
+                  let isUnitReadOnly = false;
+                  
                   if (itemStartDate && itemEndDate && itemStartTime && itemEndTime &&
                       isValid(itemStartDate) && isValid(itemEndDate) &&
                       /^\d{2}:\d{2}$/.test(itemStartTime) && /^\d{2}:\d{2}$/.test(itemEndTime)) {
@@ -788,12 +797,14 @@ export function InvoiceForm() {
                               quantityLabel = "Hours (Auto)";
                               rateLabel = "Rate/Hour (₹) *";
                               isQuantityReadOnly = true;
+                              isUnitReadOnly = true;
                           }
                       }
                   } else if (itemStartDate && itemEndDate && isValid(itemStartDate) && isValid(itemEndDate) && itemEndDate >= itemStartDate) {
                       quantityLabel = "Days (Auto)";
                       rateLabel = "Rate/Day (₹) *";
                       isQuantityReadOnly = true;
+                      isUnitReadOnly = true;
                   }
                   
                   const currentQuantity = getValues(`items.${itemIndex}.quantity`) || 0;
@@ -889,7 +900,7 @@ export function InvoiceForm() {
                       />
                     </div>
                     
-                    {(itemStartDate || itemEndDate) && ( // Show time inputs if either date is selected
+                    {(itemStartDate || itemEndDate) && ( 
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
                             control={control}
@@ -939,7 +950,7 @@ export function InvoiceForm() {
                                 type="number"
                                 placeholder="1"
                                 {...field}
-                                value={field.value ?? ''} // Ensure controlled component
+                                value={field.value ?? ''} 
                                 readOnly={isQuantityReadOnly}
                                 onChange={e => {
                                   if (!isQuantityReadOnly) {
@@ -962,10 +973,21 @@ export function InvoiceForm() {
                             <FormControl>
                              <div className="relative">
                                 <Shapes className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="e.g. hrs, pcs, day" {...field} value={field.value || ''} className="pl-8"/>
+                                <Input 
+                                  placeholder="e.g. hrs, pcs, day" 
+                                  {...field} 
+                                  value={field.value || ''} 
+                                  className={`pl-8 ${isUnitReadOnly ? "bg-muted/50" : ""}`}
+                                  readOnly={isUnitReadOnly}
+                                  onChange={e => {
+                                    if (!isUnitReadOnly) {
+                                      field.onChange(e.target.value);
+                                    }
+                                  }}
+                                />
                              </div>
                             </FormControl>
-                            <FormDescription className="text-xs">e.g., hours, pcs, day. Auto-suggested if dates used.</FormDescription>
+                            <FormDescription className="text-xs">e.g., hours, pcs, day. Auto-set if dates used.</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1336,4 +1358,4 @@ export function InvoiceForm() {
     </Card>
   );
 }
-
+    

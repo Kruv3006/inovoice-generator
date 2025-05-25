@@ -3,22 +3,22 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic'; 
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, Edit, Loader2, AlertTriangle, Home, Eye, Mail, Share2, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { StoredInvoiceData } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
-import { generatePdf, generateDoc, generateJpeg } from '@/lib/invoice-generator';
+import { generatePdf as generatePdfFile, generateDoc, generateJpeg } from '@/lib/invoice-generator'; // Renamed to avoid conflict
 import { format, parseISO, isValid } from 'date-fns';
-import html2canvas from 'html2canvas'; // Keep for share, generator handles its own
-import jsPDF from 'jspdf'; // Keep for share, generator handles its own
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 
 const InvoiceTemplate = dynamic(() => import('@/components/invoice-template').then(mod => mod.InvoiceTemplate), {
-  ssr: false, 
-  loading: () => <p>Loading template...</p>, 
+  ssr: false,
+  loading: () => <p>Loading template...</p>,
 });
 
 
@@ -85,6 +85,7 @@ export default function InvoiceDownloadPage() {
       toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
     } catch (e) {
       console.error(`Error generating ${formatName}:`, e);
+      // The generator functions themselves should show specific toasts for errors
     } finally {
       setIsGenerating(false);
     }
@@ -105,22 +106,22 @@ export default function InvoiceDownloadPage() {
 
     try {
       toast({ title: "Preparing PDF...", description: "The invoice PDF is being generated for your email." });
-      await generatePdf(invoiceData, undefined, invoiceTemplateRef.current);
-      pdfGeneratedSuccessfully = true;
-      toast({ title: "PDF Ready for Email", description: "The PDF has been downloaded. Proceeding to open your email client.", variant: "default"});
-
+      // Use the main generatePdfFile which handles toasting on its own
+      await generatePdfFile(invoiceData, undefined, invoiceTemplateRef.current);
+      pdfGeneratedSuccessfully = true; // Assume success if no error is thrown by generatePdfFile
+      // generatePdfFile will show success toast.
     } catch (e) {
       console.error("Error generating PDF for email:", e);
-      if (!pdfGeneratedSuccessfully) {
-          toast({ variant: "destructive", title: "PDF Generation Failed", description: "Could not prepare the PDF for your email. Please try downloading manually." });
-      }
+      // generatePdfFile should have shown an error toast.
+      // If we reach here, it means generatePdfFile threw an error.
     } finally {
+      setIsGenerating(false); // Ensure this is always reset
       if (!pdfGeneratedSuccessfully) {
-        setIsGenerating(false);
-        return; 
+        return;
       }
     }
 
+    // Proceed to mail if PDF generation was attempted and didn't throw an error that prevented this line.
     const subject = encodeURIComponent(`Invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}`);
     const body = encodeURIComponent(
       `Hello ${invoiceData.customerName || 'Client'},\n\nPlease find attached invoice ${invoiceData.invoiceNumber}.pdf, which should have just downloaded to your computer.\n\nIf you don't see it, please ensure pop-ups are allowed and check your downloads folder.\n\nThank you for your business!\n\nBest regards,\n${invoiceData.companyName || 'Your Company'}`
@@ -131,8 +132,6 @@ export default function InvoiceDownloadPage() {
       title: "Email Client Opened",
       description: "Please find the downloaded PDF and attach it to your email.",
     });
-
-    setIsGenerating(false); 
   };
 
   const handleShareInvoice = async () => {
@@ -141,63 +140,104 @@ export default function InvoiceDownloadPage() {
         return;
     }
 
-    if (navigator.share) {
-        setIsGenerating(true);
-        toast({ title: "Preparing PDF for sharing..." });
-        try {
-            // Temporarily make .dark class inactive for capture
-            const docEl = document.documentElement;
-            const wasDark = docEl.classList.contains('dark');
-            if (wasDark) docEl.classList.remove('dark');
-            
-            // Ensure the background of the template itself is white for capture
-            const originalBg = invoiceTemplateRef.current.style.backgroundColor;
-            invoiceTemplateRef.current.style.backgroundColor = 'white';
-
-            await new Promise(resolve => setTimeout(resolve, 50)); // Ensure styles apply
-
-
-            const canvas = await html2canvas(invoiceTemplateRef.current, { scale: 2, useCORS: true, backgroundColor: 'white' });
-            
-            // Restore dark class if it was there
-            if (wasDark) docEl.classList.add('dark');
-            invoiceTemplateRef.current.style.backgroundColor = originalBg;
-
-
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'l' : 'p', unit: 'px', format: [canvas.width, canvas.height], compress: true });
-            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-            const pdfBlob = pdf.output('blob');
-            const pdfFile = new File([pdfBlob], `invoice_${invoiceData.invoiceNumber}.pdf`, { type: 'application/pdf' });
-
-            if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-                await navigator.share({
-                    title: `Invoice ${invoiceData.invoiceNumber}`,
-                    text: `Here is invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}.`,
-                    files: [pdfFile],
-                });
-                toast({ title: "Shared successfully!" });
-            } else {
-                await navigator.share({
-                    title: `Invoice ${invoiceData.invoiceNumber}`,
-                    text: `View invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}. Please download separately.`,
-                    url: window.location.href, // Fallback to sharing URL if file share not supported
-                });
-                toast({ title: "Shared link/text successfully!" });
-            }
-        } catch (error) {
-            console.error('Error sharing invoice:', error);
-            toast({ variant: "destructive", title: "Share Error", description: "Could not share the invoice. Try downloading manually." });
-        } finally {
-            setIsGenerating(false);
-            // Ensure theme is restored if it was changed
-            const docEl = document.documentElement;
-            if (!docEl.classList.contains('dark') && localStorage.getItem('theme') === 'dark') { // Example check
-                 docEl.classList.add('dark');
-            }
-        }
-    } else {
+    if (!navigator.share) {
         toast({ variant: "default", title: "Share Not Supported", description: "Please download the invoice and share it manually." });
+        return;
+    }
+
+    setIsGenerating(true);
+    toast({ title: "Preparing PDF for sharing..." });
+
+    const docElement = document.documentElement;
+    const wasDark = docElement.classList.contains('dark');
+    if (wasDark) docElement.classList.remove('dark');
+    
+    // Ensure the element being captured is visible and has a light background
+    const targetElement = invoiceTemplateRef.current;
+    const originalTargetStyle = {
+        opacity: targetElement.style.opacity,
+        display: targetElement.style.display,
+        position: targetElement.style.position,
+        left: targetElement.style.left,
+        top: targetElement.style.top,
+        zIndex: targetElement.style.zIndex,
+        backgroundColor: targetElement.style.backgroundColor,
+    };
+
+    targetElement.style.display = 'block'; // Ensure it's displayed
+    targetElement.style.opacity = '1';
+    targetElement.style.position = 'relative'; // Or 'absolute' if needed, ensure it's in flow for capture
+    targetElement.style.left = '0';
+    targetElement.style.top = '0';
+    targetElement.style.zIndex = 'auto';
+    targetElement.style.backgroundColor = 'white'; // Force white background on the container
+
+    await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay for styles
+
+    try {
+        if (targetElement.offsetWidth === 0 || targetElement.offsetHeight === 0) {
+            toast({ variant: "destructive", title: "Share Error", description: "Invoice element not ready for capture (no dimensions)." });
+            throw new Error("Share capture element has no dimensions.");
+        }
+
+        const canvas = await html2canvas(targetElement, {
+            scale: 2,
+            useCORS: true,
+            logging: false, // Set to true for debugging
+            backgroundColor: '#FFFFFF', // Explicit white background for canvas
+            scrollX: -window.scrollX, // Capture from top-left
+            scrollY: -window.scrollY,
+            windowWidth: targetElement.scrollWidth,
+            windowHeight: targetElement.scrollHeight,
+            removeContainer: true,
+        });
+
+        if (canvas.width === 0 || canvas.height === 0) {
+            toast({ variant: "destructive", title: "Share Error", description: "Could not capture invoice image (empty canvas)." });
+            throw new Error("Canvas capture for share failed (empty canvas)");
+        }
+
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+            orientation: canvas.width > canvas.height ? 'l' : 'p',
+            unit: 'px',
+            format: [canvas.width, canvas.height],
+            compress: true,
+        });
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        const pdfBlob = pdf.output('blob');
+        const pdfFile = new File([pdfBlob], `invoice_${invoiceData.invoiceNumber}.pdf`, { type: 'application/pdf' });
+
+        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+            await navigator.share({
+                title: `Invoice ${invoiceData.invoiceNumber}`,
+                text: `Here is invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}.`,
+                files: [pdfFile],
+            });
+            toast({ title: "Shared successfully!" });
+        } else {
+            await navigator.share({
+                title: `Invoice ${invoiceData.invoiceNumber}`,
+                text: `View invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}. Please download separately.`,
+                url: window.location.href,
+            });
+            toast({ title: "Shared link/text successfully!" });
+        }
+    } catch (error) {
+        console.error('Error sharing invoice:', error);
+        toast({ variant: "destructive", title: "Share Error", description: "Could not share the invoice. Try downloading manually." });
+    } finally {
+        // Restore original styles for the target element
+        targetElement.style.opacity = originalTargetStyle.opacity;
+        targetElement.style.display = originalTargetStyle.display;
+        targetElement.style.position = originalTargetStyle.position;
+        targetElement.style.left = originalTargetStyle.left;
+        targetElement.style.top = originalTargetStyle.top;
+        targetElement.style.zIndex = originalTargetStyle.zIndex;
+        targetElement.style.backgroundColor = originalTargetStyle.backgroundColor;
+
+        if (wasDark) docElement.classList.add('dark');
+        setIsGenerating(false);
     }
   };
 
@@ -206,14 +246,13 @@ export default function InvoiceDownloadPage() {
       toast({ title: "Error", description: "Invoice template not ready for printing.", variant: "destructive" });
       return;
     }
-    // Add a class to body to trigger print-specific styles
     document.body.classList.add('print-active');
     window.print();
-    // Remove class after print dialog is closed or printing is done
     // Using a timeout as there's no direct event for print dialog close
+    // Consider using window.onafterprint if broader browser support is acceptable later
     setTimeout(() => {
       document.body.classList.remove('print-active');
-    }, 1000);
+    }, 1000); // Give it a second for the print dialog to usually close
   };
 
 
@@ -252,6 +291,13 @@ export default function InvoiceDownloadPage() {
 
   return (
     <div className="py-8 bg-muted/40 dark:bg-muted/20 min-h-[calc(100vh-4rem)]">
+      {/* Off-screen invoice template for generation and printing */}
+      <div className="printable-invoice-wrapper"> {/* This wrapper is controlled by print CSS */}
+        <div ref={invoiceTemplateRef} id="invoice-capture-area" className="bg-white"> {/* Ensure this div itself has a white background for capture consistency */}
+          {invoiceData && <InvoiceTemplate data={invoiceData} forceLightMode={true} />}
+        </div>
+      </div>
+
       <div className="no-print container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <h1 className="text-3xl font-bold text-primary">Download, Share & Print</h1>
@@ -267,17 +313,7 @@ export default function InvoiceDownloadPage() {
             </Button>
           </div>
         </div>
-      </div>
-      
-      {/* Wrapper for the printable/capturable invoice. Hidden visually on screen. */}
-      <div className="printable-invoice-wrapper fixed top-0 left-[-9999px] opacity-0 -z-[1]">
-        <div ref={invoiceTemplateRef} style={{ width: '800px', padding: '0', margin: '0' }}> {/* Ensure bg is white FOR CAPTURE */}
-          {invoiceData && <InvoiceTemplate data={invoiceData} forceLightMode={true} />}
-        </div>
-      </div>
 
-
-      <div className="no-print container mx-auto px-4">
         <Card className="shadow-xl rounded-lg">
           <CardHeader>
             <CardTitle className="text-xl">Choose Format & Action</CardTitle>
@@ -285,7 +321,7 @@ export default function InvoiceDownloadPage() {
           </CardHeader>
           <CardFooter className="flex flex-col sm:flex-row flex-wrap gap-3 pt-2">
             <Button
-              onClick={() => handleGenerate(generatePdf, 'PDF')}
+              onClick={() => handleGenerate(generatePdfFile, 'PDF')}
               disabled={isGenerating}
               className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground shadow-md"
             >
@@ -353,3 +389,5 @@ export default function InvoiceDownloadPage() {
     </div>
   );
 }
+
+    

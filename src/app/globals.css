@@ -42,9 +42,9 @@
 
     /* Invoice specific variables - LIGHT MODE DEFAULTS */
     --invoice-background: hsl(0 0% 100%);
-    --invoice-text: hsl(220 15% 20%); 
+    --invoice-text: hsl(220 15% 20%);
     --invoice-muted-text: hsl(220 10% 40%);
-    --invoice-primary-color-hsl: 217 91% 55%; 
+    --invoice-primary-color-hsl: 217 91% 55%;
     --invoice-primary-color: hsl(var(--invoice-primary-color-hsl));
     --invoice-border-color: hsl(220 15% 85%);
     --invoice-header-bg: hsl(220 20% 95%);
@@ -58,20 +58,20 @@
   }
 
   .dark {
-    --background: 220 15% 12%; 
-    --foreground: 220 15% 90%; 
-    --card: 220 15% 18%; 
+    --background: 220 15% 12%;
+    --foreground: 220 15% 90%;
+    --card: 220 15% 18%;
     --card-foreground: 220 15% 90%;
     --popover: 220 15% 18%;
     --popover-foreground: 220 15% 90%;
-    --primary: 217 91% 65%; 
-    --primary-foreground: 0 0% 100%; 
-    --secondary: 220 15% 25%; 
+    --primary: 217 91% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 25%;
     --secondary-foreground: 220 15% 85%;
-    --muted: 220 15% 22%; 
+    --muted: 220 15% 22%;
     --muted-foreground: 220 10% 65%;
-    --accent: 30 90% 60%; 
-    --accent-foreground: 0 0% 10%; 
+    --accent: 30 90% 60%;
+    --accent-foreground: 0 0% 10%;
     --destructive: 0 70% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 220 15% 30%;
@@ -96,7 +96,7 @@
     --invoice-background: hsl(220 15% 15%);
     --invoice-text: hsl(220 15% 92%);
     --invoice-muted-text: hsl(220 10% 60%);
-    --invoice-primary-color-hsl: 217 91% 65%; 
+    --invoice-primary-color-hsl: 217 91% 65%;
     --invoice-primary-color: hsl(var(--invoice-primary-color-hsl));
     --invoice-border-color: hsl(220 15% 35%);
     --invoice-header-bg: hsl(220 15% 20%);
@@ -146,7 +146,7 @@
     --invoice-border-color: hsl(220 15% 85%) !important;
     --invoice-header-bg: hsl(220 20% 95%) !important;
     /* Keep the chosen theme's primary color, but ensure it's the light version */
-    --invoice-primary-color: hsl(var(--invoice-primary-color-hsl)) !important; 
+    --invoice-primary-color: hsl(var(--invoice-primary-color-hsl)) !important;
   }
   .invoice-render-light.theme-default {
     --invoice-primary-color-hsl: 217 91% 55% !important; /* Default light primary */
@@ -181,36 +181,47 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-geist-sans); 
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11"; 
+    font-family: var(--font-geist-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
 /* Print specific styles */
 @media print {
+  body {
+    -webkit-print-color-adjust: exact !important; /* Chrome, Safari, Edge */
+    print-color-adjust: exact !important; /* Firefox */
+    background-color: white !important; /* Ensure body background is white for print */
+  }
   body.print-active > *:not(.printable-invoice-wrapper) {
     display: none !important;
   }
   .printable-invoice-wrapper {
-    display: block !important; /* Ensure it's block for layout */
+    display: block !important;
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 100% !important;
+    width: 100% !important; /* Or set to a specific print width like '210mm' */
     height: auto !important;
     padding: 0 !important;
     margin: 0 !important;
-    z-index: 9999 !important; /* High z-index for printing */
+    z-index: 9999 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background-color: white !important; /* Ensure wrapper has white background */
   }
-  .printable-invoice-wrapper .invoice-render-light { /* Ensure the template itself also behaves well */
+  .printable-invoice-wrapper #invoice-capture-area,
+  .printable-invoice-wrapper .invoice-render-light {
     box-shadow: none !important;
     border: none !important;
     margin: 0 !important;
     border-radius: 0 !important;
+    width: 100% !important; /* Ensure inner template fills wrapper for print */
+    background-color: white !important; /* Explicitly set template background */
   }
-
-  /* Hide elements specifically marked as no-print */
   .no-print {
     display: none !important;
   }
 }
+
+    

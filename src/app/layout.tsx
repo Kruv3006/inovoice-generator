@@ -34,7 +34,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#64B5F6" /> 
+        <meta name="theme-color" content="#64B5F6" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
@@ -42,8 +42,8 @@ export default function RootLayout({
         <header className="sticky top-0 z-50 w-full border-b bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <div className="container flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
             <Link href="/" className="flex items-center gap-2 group">
-              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover:text-primary/90 transition-colors" />
-              <h1 className="text-lg sm:text-xl font-semibold tracking-tight group-hover:text-primary/90 transition-colors">InvoiceCraft</h1>
+              <FileText className="h-6 w-6 text-primary group-hover:text-primary/90 transition-colors" />
+              <h1 className="text-xl font-semibold tracking-tight group-hover:text-primary/90 transition-colors">InvoiceCraft</h1>
             </Link>
             <nav className="flex items-center gap-1">
               <Link href="/invoices" passHref>
@@ -65,8 +65,13 @@ export default function RootLayout({
         <main className="flex-1 w-full">
           {children}
         </main>
+        <footer className="text-center text-xs text-muted-foreground p-4 border-t">
+          <p>InvoiceCraft is provided as-is. We are not responsible for any errors or omissions in invoices generated or for any issues arising from the use of this application.</p>
+        </footer>
         <Toaster />
       </body>
     </html>
   );
 }
+
+    

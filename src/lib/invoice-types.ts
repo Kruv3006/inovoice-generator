@@ -114,6 +114,7 @@ export const invoiceFormSchema = z.object({
   termsAndConditions: z.string().optional(),
   themeColor: z.string().optional().default('default'),
   fontTheme: z.string().optional().default('default'),
+  templateStyle: z.enum(['classic', 'modern']).optional().default('classic'),
 });
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
@@ -126,7 +127,7 @@ export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEn
   discount?: number;
   unit?: string;
 }
-export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'dueDate' | 'watermarkOpacity' | 'invoiceNotes' | 'termsAndConditions' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor' | 'fontTheme'> {
+export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'dueDate' | 'watermarkOpacity' | 'invoiceNotes' | 'termsAndConditions' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor' | 'fontTheme' | 'templateStyle'> {
   id: string;
   invoiceDate: string;
   dueDate?: string;
@@ -142,6 +143,7 @@ export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyL
   totalFee: number;
   themeColor?: string;
   fontTheme?: string;
+  templateStyle?: 'classic' | 'modern';
 }
 
 // Settings Page Types
@@ -150,6 +152,7 @@ export interface CompanyProfileData {
   companyLogoDataUrl?: string | null;
   defaultInvoiceNotes?: string;
   defaultTermsAndConditions?: string;
+  defaultTemplateStyle?: 'classic' | 'modern';
 }
 
 export interface ClientData {

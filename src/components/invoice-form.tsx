@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, Type, Shapes, CalendarClock, RotateCcw, Clock } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, Type, Shapes, CalendarClock, RotateCcw, Clock, LayoutTemplate } from "lucide-react";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -106,6 +106,7 @@ const generateDefaultFormValues = (companyProfile?: CompanyProfileData | null): 
     watermarkOpacity: 0.05,
     themeColor: 'default',
     fontTheme: 'default',
+    templateStyle: companyProfile?.defaultTemplateStyle || 'classic',
   };
 };
 
@@ -151,7 +152,6 @@ export function InvoiceForm() {
       watchedItems.forEach((item) => {
         const quantity = Number(item.quantity) || 0;
         const rate = Number(item.rate) || 0;
-        const discount = Number(item.discount) || 0;
         const itemDiscountForItem = Number(item.discount) || 0; // per-item discount
 
         const itemSubtotal = quantity * rate;
@@ -226,6 +226,7 @@ export function InvoiceForm() {
                 watermarkOpacity: sourceInvoice.watermarkOpacity ?? baseFormValues.watermarkOpacity,
                 themeColor: sourceInvoice.themeColor ?? baseFormValues.themeColor,
                 fontTheme: sourceInvoice.fontTheme ?? baseFormValues.fontTheme,
+                templateStyle: sourceInvoice.templateStyle ?? baseFormValues.templateStyle,
                 globalDiscountType: sourceInvoice.globalDiscountType ?? baseFormValues.globalDiscountType,
                 globalDiscountValue: sourceInvoice.globalDiscountValue ?? baseFormValues.globalDiscountValue,
             };
@@ -282,6 +283,7 @@ export function InvoiceForm() {
           globalDiscountValue: data.globalDiscountValue ?? baseFormValues.globalDiscountValue,
           themeColor: data.themeColor ?? baseFormValues.themeColor,
           fontTheme: data.fontTheme ?? baseFormValues.fontTheme,
+          templateStyle: data.templateStyle ?? baseFormValues.templateStyle,
         };
         reset(formData);
 
@@ -446,6 +448,7 @@ export function InvoiceForm() {
         watermarkOpacity: data.watermarkOpacity ?? 0.05,
         themeColor: data.themeColor ?? 'default',
         fontTheme: data.fontTheme ?? 'default',
+        templateStyle: data.templateStyle ?? 'classic',
       };
 
       saveInvoiceData(invoiceId, storedData);
@@ -816,7 +819,7 @@ export function InvoiceForm() {
 
                   return (
                   <div key={item.id} className="p-4 border rounded-md shadow-sm space-y-4 bg-card">
-                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-x-4 gap-y-2 items-end">
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-x-4 gap-y-2 items-baseline">
                       <div className="sm:col-span-4">
                         <FormField
                           control={control}
@@ -1156,6 +1159,28 @@ export function InvoiceForm() {
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
+                  control={form.control}
+                  name="templateStyle"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center"><LayoutTemplate className="mr-2 h-4 w-4"/> Invoice Template Style</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an invoice template" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="classic">Classic - Traditional and professional</SelectItem>
+                          <SelectItem value="modern">Modern - Sleek and contemporary</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Choose a visual style for your invoice.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
                 control={form.control}
                 name="themeColor"
                 render={({ field }) => (
@@ -1320,7 +1345,7 @@ export function InvoiceForm() {
                   <FormControl>
                     <Textarea placeholder="e.g., Payment terms, late fee policy, confidentiality clause..." {...field} rows={4} value={field.value || ''} />
                   </FormControl>
-                   <FormDescription>Your standard terms and conditions. You can set default terms in Application Settings.</FormDescription>
+                   <FormDescription>Your standard terms and conditions. Set defaults in Application Settings.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

@@ -6,7 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Image from 'next/image';
-import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash, RotateCcw } from 'lucide-react';
+import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash, RotateCcw, LayoutTemplate } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,12 +32,21 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 
 const companyProfileSchema = z.object({
   companyName: z.string().optional(),
   companyLogoFile: z.custom<FileList>().optional(),
   defaultInvoiceNotes: z.string().optional(),
   defaultTermsAndConditions: z.string().optional(),
+  defaultTemplateStyle: z.enum(['classic', 'modern']).optional().default('classic'),
 });
 type CompanyProfileFormValues = z.infer<typeof companyProfileSchema>;
 
@@ -85,7 +94,7 @@ export function SettingsForm() {
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
   const companyProfileForm = useForm<CompanyProfileFormValues>({
     resolver: zodResolver(companyProfileSchema),
-    defaultValues: { companyName: '', defaultInvoiceNotes: '', defaultTermsAndConditions: '' },
+    defaultValues: { companyName: '', defaultInvoiceNotes: '', defaultTermsAndConditions: '', defaultTemplateStyle: 'classic' },
   });
 
   // Client Management State
@@ -103,6 +112,7 @@ export function SettingsForm() {
         companyName: profile.companyName || '',
         defaultInvoiceNotes: profile.defaultInvoiceNotes || '',
         defaultTermsAndConditions: profile.defaultTermsAndConditions || '',
+        defaultTemplateStyle: profile.defaultTemplateStyle || 'classic',
       });
       if (profile.companyLogoDataUrl) {
         setCompanyLogoPreview(profile.companyLogoDataUrl);
@@ -147,6 +157,7 @@ export function SettingsForm() {
       companyLogoDataUrl: logoDataUrl,
       defaultInvoiceNotes: data.defaultInvoiceNotes,
       defaultTermsAndConditions: data.defaultTermsAndConditions,
+      defaultTemplateStyle: data.defaultTemplateStyle,
     });
     toast({ title: "Company Profile Saved!", variant: "default" });
   };
@@ -206,7 +217,7 @@ export function SettingsForm() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><Building className="mr-2 h-5 w-5 text-primary" /> Company Profile</CardTitle>
-          <CardDescription>Set your default company information. This will pre-fill new invoices.</CardDescription>
+          <CardDescription>Set your default company information and invoice appearance. This will pre-fill new invoices.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={companyProfileForm.handleSubmit(handleCompanyProfileSubmit)} className="space-y-6">
@@ -255,6 +266,28 @@ export function SettingsForm() {
                 </div>
               )}
             </div>
+
+            <Controller
+              control={companyProfileForm.control}
+              name="defaultTemplateStyle"
+              render={({ field }) => (
+                <div>
+                  <Label htmlFor="defaultTemplateStyleProf" className="flex items-center"><LayoutTemplate className="mr-2 h-4 w-4"/> Default Invoice Template Style</Label>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger id="defaultTemplateStyleProf">
+                      <SelectValue placeholder="Select default template style" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="classic">Classic - Traditional and professional</SelectItem>
+                      <SelectItem value="modern">Modern - Sleek and contemporary</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">Choose the default look for your new invoices.</p>
+                </div>
+              )}
+            />
+
+
             <div>
               <Label htmlFor="defaultInvoiceNotes">Default Invoice Notes</Label>
               <Textarea id="defaultInvoiceNotes" {...companyProfileForm.register("defaultInvoiceNotes")} placeholder="e.g., Payment is due within 30 days. Thank you for your business!" rows={3} />

@@ -10,14 +10,25 @@ const SAVED_ITEMS_KEY = 'savedItemsData_v1';
 // Company Profile
 export const saveCompanyProfile = (data: CompanyProfileData): void => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem(COMPANY_PROFILE_KEY, JSON.stringify(data));
+    const profileToSave: CompanyProfileData = {
+      ...data,
+      defaultTemplateStyle: data.defaultTemplateStyle || 'classic',
+    };
+    localStorage.setItem(COMPANY_PROFILE_KEY, JSON.stringify(profileToSave));
   }
 };
 
 export const getCompanyProfile = (): CompanyProfileData | null => {
   if (typeof window !== 'undefined') {
     const dataString = localStorage.getItem(COMPANY_PROFILE_KEY);
-    return dataString ? JSON.parse(dataString) : null;
+    if (dataString) {
+      const profile = JSON.parse(dataString) as CompanyProfileData;
+      return {
+        ...profile,
+        defaultTemplateStyle: profile.defaultTemplateStyle || 'classic',
+      };
+    }
+    return null;
   }
   return null;
 };
@@ -78,9 +89,9 @@ export const saveSavedItems = (items: SavedItemData[]): void => {
 
 export const addSavedItem = (description: string, rate: number, defaultQuantity?: number, defaultUnit?: string): SavedItemData[] => {
   const items = getSavedItems();
-  const newItem: SavedItemData = { 
-    id: `item_${Date.now()}`, 
-    description, 
+  const newItem: SavedItemData = {
+    id: `item_${Date.now()}`,
+    description,
     rate,
     defaultQuantity: defaultQuantity != null ? Number(defaultQuantity) : undefined,
     defaultUnit: defaultUnit != null ? String(defaultUnit) : undefined,

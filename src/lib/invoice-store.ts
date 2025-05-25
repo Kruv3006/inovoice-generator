@@ -26,6 +26,7 @@ export const saveInvoiceData = (invoiceId: string, data: StoredInvoiceData): voi
       totalFee: data.totalFee,
       themeColor: data.themeColor || 'default',
       fontTheme: data.fontTheme || 'default',
+      templateStyle: data.templateStyle || 'classic',
       invoiceNotes: data.invoiceNotes,
       termsAndConditions: data.termsAndConditions,
     };
@@ -66,6 +67,7 @@ export const getInvoiceData = (invoiceId: string): StoredInvoiceData | null => {
     parsedData.watermarkOpacity = typeof parsedData.watermarkOpacity === 'number' ? parsedData.watermarkOpacity : 0.05;
     parsedData.themeColor = parsedData.themeColor || 'default';
     parsedData.fontTheme = parsedData.fontTheme || 'default';
+    parsedData.templateStyle = parsedData.templateStyle || 'classic';
     parsedData.invoiceNotes = parsedData.invoiceNotes || '';
     parsedData.termsAndConditions = parsedData.termsAndConditions || '';
 
@@ -93,7 +95,7 @@ export const getAllInvoiceIds = (): string[] => {
   return ids.sort((a, b) => {
     const timeA = parseInt(a.split('_')[1] || '0');
     const timeB = parseInt(b.split('_')[1] || '0');
-    return timeB - timeA; 
+    return timeB - timeA;
   });
 };
 

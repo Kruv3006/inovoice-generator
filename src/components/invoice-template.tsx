@@ -15,15 +15,100 @@ const formatCurrency = (amount?: number) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 };
 
-// Wrap InvoiceTemplate with React.memo
+// Helper component for the "Classic" style header
+const ClassicHeader: React.FC<InvoiceTemplateProps> = ({ data }) => {
+  const { companyName, companyLogoDataUrl, customerName, invoiceNumber, invoiceDate, dueDate } = data;
+  const defaultDisplayDate = new Date();
+  const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : defaultDisplayDate;
+  const parsedDueDate = dueDate && isValid(parseISO(dueDate)) ? parseISO(dueDate) : null;
+
+  return (
+    <>
+      <header className="flex flex-col sm:flex-row justify-between items-start pb-6 mb-6 border-b border-[var(--invoice-border-color)]">
+        <div className="flex items-center gap-4 mb-4 sm:mb-0">
+          {companyLogoDataUrl && (
+            <div className="relative w-20 h-20 sm:w-24 sm:h-24 print:w-16 print:h-16 shrink-0">
+              <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
+          )}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[var(--invoice-primary-color)] print:text-black">{companyName || "Your Company Name"}</h1>
+          </div>
+        </div>
+        <div className="text-left sm:text-right w-full sm:w-auto">
+          <h2 className="text-3xl sm:text-4xl font-semibold uppercase text-[var(--invoice-muted-text)] print:text-gray-700">INVOICE</h2>
+          <p className="text-sm text-[var(--invoice-muted-text)] mt-1 print:text-gray-600">
+            <span className="font-medium text-[var(--invoice-text)] print:text-black">Invoice No:</span> {invoiceNumber}
+          </p>
+          <p className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">
+            <span className="font-medium text-[var(--invoice-text)] print:text-black">Date:</span> {format(parsedInvoiceDate, "MMMM d, yyyy")}
+          </p>
+          {parsedDueDate && (
+            <p className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">
+              <span className="font-medium text-[var(--invoice-text)] print:text-black">Due Date:</span> {format(parsedDueDate, "MMMM d, yyyy")}
+            </p>
+          )}
+        </div>
+      </header>
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+        <div>
+          <h3 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">BILL TO</h3>
+          <p className="text-lg font-medium text-[var(--invoice-text)] print:text-black">{customerName || "Client Name"}</p>
+        </div>
+      </section>
+    </>
+  );
+};
+
+// Helper component for the "Modern" style header
+const ModernHeader: React.FC<InvoiceTemplateProps> = ({ data }) => {
+  const { companyName, companyLogoDataUrl, customerName, invoiceNumber, invoiceDate, dueDate } = data;
+  const defaultDisplayDate = new Date();
+  const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : defaultDisplayDate;
+  const parsedDueDate = dueDate && isValid(parseISO(dueDate)) ? parseISO(dueDate) : null;
+
+  return (
+    <>
+      <header className="pb-6 mb-6 border-b border-[var(--invoice-border-color)]">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+          {/* Left Side: Logo and Company Name */}
+          <div className="flex items-center gap-3">
+            {companyLogoDataUrl && (
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 print:w-12 print:h-12 shrink-0">
+                <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
+            )}
+            <h1 className="text-xl sm:text-2xl font-bold text-[var(--invoice-primary-color)] print:text-black">{companyName || "Your Company Name"}</h1>
+          </div>
+
+          {/* Right Side: Invoice Title and Details */}
+          <div className="text-left sm:text-right w-full sm:w-auto mt-4 sm:mt-0">
+            <h2 className="text-2xl sm:text-3xl font-semibold uppercase text-[var(--invoice-muted-text)] print:text-gray-700">INVOICE</h2>
+            <p className="text-xs text-[var(--invoice-muted-text)] mt-1 print:text-gray-600">
+              <span className="font-medium text-[var(--invoice-text)] print:text-black">No:</span> {invoiceNumber}
+            </p>
+            <p className="text-xs text-[var(--invoice-muted-text)] print:text-gray-600">
+              <span className="font-medium text-[var(--invoice-text)] print:text-black">Date:</span> {format(parsedInvoiceDate, "MMMM d, yyyy")}
+            </p>
+            {parsedDueDate && (
+              <p className="text-xs text-[var(--invoice-muted-text)] print:text-gray-600">
+                <span className="font-medium text-[var(--invoice-text)] print:text-black">Due:</span> {format(parsedDueDate, "MMMM d, yyyy")}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="mt-6 pt-4 border-t border-[var(--invoice-border-color)]">
+            <h3 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">BILL TO:</h3>
+            <p className="text-md font-medium text-[var(--invoice-text)] print:text-black">{customerName || "Client Name"}</p>
+        </div>
+      </header>
+    </>
+  );
+};
+
+
 export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(function InvoiceTemplate({ data }) {
   const {
-    companyName,
-    companyLogoDataUrl,
-    customerName,
-    invoiceNumber,
-    invoiceDate,
-    dueDate,
     items,
     subTotal,
     globalDiscountType,
@@ -35,11 +120,9 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
     watermarkOpacity,
     themeColor = 'default',
     fontTheme = 'default',
+    templateStyle = 'classic',
   } = data;
 
-  const defaultDisplayDate = new Date();
-  const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : defaultDisplayDate;
-  const parsedDueDate = dueDate && isValid(parseISO(dueDate)) ? parseISO(dueDate) : null;
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
 
   let globalDiscountAmount = 0;
@@ -68,68 +151,41 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
         position: 'relative'
       }}
     >
-      {/* Watermark Layer - positioned absolutely, behind content */}
+      {/* Watermark Layer */}
       {watermarkDataUrl && (
          <div
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            style={{ zIndex: 0 }}
+            style={{ zIndex: 0 }} // Watermark is at the bottom
          >
             <img
                 src={watermarkDataUrl}
                 alt="Watermark"
                 style={{
-                maxWidth: '80%',
-                maxHeight: '70%',
+                maxWidth: '70%', // Slightly smaller to not overwhelm
+                maxHeight: '60%',
                 objectFit: 'contain',
                 opacity: displayWatermarkOpacity,
+                filter: templateStyle === 'modern' ? 'grayscale(50%)' : 'none', // Example: subtle style change for modern
                 }}
+                data-ai-hint="background pattern"
             />
         </div>
       )}
 
-      {/* Content Layer - relatively positioned with higher z-index */}
+      {/* Content Layer */}
       <div
         className="relative p-6 sm:p-8 md:p-10"
-        style={{ zIndex: 1 }}
+        style={{ zIndex: 1 }} // Content is on top
       >
-        <header className="flex flex-col sm:flex-row justify-between items-start pb-6 mb-6 border-b border-[var(--invoice-border-color)]">
-          <div className="flex items-center gap-4 mb-4 sm:mb-0">
-            {companyLogoDataUrl && (
-              <div className="relative w-20 h-20 sm:w-24 sm:h-24 print:w-16 print:h-16 shrink-0">
-                <img src={companyLogoDataUrl} alt={`${companyName || 'Your Company Name'} Logo`} style={{width: '100%', height: '100%', objectFit: 'contain'}} />
-              </div>
-            )}
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-[var(--invoice-primary-color)] print:text-black">{companyName || "Your Company Name"}</h1>
-            </div>
-          </div>
-          <div className="text-left sm:text-right w-full sm:w-auto">
-            <h2 className="text-3xl sm:text-4xl font-semibold uppercase text-[var(--invoice-muted-text)] print:text-gray-700">INVOICE</h2>
-            <p className="text-sm text-[var(--invoice-muted-text)] mt-1 print:text-gray-600">
-              <span className="font-medium text-[var(--invoice-text)] print:text-black">Invoice No:</span> {invoiceNumber}
-            </p>
-            <p className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">
-              <span className="font-medium text-[var(--invoice-text)] print:text-black">Date:</span> {format(parsedInvoiceDate, "MMMM d, yyyy")}
-            </p>
-            {parsedDueDate && (
-                 <p className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">
-                    <span className="font-medium text-[var(--invoice-text)] print:text-black">Due Date:</span> {format(parsedDueDate, "MMMM d, yyyy")}
-                </p>
-            )}
-          </div>
-        </header>
-
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-          <div>
-            <h3 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">BILL TO</h3>
-            <p className="text-lg font-medium text-[var(--invoice-text)] print:text-black">{customerName || "Client Name"}</p>
-          </div>
-        </section>
+        {templateStyle === 'modern' ? <ModernHeader data={data} /> : <ClassicHeader data={data} />}
 
         <section className="mb-8">
           <div className="overflow-x-auto rounded-md border border-[var(--invoice-border-color)]">
             <table className="w-full table-auto">
-              <thead className="bg-[var(--invoice-header-bg)] print:bg-gray-100">
+              <thead className={cn(
+                "bg-[var(--invoice-header-bg)] print:bg-gray-100",
+                templateStyle === 'modern' && "border-b-2 border-[var(--invoice-primary-color)]"
+              )}>
                 <tr>
                   <th className="p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600 w-2/5 sm:w-[40%]">Description</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Qty</th>
@@ -228,7 +284,10 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
         </section>
 
         <section className="flex justify-end mb-8">
-          <div className="w-full sm:w-1/2 md:w-2/5 lg:w-1/3 space-y-2">
+          <div className={cn(
+              "w-full sm:w-1/2 md:w-2/5 lg:w-1/3 space-y-2",
+              templateStyle === 'modern' && "md:w-1/2 lg:w-2/5"
+            )}>
              <div className="flex justify-between items-center py-2 px-3 border-b border-[var(--invoice-border-color)]">
               <span className="text-sm text-[var(--invoice-muted-text)] print:text-gray-600">SUBTOTAL:</span>
               <span className="text-sm font-medium text-[var(--invoice-text)] print:text-black">{formatCurrency(subTotal)}</span>
@@ -250,22 +309,33 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
           </div>
         </section>
 
-        {invoiceNotes && (
-          <section className="mb-6 pt-4 border-t border-[var(--invoice-border-color)]">
-            <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Notes</h4>
-            <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
-          </section>
+        {(invoiceNotes || termsAndConditions) && (
+          <div className={cn(
+            "grid gap-6",
+            templateStyle === 'classic' && "grid-cols-1",
+            templateStyle === 'modern' && "md:grid-cols-2" // For modern, notes and terms can be side-by-side on larger screens
+          )}>
+            {invoiceNotes && (
+              <section className="pt-4 border-t border-[var(--invoice-border-color)]">
+                <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Notes</h4>
+                <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
+              </section>
+            )}
+
+            {termsAndConditions && (
+              <section className={cn(
+                "pt-4 border-t border-[var(--invoice-border-color)]",
+                templateStyle === 'modern' && invoiceNotes && "md:border-t-0 md:pt-0 md:pl-6 md:border-l" // if notes exist, add left border for T&C
+              )}>
+                <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Terms &amp; Conditions</h4>
+                <p className="text-xs text-[var(--invoice-muted-text)]/80 whitespace-pre-line print:text-gray-500 print:text-[10px]">{termsAndConditions}</p>
+              </section>
+            )}
+          </div>
         )}
 
-        {termsAndConditions && (
-          <section className="mb-8 pt-4 border-t border-[var(--invoice-border-color)]">
-            <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Terms &amp; Conditions</h4>
-            <p className="text-xs text-[var(--invoice-muted-text)]/80 whitespace-pre-line print:text-gray-500 print:text-[10px]">{termsAndConditions}</p>
-          </section>
-        )}
 
-
-        <footer className="text-center text-xs text-[var(--invoice-muted-text)] pt-6 border-t border-[var(--invoice-border-color)] print:text-gray-500">
+        <footer className="text-center text-xs text-[var(--invoice-muted-text)] pt-6 mt-8 border-t border-[var(--invoice-border-color)] print:text-gray-500">
           <p>Thank you for your business!</p>
         </footer>
       </div>

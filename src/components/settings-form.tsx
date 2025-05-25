@@ -6,7 +6,8 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Image from 'next/image';
-import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash, RotateCcw, LayoutTemplate, DollarSign, Mail, Phone, MapPin, Download, Upload, Eye, EyeOff, Database } from 'lucide-react';
+import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash, RotateCcw, LayoutTemplate, DollarSign, Mail, Phone, MapPin, Download, Upload, Eye, EyeOff, Database, FileJson, Sheet as ExcelIcon, FileArchive } from 'lucide-react';
+import { format, parseISO, isValid } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,14 +16,14 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import type { CompanyProfileData, ClientData, SavedItemData, AppBackupData, AvailableCurrency } from '@/lib/invoice-types';
+import type { CompanyProfileData, ClientData, SavedItemData, AppBackupData, AvailableCurrency, StoredInvoiceData } from '@/lib/invoice-types';
 import { availableCurrencies } from '@/lib/invoice-types';
 import {
   saveCompanyProfile, getCompanyProfile,
   getClients, addClient, updateClient, removeClient,
   getSavedItems, addSavedItem, removeSavedItem, saveClients, saveSavedItems
 } from '@/lib/settings-store';
-import { getAllInvoices, saveInvoiceData, removeInvoiceData, INVOICE_STORAGE_KEY_PREFIX } from '@/lib/invoice-store';
+import { getAllInvoices, saveInvoiceData, INVOICE_STORAGE_KEY_PREFIX } from '@/lib/invoice-store';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,6 +51,7 @@ const companyProfileSchema = z.object({
   defaultInvoiceNotes: z.string().optional(),
   defaultTermsAndConditions: z.string().optional(),
   defaultTemplateStyle: z.enum(['classic', 'modern', 'compact', 'minimalist']).optional().default('classic'),
+  defaultFontTheme: z.enum(['default', 'serif', 'mono']).optional().default('default'),
   currencyCode: z.string().optional().default(availableCurrencies[0].code),
   showClientAddressOnInvoice: z.boolean().optional().default(true),
 });
@@ -100,6 +102,19 @@ const fileToDataUrl = (file: File, toastFn: ReturnType<typeof useToast>['toast']
   });
 };
 
+// Helper function to trigger file download
+const downloadFile = (filename: string, content: string, mimeType: string) => {
+  const blob = new Blob([content], { type: mimeType });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+};
+
+
 export function SettingsForm() {
   const { toast } = useToast();
   const companyLogoFileRef = useRef<HTMLInputElement | null>(null);
@@ -114,6 +129,7 @@ export function SettingsForm() {
       defaultInvoiceNotes: '',
       defaultTermsAndConditions: '',
       defaultTemplateStyle: 'classic',
+      defaultFontTheme: 'default',
       currencyCode: availableCurrencies[0].code,
       showClientAddressOnInvoice: true,
     },
@@ -137,6 +153,7 @@ export function SettingsForm() {
         defaultInvoiceNotes: profile.defaultInvoiceNotes || '',
         defaultTermsAndConditions: profile.defaultTermsAndConditions || '',
         defaultTemplateStyle: profile.defaultTemplateStyle || 'classic',
+        defaultFontTheme: profile.defaultFontTheme || 'default',
         currencyCode: profile.currency?.code || availableCurrencies[0].code,
         showClientAddressOnInvoice: profile.showClientAddressOnInvoice === undefined ? true : profile.showClientAddressOnInvoice,
       });
@@ -184,6 +201,7 @@ export function SettingsForm() {
       defaultInvoiceNotes: data.defaultInvoiceNotes,
       defaultTermsAndConditions: data.defaultTermsAndConditions,
       defaultTemplateStyle: data.defaultTemplateStyle,
+      defaultFontTheme: data.defaultFontTheme,
       currency: selectedCurrency,
       showClientAddressOnInvoice: data.showClientAddressOnInvoice,
     });
@@ -243,7 +261,6 @@ export function SettingsForm() {
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
       if (file.size > 2 * 1024 * 1024 || !['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
-        // If validation fails here (e.g., due to direct file drop), reset the preview and the file value
         companyProfileForm.setValue('companyLogoFile', undefined);
         const profile = getCompanyProfile();
         setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
@@ -253,14 +270,12 @@ export function SettingsForm() {
         if (dataUrl) {
             setCompanyLogoPreview(dataUrl);
         } else {
-            // If file read fails, reset preview and file value
             companyProfileForm.setValue('companyLogoFile', undefined);
             const profile = getCompanyProfile();
             setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
         }
       });
     } else if (!watchedCompanyLogoFile && !companyProfileForm.formState.isDirty) {
-        // On initial load or reset, if no file is staged, load from profile
         const profile = getCompanyProfile();
         if (profile?.companyLogoDataUrl) {
             setCompanyLogoPreview(profile.companyLogoDataUrl);
@@ -272,7 +287,7 @@ export function SettingsForm() {
   }, [watchedCompanyLogoFile, companyProfileForm.formState.isDirty, toast]);
 
 
-  const handleExportData = () => {
+  const handleFullAppBackup = () => {
     try {
         const companyProfileData = getCompanyProfile();
         const clientsData = getClients();
@@ -287,22 +302,15 @@ export function SettingsForm() {
         };
 
         const jsonString = JSON.stringify(backupData, null, 2);
-        const blob = new Blob([jsonString], { type: "application/json" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `invoicecraft_backup_${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-        toast({ title: "Data Exported Successfully!", description: "Your backup file has been downloaded." });
+        downloadFile(`invoicecraft_full_backup_${new Date().toISOString().split('T')[0]}.json`, jsonString, 'application/json');
+        toast({ title: "Full App Backup Exported!", description: "Your backup file has been downloaded." });
     } catch (error) {
-        console.error("Error exporting data:", error);
-        toast({ variant: "destructive", title: "Export Failed", description: "Could not export data. Check console." });
+        console.error("Error exporting full app backup:", error);
+        toast({ variant: "destructive", title: "Backup Export Failed", description: "Could not export data. Check console." });
     }
   };
 
-  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFullAppBackup = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
         toast({ variant: "destructive", title: "Import Failed", description: "No file selected." });
@@ -317,48 +325,139 @@ export function SettingsForm() {
 
             if (importedData.companyProfile) {
                 saveCompanyProfile(importedData.companyProfile);
-                // Update form and preview after importing profile
                 companyProfileForm.reset({
                     companyName: importedData.companyProfile.companyName || '',
                     defaultInvoiceNotes: importedData.companyProfile.defaultInvoiceNotes || '',
                     defaultTermsAndConditions: importedData.companyProfile.defaultTermsAndConditions || '',
                     defaultTemplateStyle: importedData.companyProfile.defaultTemplateStyle || 'classic',
+                    defaultFontTheme: importedData.companyProfile.defaultFontTheme || 'default',
                     currencyCode: importedData.companyProfile.currency?.code || availableCurrencies[0].code,
                     showClientAddressOnInvoice: importedData.companyProfile.showClientAddressOnInvoice === undefined ? true : importedData.companyProfile.showClientAddressOnInvoice,
                 });
                 setCompanyLogoPreview(importedData.companyProfile.companyLogoDataUrl || null);
+            } else { // If no profile in backup, reset to defaults
+                 saveCompanyProfile({
+                    companyName: '', companyLogoDataUrl: null, defaultInvoiceNotes: '', defaultTermsAndConditions: '',
+                    defaultTemplateStyle: 'classic', defaultFontTheme: 'default', currency: availableCurrencies[0], showClientAddressOnInvoice: true,
+                });
+                 companyProfileForm.reset({
+                    companyName: '', defaultInvoiceNotes: '', defaultTermsAndConditions: '',
+                    defaultTemplateStyle: 'classic', defaultFontTheme: 'default', currencyCode: availableCurrencies[0].code, showClientAddressOnInvoice: true,
+                });
+                setCompanyLogoPreview(null);
             }
+
             if (importedData.clients && Array.isArray(importedData.clients)) {
                 saveClients(importedData.clients);
                 setClients(importedData.clients);
+            } else {
+                saveClients([]);
+                setClients([]);
             }
+
             if (importedData.savedItems && Array.isArray(importedData.savedItems)) {
                 saveSavedItems(importedData.savedItems);
                 setSavedItems(importedData.savedItems);
+            } else {
+                saveSavedItems([]);
+                setSavedItems([]);
             }
+
+            // Clear existing invoices first for a clean import
+            const existingInvoiceKeys = Object.keys(localStorage).filter(key => key.startsWith(INVOICE_STORAGE_KEY_PREFIX));
+            existingInvoiceKeys.forEach(key => localStorage.removeItem(key));
+            
             if (importedData.invoices && Array.isArray(importedData.invoices)) {
-                // Clear existing invoices first to avoid duplicates if IDs clash or for a clean import
-                const existingInvoiceKeys = Object.keys(localStorage).filter(key => key.startsWith(INVOICE_STORAGE_KEY_PREFIX));
-                existingInvoiceKeys.forEach(key => localStorage.removeItem(key));
-                
                 importedData.invoices.forEach(invoice => saveInvoiceData(invoice.id, invoice));
             }
 
-            toast({ title: "Data Imported Successfully!", description: "Please refresh the page to see all changes reflected, or re-navigate if already refreshed." });
-            // Consider a full page reload or more targeted state updates if needed
-            // window.location.reload(); // Uncomment if a full reload is desired after import
+            toast({ title: "Full App Backup Imported!", description: "All data has been restored. Please review." });
+            // Force re-render or state update if necessary, e.g., by re-fetching relevant data or a page reload
+            // window.location.reload(); // Consider if this UX is acceptable
 
         } catch (error) {
             console.error("Error importing data:", error);
             toast({ variant: "destructive", title: "Import Failed", description: "Invalid backup file or format. Check console." });
         } finally {
-            // Reset file input
             if (importFileRef.current) {
                 importFileRef.current.value = "";
             }
         }
     };
     reader.readAsText(file);
+  };
+
+  const handleExportAllInvoicesAsJSON = () => {
+    try {
+        const allInvoices = getAllInvoices();
+        if (!allInvoices.length) {
+            toast({ title: "No Invoices", description: "There are no invoices to export." });
+            return;
+        }
+        const jsonString = JSON.stringify(allInvoices, null, 2);
+        downloadFile(`invoicecraft_all_invoices_${new Date().toISOString().split('T')[0]}.json`, jsonString, 'application/json');
+        toast({ title: "Invoices Exported as JSON!", description: "Your JSON file has been downloaded." });
+    } catch (error) {
+        console.error("Error exporting invoices as JSON:", error);
+        toast({ variant: "destructive", title: "JSON Export Failed", description: "Could not export invoices. Check console." });
+    }
+  };
+
+  const handleExportAllInvoicesAsCSV = () => {
+    try {
+        const allInvoices = getAllInvoices();
+        if (!allInvoices.length) {
+            toast({ title: "No Invoices", description: "There are no invoices to export." });
+            return;
+        }
+
+        const headers = [
+            "Invoice ID", "Invoice Number", "Invoice Date", "Due Date",
+            "Customer Name", "Customer Email", "Customer Phone", "Company Name",
+            "SubTotal", "Global Discount Type", "Global Discount Value", "Total Fee",
+            "Currency Code", "Currency Symbol", "Theme Color", "Font Theme", "Template Style",
+            "Invoice Notes", "Terms and Conditions"
+        ];
+
+        const escapeCSV = (text: string | undefined | null): string => {
+            if (text === undefined || text === null) return '';
+            let str = String(text);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                str = '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        };
+        
+        const rows = allInvoices.map(invoice => [
+            invoice.id,
+            invoice.invoiceNumber,
+            invoice.invoiceDate ? format(parseISO(invoice.invoiceDate), "yyyy-MM-dd") : '',
+            invoice.dueDate ? format(parseISO(invoice.dueDate), "yyyy-MM-dd") : '',
+            invoice.customerName,
+            invoice.customerEmail || '',
+            invoice.customerPhone || '',
+            invoice.companyName,
+            invoice.subTotal?.toFixed(2) || '0.00',
+            invoice.globalDiscountType || '',
+            invoice.globalDiscountValue?.toString() || '0',
+            invoice.totalFee.toFixed(2),
+            invoice.currency.code,
+            invoice.currency.symbol,
+            invoice.themeColor || 'default',
+            invoice.fontTheme || 'default',
+            invoice.templateStyle || 'classic',
+            invoice.invoiceNotes || '',
+            invoice.termsAndConditions || '',
+        ].map(escapeCSV).join(','));
+
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        downloadFile(`invoicecraft_all_invoices_${new Date().toISOString().split('T')[0]}.csv`, csvContent, 'text/csv;charset=utf-8;');
+        toast({ title: "Invoices Exported as CSV!", description: "Your CSV file has been downloaded." });
+
+    } catch (error) {
+        console.error("Error exporting invoices as CSV:", error);
+        toast({ variant: "destructive", title: "CSV Export Failed", description: "Could not export invoices. Check console." });
+    }
   };
 
 
@@ -412,8 +511,8 @@ export function SettingsForm() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">Your company logo. It will appear on your invoices.</p>
               {companyLogoPreview && (
-                <div className="mt-2 p-2 border rounded-md aspect-square relative w-24 h-24 bg-muted overflow-hidden">
-                  <Image src={companyLogoPreview} alt="Company logo preview" layout="fill" objectFit="contain" data-ai-hint="company brand logo"/>
+                <div className="mt-2 p-2 border rounded-md aspect-square relative w-24 h-24 bg-muted overflow-hidden" data-ai-hint="company brand logo">
+                  <Image src={companyLogoPreview} alt="Company logo preview" layout="fill" objectFit="contain"/>
                 </div>
               )}
             </div>
@@ -460,6 +559,27 @@ export function SettingsForm() {
                 </div>
               )}
             />
+            <Controller
+                control={companyProfileForm.control}
+                name="defaultFontTheme"
+                render={({ field }) => (
+                    <div>
+                    <Label htmlFor="defaultFontThemeProf" className="flex items-center"><Type className="mr-2 h-4 w-4"/> Default Invoice Font Style</Label>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger id="defaultFontThemeProf">
+                        <SelectValue placeholder="Select default font style" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="default">Default Sans</SelectItem>
+                        <SelectItem value="serif">Classic Serif</SelectItem>
+                        <SelectItem value="mono">Modern Mono</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">Choose the default font for your new invoices.</p>
+                    </div>
+                )}
+             />
+
 
             <div>
               <Label htmlFor="defaultInvoiceNotes">Default Invoice Notes</Label>
@@ -675,32 +795,57 @@ export function SettingsForm() {
       
       <Separator />
 
-       {/* Data Management Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl flex items-center"><Database className="mr-2 h-5 w-5 text-primary" /> Data Management</CardTitle>
-          <CardDescription>Export all your application data for backup, or import a previous backup.</CardDescription>
+            <CardTitle className="text-xl flex items-center"><Database className="mr-2 h-5 w-5 text-primary" /> Data Management</CardTitle>
+            <CardDescription>Manage your application data backups and export invoices.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-                <Button onClick={handleExportData} variant="outline" className="w-full sm:w-auto">
-                    <Download className="mr-2 h-4 w-4" /> Export All Data
-                </Button>
-                <Button type="button" variant="outline" onClick={() => importFileRef.current?.click()} className="w-full sm:w-auto">
-                    <Upload className="mr-2 h-4 w-4" /> Import Data
-                </Button>
-                <Input 
-                    type="file" 
-                    accept=".json" 
-                    className="hidden" 
-                    ref={importFileRef} 
-                    onChange={handleImportData}
-                />
+        <CardContent className="space-y-6">
+            <div>
+                <h3 className="text-lg font-medium mb-2 flex items-center"><FileArchive className="mr-2 h-5 w-5 text-muted-foreground" /> Full Application Backup</h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                    This creates a single JSON file containing your company profile, clients, saved items, and all invoices. Use this for complete backup and restore.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <Button onClick={handleFullAppBackup} variant="outline" className="w-full sm:w-auto">
+                        <Download className="mr-2 h-4 w-4" /> Export Full App Backup (JSON)
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => importFileRef.current?.click()} className="w-full sm:w-auto">
+                        <Upload className="mr-2 h-4 w-4" /> Import Full App Backup (JSON)
+                    </Button>
+                    <Input 
+                        type="file" 
+                        accept=".json" 
+                        className="hidden" 
+                        ref={importFileRef} 
+                        onChange={handleImportFullAppBackup}
+                    />
+                </div>
+                 <p className="text-xs text-muted-foreground mt-2">
+                    Importing will overwrite existing application data with the content of the backup file. Use with caution.
+                </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-                Export creates a JSON file with your company profile, clients, saved items, and all invoices.
-                Importing will overwrite existing data with the content of the backup file. Use with caution.
-            </p>
+            
+            <Separator />
+
+            <div>
+                <h3 className="text-lg font-medium mb-2 flex items-center"><FileText className="mr-2 h-5 w-5 text-muted-foreground" /> Batch Export Invoices</h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                    Export all your created invoices in different formats.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <Button onClick={handleExportAllInvoicesAsJSON} variant="outline" className="w-full sm:w-auto">
+                        <FileJson className="mr-2 h-4 w-4" /> Export All Invoices as JSON
+                    </Button>
+                    <Button onClick={handleExportAllInvoicesAsCSV} variant="outline" className="w-full sm:w-auto">
+                        <ExcelIcon className="mr-2 h-4 w-4" /> Export All Invoices as CSV
+                    </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                    Batch export for PDF, DOCX, or detailed Excel (.xlsx) for all invoices is not available due to browser performance limitations.
+                    Individual invoices can be downloaded in these formats from their respective Download pages.
+                </p>
+            </div>
         </CardContent>
       </Card>
 

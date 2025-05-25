@@ -8,6 +8,7 @@ import React from 'react'; // Import React for React.memo
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
+  forceLightMode?: boolean; // New prop
 }
 
 const formatCurrency = (amount?: number) => {
@@ -16,7 +17,7 @@ const formatCurrency = (amount?: number) => {
 };
 
 // Helper component for the "Classic" style header
-const ClassicHeader: React.FC<InvoiceTemplateProps> = ({ data }) => {
+const ClassicHeader: React.FC<Omit<InvoiceTemplateProps, 'forceLightMode'>> = ({ data }) => {
   const { companyName, companyLogoDataUrl, customerName, invoiceNumber, invoiceDate, dueDate } = data;
   const defaultDisplayDate = new Date();
   const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : defaultDisplayDate;
@@ -61,7 +62,7 @@ const ClassicHeader: React.FC<InvoiceTemplateProps> = ({ data }) => {
 };
 
 // Helper component for the "Modern" style header
-const ModernHeader: React.FC<InvoiceTemplateProps> = ({ data }) => {
+const ModernHeader: React.FC<Omit<InvoiceTemplateProps, 'forceLightMode'>> = ({ data }) => {
   const { companyName, companyLogoDataUrl, customerName, invoiceNumber, invoiceDate, dueDate } = data;
   const defaultDisplayDate = new Date();
   const parsedInvoiceDate = invoiceDate && isValid(parseISO(invoiceDate)) ? parseISO(invoiceDate) : defaultDisplayDate;
@@ -107,7 +108,7 @@ const ModernHeader: React.FC<InvoiceTemplateProps> = ({ data }) => {
 };
 
 
-export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(function InvoiceTemplate({ data }) {
+export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(function InvoiceTemplate({ data, forceLightMode = false }) {
   const {
     items,
     subTotal,
@@ -141,7 +142,8 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
       className={cn(
         "bg-[var(--invoice-background)] text-[var(--invoice-text)] shadow-lg print:shadow-none min-w-[320px] md:min-w-[700px] lg:min-w-[800px] max-w-4xl mx-auto print:border-none print:bg-white",
         `theme-${themeColor}`,
-        fontThemeClass
+        fontThemeClass,
+        forceLightMode && "invoice-render-light" // Apply force light mode class
       )}
       style={{
         width: '100%',
@@ -161,11 +163,11 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
                 src={watermarkDataUrl}
                 alt="Watermark"
                 style={{
-                maxWidth: '70%', // Slightly smaller to not overwhelm
+                maxWidth: '70%', 
                 maxHeight: '60%',
                 objectFit: 'contain',
                 opacity: displayWatermarkOpacity,
-                filter: templateStyle === 'modern' ? 'grayscale(50%)' : 'none', // Example: subtle style change for modern
+                filter: templateStyle === 'modern' ? 'grayscale(50%)' : 'none', 
                 }}
                 data-ai-hint="background pattern"
             />
@@ -188,7 +190,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
               )}>
                 <tr>
                   <th className="p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600 w-2/5 sm:w-[40%]">Description</th>
-                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Qty</th>
+                  <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Qty/Dur.</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Unit</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Rate (₹)</th>
                   <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--invoice-muted-text)] print:text-gray-600">Disc (%)</th>
@@ -309,30 +311,30 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
           </div>
         </section>
 
-        {(invoiceNotes || termsAndConditions) && (
-          <div className={cn(
-            "grid gap-6",
-            templateStyle === 'classic' && "grid-cols-1",
-            templateStyle === 'modern' && "md:grid-cols-2" // For modern, notes and terms can be side-by-side on larger screens
-          )}>
-            {invoiceNotes && (
-              <section className="pt-4 border-t border-[var(--invoice-border-color)]">
-                <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Notes</h4>
-                <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
-              </section>
-            )}
+        <div className={cn(
+          "grid gap-6",
+           (invoiceNotes && termsAndConditions && templateStyle === 'classic') && "grid-cols-1", // Stack if both exist in classic
+           (invoiceNotes && termsAndConditions && templateStyle === 'modern') && "md:grid-cols-2", // Side-by-side if both exist in modern
+           (!invoiceNotes || !termsAndConditions) && "grid-cols-1" // Always single column if one is missing
+        )}>
+          {invoiceNotes && (
+            <section className="pt-4 border-t border-[var(--invoice-border-color)]">
+              <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Notes</h4>
+              <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
+            </section>
+          )}
 
-            {termsAndConditions && (
-              <section className={cn(
-                "pt-4 border-t border-[var(--invoice-border-color)]",
-                templateStyle === 'modern' && invoiceNotes && "md:border-t-0 md:pt-0 md:pl-6 md:border-l" // if notes exist, add left border for T&C
-              )}>
-                <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Terms &amp; Conditions</h4>
-                <p className="text-xs text-[var(--invoice-muted-text)]/80 whitespace-pre-line print:text-gray-500 print:text-[10px]">{termsAndConditions}</p>
-              </section>
-            )}
-          </div>
-        )}
+          {termsAndConditions && (
+            <section className={cn(
+              "pt-4 border-t border-[var(--invoice-border-color)]",
+               // Add left border only if notes exist and template is modern and on md+ screens
+              (invoiceNotes && templateStyle === 'modern') && "md:border-t-0 md:pt-0 md:pl-6 md:border-l"
+            )}>
+              <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Terms &amp; Conditions</h4>
+              <p className="text-xs text-[var(--invoice-muted-text)]/80 whitespace-pre-line print:text-gray-500 print:text-[10px]">{termsAndConditions}</p>
+            </section>
+          )}
+        </div>
 
 
         <footer className="text-center text-xs text-[var(--invoice-muted-text)] pt-6 mt-8 border-t border-[var(--invoice-border-color)] print:text-gray-500">

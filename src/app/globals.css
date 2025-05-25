@@ -40,9 +40,9 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* Invoice specific variables */
+    /* Invoice specific variables - LIGHT MODE DEFAULTS */
     --invoice-background: hsl(0 0% 100%);
-    --invoice-text: hsl(220 15% 20%); /* Default font color for invoice */
+    --invoice-text: hsl(220 15% 20%); 
     --invoice-muted-text: hsl(220 10% 40%);
     --invoice-primary-color-hsl: 217 91% 55%; 
     --invoice-primary-color: hsl(var(--invoice-primary-color-hsl));
@@ -58,19 +58,19 @@
   }
 
   .dark {
-    --background: 220 15% 12%; /* Darker blue-gray background */
-    --foreground: 220 15% 90%; /* Light gray text */
-    --card: 220 15% 18%; /* Slightly lighter dark for cards */
+    --background: 220 15% 12%; 
+    --foreground: 220 15% 90%; 
+    --card: 220 15% 18%; 
     --card-foreground: 220 15% 90%;
     --popover: 220 15% 18%;
     --popover-foreground: 220 15% 90%;
-    --primary: 217 91% 65%; /* Keep primary blue vibrant */
+    --primary: 217 91% 65%; 
     --primary-foreground: 0 0% 100%; 
-    --secondary: 220 15% 25%; /* Darker gray for secondary elements */
+    --secondary: 220 15% 25%; 
     --secondary-foreground: 220 15% 85%;
-    --muted: 220 15% 22%; /* Darker muted for subtle backgrounds */
+    --muted: 220 15% 22%; 
     --muted-foreground: 220 10% 65%;
-    --accent: 30 90% 60%; /* Keep accent orange vibrant */
+    --accent: 30 90% 60%; 
     --accent-foreground: 0 0% 10%; 
     --destructive: 0 70% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -92,7 +92,7 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* Invoice specific variables - Dark theme */
+    /* Invoice specific variables - DARK THEME DEFAULTS */
     --invoice-background: hsl(220 15% 15%);
     --invoice-text: hsl(220 15% 92%);
     --invoice-muted-text: hsl(220 10% 60%);
@@ -102,34 +102,35 @@
     --invoice-header-bg: hsl(220 15% 20%);
   }
 
-  /* Invoice Color Themes */
-  .theme-default { /* Uses root/dark variables by default for invoice */ }
+  /* Invoice Color Themes - Light Mode Definitions */
+  .theme-default { /* Uses root variables by default for invoice light */ }
 
   .theme-classic-blue {
     --invoice-primary-color-hsl: 210 80% 50%;
     --invoice-header-bg: hsl(210 50% 96%);
     --invoice-border-color: hsl(210 30% 80%);
   }
-  .dark .theme-classic-blue {
-    --invoice-primary-color-hsl: 210 75% 60%;
-    --invoice-header-bg: hsl(210 30% 22%);
-    --invoice-border-color: hsl(210 25% 38%);
-  }
-
   .theme-emerald-green {
     --invoice-primary-color-hsl: 145 63% 40%;
     --invoice-header-bg: hsl(145 40% 95%);
     --invoice-border-color: hsl(145 30% 80%);
   }
-  .dark .theme-emerald-green {
-    --invoice-primary-color-hsl: 145 55% 55%;
-    --invoice-header-bg: hsl(145 30% 20%);
-    --invoice-border-color: hsl(145 25% 35%);
-  }
    .theme-crimson-red {
     --invoice-primary-color-hsl: 340 70% 45%;
     --invoice-header-bg: hsl(340 50% 96%);
     --invoice-border-color: hsl(340 40% 85%);
+  }
+
+  /* Invoice Color Themes - Dark Mode Overrides */
+  .dark .theme-classic-blue {
+    --invoice-primary-color-hsl: 210 75% 60%;
+    --invoice-header-bg: hsl(210 30% 22%);
+    --invoice-border-color: hsl(210 25% 38%);
+  }
+  .dark .theme-emerald-green {
+    --invoice-primary-color-hsl: 145 55% 55%;
+    --invoice-header-bg: hsl(145 30% 20%);
+    --invoice-border-color: hsl(145 25% 35%);
   }
   .dark .theme-crimson-red {
     --invoice-primary-color-hsl: 340 65% 60%;
@@ -137,16 +138,40 @@
     --invoice-border-color: hsl(340 25% 40%);
   }
 
+  /* Class to force invoice to render with light theme variables */
+  .invoice-render-light {
+    --invoice-background: hsl(0 0% 100%) !important;
+    --invoice-text: hsl(220 15% 20%) !important;
+    --invoice-muted-text: hsl(220 10% 40%) !important;
+    --invoice-border-color: hsl(220 15% 85%) !important;
+    --invoice-header-bg: hsl(220 20% 95%) !important;
+    /* Keep the chosen theme's primary color, but ensure it's the light version */
+    --invoice-primary-color: hsl(var(--invoice-primary-color-hsl)) !important; 
+  }
+  .invoice-render-light.theme-default {
+    --invoice-primary-color-hsl: 217 91% 55% !important; /* Default light primary */
+  }
+  .invoice-render-light.theme-classic-blue {
+    --invoice-primary-color-hsl: 210 80% 50% !important;
+    --invoice-header-bg: hsl(210 50% 96%) !important;
+    --invoice-border-color: hsl(210 30% 80%) !important;
+  }
+  .invoice-render-light.theme-emerald-green {
+    --invoice-primary-color-hsl: 145 63% 40% !important;
+    --invoice-header-bg: hsl(145 40% 95%) !important;
+    --invoice-border-color: hsl(145 30% 80%) !important;
+  }
+  .invoice-render-light.theme-crimson-red {
+    --invoice-primary-color-hsl: 340 70% 45% !important;
+    --invoice-header-bg: hsl(340 50% 96%) !important;
+    --invoice-border-color: hsl(340 40% 85%) !important;
+  }
+
+
   /* Invoice Font Themes */
-  .font-theme-default {
-    font-family: var(--font-family-default);
-  }
-  .font-theme-serif {
-    font-family: var(--font-family-serif);
-  }
-  .font-theme-mono {
-    font-family: var(--font-family-mono);
-  }
+  .font-theme-default { font-family: var(--font-family-default); }
+  .font-theme-serif { font-family: var(--font-family-serif); }
+  .font-theme-mono { font-family: var(--font-family-mono); }
 
 }
 
@@ -156,7 +181,36 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-geist-sans); /* Default body font */
+    font-family: var(--font-geist-sans); 
     font-feature-settings: "cv02", "cv03", "cv04", "cv11"; 
+  }
+}
+
+/* Print specific styles */
+@media print {
+  body.print-active > *:not(.printable-invoice-wrapper) {
+    display: none !important;
+  }
+  .printable-invoice-wrapper {
+    display: block !important; /* Ensure it's block for layout */
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: 9999 !important; /* High z-index for printing */
+  }
+  .printable-invoice-wrapper .invoice-render-light { /* Ensure the template itself also behaves well */
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* Hide elements specifically marked as no-print */
+  .no-print {
+    display: none !important;
   }
 }

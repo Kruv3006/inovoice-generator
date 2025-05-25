@@ -76,7 +76,7 @@ export default function InvoicePreview() {
   }
 
   return (
-    <div className="py-8">
+    <div className="py-8 bg-muted/30 dark:bg-muted/10"> {/* Slightly lighter background for preview page */}
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <h1 className="text-2xl md:text-3xl font-bold text-primary">Invoice Preview</h1>
@@ -90,10 +90,10 @@ export default function InvoicePreview() {
           </div>
         </div>
 
-        <div className="mx-auto w-full max-w-4xl"> 
+        {/* Wrapper to simulate white paper and ensure light mode rendering for the template */}
+        <div className="bg-white p-4 sm:p-8 shadow-2xl rounded-lg mx-auto max-w-4xl print-target-area"> 
           <div className="transform scale-[0.8] sm:scale-[0.9] md:scale-[1] origin-top">
-             {/* Pass invoiceData directly; template handles watermark and opacity from it */}
-             <InvoiceTemplate data={invoiceData} />
+             <InvoiceTemplate data={invoiceData} forceLightMode={true} />
           </div>
         </div>
         
@@ -103,7 +103,7 @@ export default function InvoicePreview() {
                 size="lg"
                 className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-md"
             >
-                Proceed to Download Options <ArrowRight className="ml-2 h-5 w-5" />
+                Proceed to Download & Share <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
         </div>
       </div>

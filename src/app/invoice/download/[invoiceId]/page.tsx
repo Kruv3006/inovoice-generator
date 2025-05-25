@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, Edit, Loader2, AlertTriangle, Home, Eye, Mail, Share2, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { StoredInvoiceData, AvailableCurrency } from '@/lib/invoice-types';
+import type { StoredInvoiceData } from '@/lib/invoice-types';
 import { getInvoiceData } from '@/lib/invoice-store';
 import { generatePdf as generatePdfFile, generateDoc, generateJpeg } from '@/lib/invoice-generator';
 import { format, parseISO, isValid } from 'date-fns';
@@ -84,7 +84,6 @@ export default function InvoiceDownloadPage() {
         await generator(invoiceData);
       }
       // Generator functions should show their own success toasts now
-      // toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
     } catch (e) {
       console.error(`Error generating ${formatName}:`, e);
       // The generator functions themselves should show specific toasts for errors
@@ -110,10 +109,8 @@ export default function InvoiceDownloadPage() {
       toast({ title: "Preparing PDF...", description: "The invoice PDF is being generated for your email." });
       await generatePdfFile(invoiceData, undefined, invoiceTemplateRef.current);
       pdfGeneratedSuccessfully = true; 
-      // generatePdfFile handles its own success toast
     } catch (e) {
       console.error("Error generating PDF for email:", e);
-      // generatePdfFile should have shown an error toast.
     } finally {
       setIsGenerating(false); 
       if (!pdfGeneratedSuccessfully) {
@@ -148,29 +145,21 @@ export default function InvoiceDownloadPage() {
     toast({ title: "Preparing PDF for sharing..." });
 
     const targetElement = invoiceTemplateRef.current;
-     // Store original styles that might be temporarily changed for capture
     const originalTargetStyle = {
         opacity: targetElement.style.opacity,
         display: targetElement.style.display,
-        position: targetElement.style.position,
-        left: targetElement.style.left,
-        top: targetElement.style.top,
-        zIndex: targetElement.style.zIndex,
         backgroundColor: targetElement.style.backgroundColor,
     };
     
-    // Ensure the element being captured is visible and has a light background
-    targetElement.style.display = 'block'; // Ensure it's displayed for html2canvas
+    targetElement.style.display = 'block'; 
     targetElement.style.opacity = '1';
-    targetElement.style.backgroundColor = 'white'; // Force white background on the container
-    // If it's off-screen, position it onscreen temporarily (could be tricky if layout is complex)
-    // For now, assuming CSS for .printable-invoice-wrapper handles visibility correctly.
+    targetElement.style.backgroundColor = 'white'; 
 
     const docElement = document.documentElement;
     const wasDark = docElement.classList.contains('dark');
     if (wasDark) docElement.classList.remove('dark');
     
-    await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay for styles
+    await new Promise(resolve => setTimeout(resolve, 100)); 
 
     try {
         if (targetElement.offsetWidth === 0 || targetElement.offsetHeight === 0) {
@@ -214,11 +203,10 @@ export default function InvoiceDownloadPage() {
             });
             toast({ title: "Shared successfully!" });
         } else {
-            // Fallback for browsers that support navigator.share but not sharing files directly
              await navigator.share({
                 title: `Invoice ${invoiceData.invoiceNumber}`,
                 text: `View invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}. Please download separately.`,
-                url: window.location.href, // Share link to the current page
+                url: window.location.href, 
             });
             toast({ title: "Shared link/text successfully! File sharing not fully supported." });
         }
@@ -226,15 +214,9 @@ export default function InvoiceDownloadPage() {
         console.error('Error sharing invoice:', error);
         toast({ variant: "destructive", title: "Share Error", description: "Could not share the invoice. Try downloading manually." });
     } finally {
-        // Restore original styles for the target element
         targetElement.style.opacity = originalTargetStyle.opacity;
-        targetElement.style.display = originalTargetStyle.display; // Important to restore if changed
+        targetElement.style.display = originalTargetStyle.display; 
         targetElement.style.backgroundColor = originalTargetStyle.backgroundColor;
-        // If other styles like position, left, top, zIndex were changed, restore them too.
-        // targetElement.style.position = originalTargetStyle.position;
-        // targetElement.style.left = originalTargetStyle.left;
-        // targetElement.style.top = originalTargetStyle.top;
-        // targetElement.style.zIndex = originalTargetStyle.zIndex;
 
         if (wasDark) docElement.classList.add('dark');
         setIsGenerating(false);
@@ -286,13 +268,13 @@ export default function InvoiceDownloadPage() {
     ? parseISO(invoiceData.invoiceDate)
     : new Date();
   
-  const currentCurrency = invoiceData.currency || availableCurrencies[0];
+  const currentCurrencyForDisplay = invoiceData.currency || availableCurrencies[0];
   const formatCurrencyLocal = (amount?: number) => {
-    if (typeof amount !== 'number') return `${currentCurrency.symbol}0.00`;
+    if (typeof amount !== 'number') return `${currentCurrencyForDisplay.symbol}0.00`;
     try {
-        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: currentCurrency.code, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: currentCurrencyForDisplay.code, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
     } catch (e) {
-        return `${currentCurrency.symbol}${amount.toFixed(2)}`;
+        return `${currentCurrencyForDisplay.symbol}${amount.toFixed(2)}`;
     }
   };
 
@@ -399,5 +381,3 @@ export default function InvoiceDownloadPage() {
     </div>
   );
 }
-
-    

@@ -185,7 +185,7 @@ export function SettingsForm() {
       } else {
         logoDataUrl = getCompanyProfile()?.companyLogoDataUrl || null;
         setCompanyLogoPreview(logoDataUrl);
-        toast({ variant: "destructive", title: "Logo Upload Failed", description: "Could not process the logo file." });
+        // toast({ variant: "destructive", title: "Logo Upload Failed", description: "Could not process the logo file." }); // fileToDataUrl shows toast
       }
     } else if (data.companyLogoFile === undefined && companyLogoPreview) {
       logoDataUrl = companyLogoPreview;
@@ -261,6 +261,7 @@ export function SettingsForm() {
     if (watchedCompanyLogoFile && watchedCompanyLogoFile.length > 0) {
       const file = watchedCompanyLogoFile[0];
       if (file.size > 2 * 1024 * 1024 || !['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+        // Toast is shown in handleCompanyProfileSubmit, avoid double toast
         companyProfileForm.setValue('companyLogoFile', undefined);
         const profile = getCompanyProfile();
         setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
@@ -322,30 +323,37 @@ export function SettingsForm() {
         try {
             const jsonString = e.target?.result as string;
             const importedData = JSON.parse(jsonString) as AppBackupData;
+            
+            let currentProfileToSet: CompanyProfileData = { // Start with defaults
+                companyName: '', companyLogoDataUrl: null, defaultInvoiceNotes: '', defaultTermsAndConditions: '',
+                defaultTemplateStyle: 'classic', defaultFontTheme: 'default', currency: availableCurrencies[0], showClientAddressOnInvoice: true,
+            };
 
             if (importedData.companyProfile) {
-                saveCompanyProfile(importedData.companyProfile);
-                companyProfileForm.reset({
-                    companyName: importedData.companyProfile.companyName || '',
-                    defaultInvoiceNotes: importedData.companyProfile.defaultInvoiceNotes || '',
-                    defaultTermsAndConditions: importedData.companyProfile.defaultTermsAndConditions || '',
-                    defaultTemplateStyle: importedData.companyProfile.defaultTemplateStyle || 'classic',
-                    defaultFontTheme: importedData.companyProfile.defaultFontTheme || 'default',
-                    currencyCode: importedData.companyProfile.currency?.code || availableCurrencies[0].code,
-                    showClientAddressOnInvoice: importedData.companyProfile.showClientAddressOnInvoice === undefined ? true : importedData.companyProfile.showClientAddressOnInvoice,
-                });
-                setCompanyLogoPreview(importedData.companyProfile.companyLogoDataUrl || null);
-            } else { // If no profile in backup, reset to defaults
-                 saveCompanyProfile({
-                    companyName: '', companyLogoDataUrl: null, defaultInvoiceNotes: '', defaultTermsAndConditions: '',
-                    defaultTemplateStyle: 'classic', defaultFontTheme: 'default', currency: availableCurrencies[0], showClientAddressOnInvoice: true,
-                });
-                 companyProfileForm.reset({
-                    companyName: '', defaultInvoiceNotes: '', defaultTermsAndConditions: '',
-                    defaultTemplateStyle: 'classic', defaultFontTheme: 'default', currencyCode: availableCurrencies[0].code, showClientAddressOnInvoice: true,
-                });
-                setCompanyLogoPreview(null);
+                const importedProfile = importedData.companyProfile;
+                currentProfileToSet = {
+                    companyName: importedProfile.companyName || '',
+                    companyLogoDataUrl: importedProfile.companyLogoDataUrl || null,
+                    defaultInvoiceNotes: importedProfile.defaultInvoiceNotes || '',
+                    defaultTermsAndConditions: importedProfile.defaultTermsAndConditions || '',
+                    defaultTemplateStyle: importedProfile.defaultTemplateStyle || 'classic',
+                    defaultFontTheme: importedProfile.defaultFontTheme || 'default',
+                    currency: importedProfile.currency || availableCurrencies[0],
+                    showClientAddressOnInvoice: importedProfile.showClientAddressOnInvoice === undefined ? true : importedProfile.showClientAddressOnInvoice,
+                };
             }
+            saveCompanyProfile(currentProfileToSet);
+            companyProfileForm.reset({
+                companyName: currentProfileToSet.companyName,
+                defaultInvoiceNotes: currentProfileToSet.defaultInvoiceNotes,
+                defaultTermsAndConditions: currentProfileToSet.defaultTermsAndConditions,
+                defaultTemplateStyle: currentProfileToSet.defaultTemplateStyle,
+                defaultFontTheme: currentProfileToSet.defaultFontTheme,
+                currencyCode: currentProfileToSet.currency?.code,
+                showClientAddressOnInvoice: currentProfileToSet.showClientAddressOnInvoice,
+            });
+            setCompanyLogoPreview(currentProfileToSet.companyLogoDataUrl || null);
+
 
             if (importedData.clients && Array.isArray(importedData.clients)) {
                 saveClients(importedData.clients);
@@ -372,8 +380,8 @@ export function SettingsForm() {
             }
 
             toast({ title: "Full App Backup Imported!", description: "All data has been restored. Please review." });
-            // Force re-render or state update if necessary, e.g., by re-fetching relevant data or a page reload
-            // window.location.reload(); // Consider if this UX is acceptable
+            // Consider a page reload or other mechanism to ensure all components reflect new settings (like currency)
+            // window.location.reload(); // Could be too disruptive, maybe manage state more centrally or use events
 
         } catch (error) {
             console.error("Error importing data:", error);
@@ -441,8 +449,8 @@ export function SettingsForm() {
             invoice.globalDiscountType || '',
             invoice.globalDiscountValue?.toString() || '0',
             invoice.totalFee.toFixed(2),
-            invoice.currency.code,
-            invoice.currency.symbol,
+            invoice.currency?.code || availableCurrencies[0].code,
+            invoice.currency?.symbol || availableCurrencies[0].symbol,
             invoice.themeColor || 'default',
             invoice.fontTheme || 'default',
             invoice.templateStyle || 'classic',
@@ -724,7 +732,7 @@ export function SettingsForm() {
                 {newSavedItemForm.formState.errors.itemDescription && <p className="text-sm text-destructive mt-1">{newSavedItemForm.formState.errors.itemDescription.message}</p>}
               </div>
               <div>
-                <Label htmlFor="itemRateInput">Item Rate ({getCompanyProfile()?.currency?.symbol || '₹'}) *</Label>
+                <Label htmlFor="itemRateInput">Item Rate ({companyProfileForm.getValues('currencyCode') ? availableCurrencies.find(c => c.code === companyProfileForm.getValues('currencyCode'))?.symbol : availableCurrencies[0].symbol}) *</Label>
                 <Input id="itemRateInput" type="number" step="0.01" {...newSavedItemForm.register("itemRate")} placeholder="100.00" />
                 {newSavedItemForm.formState.errors.itemRate && <p className="text-sm text-destructive mt-1">{newSavedItemForm.formState.errors.itemRate.message}</p>}
               </div>
@@ -754,7 +762,7 @@ export function SettingsForm() {
                   <div>
                     <p className="font-medium">{item.description}</p>
                     <p className="text-sm text-muted-foreground">
-                      Rate: {getCompanyProfile()?.currency?.symbol || '₹'}{item.rate.toFixed(2)}
+                      Rate: {companyProfileForm.getValues('currencyCode') ? availableCurrencies.find(c => c.code === companyProfileForm.getValues('currencyCode'))?.symbol : availableCurrencies[0].symbol}{item.rate.toFixed(2)}
                       {item.defaultQuantity != null && `, Qty: ${item.defaultQuantity}`}
                       {item.defaultUnit && `, Unit: ${item.defaultUnit}`}
                     </p>
@@ -804,7 +812,7 @@ export function SettingsForm() {
             <div>
                 <h3 className="text-lg font-medium mb-2 flex items-center"><FileArchive className="mr-2 h-5 w-5 text-muted-foreground" /> Full Application Backup</h3>
                 <p className="text-xs text-muted-foreground mb-3">
-                    This creates a single JSON file containing your company profile, clients, saved items, and all invoices. Use this for complete backup and restore.
+                    Creates a JSON file with your company profile, clients, saved items, and all invoices. Importing will overwrite existing data. Use with caution.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
                     <Button onClick={handleFullAppBackup} variant="outline" className="w-full sm:w-auto">
@@ -822,7 +830,7 @@ export function SettingsForm() {
                     />
                 </div>
                  <p className="text-xs text-muted-foreground mt-2">
-                    Importing will overwrite existing application data with the content of the backup file. Use with caution.
+                    Importing will overwrite existing application data with the content of the backup file.
                 </p>
             </div>
             
@@ -842,7 +850,7 @@ export function SettingsForm() {
                     </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                    Batch export for PDF, DOCX, or detailed Excel (.xlsx) for all invoices is not available due to browser performance limitations.
+                    Batch export for PDF, DOCX, or detailed Excel (.xlsx) for all invoices is not available.
                     Individual invoices can be downloaded in these formats from their respective Download pages.
                 </p>
             </div>

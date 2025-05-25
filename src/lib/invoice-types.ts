@@ -135,14 +135,17 @@ export const invoiceFormSchema = z.object({
 
 export type InvoiceFormSchemaType = z.infer<typeof invoiceFormSchema>;
 
-export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEndDate' | 'discount' | 'itemStartTime' | 'itemEndTime' | 'unit'> {
+export interface StoredLineItem extends Omit<LineItem, 'itemStartDate' | 'itemEndDate' | 'discount' | 'itemStartTime' | 'itemEndTime' | 'unit' | 'quantity' | 'rate'> {
   itemStartDate?: string; // ISO string
   itemEndDate?: string; // ISO string
   itemStartTime?: string;
   itemEndTime?: string;
-  discount?: number;
+  quantity: number;
   unit?: string;
+  rate: number;
+  discount?: number;
 }
+
 export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyLogoFile' | 'watermarkFile' | 'items' | 'invoiceDate' | 'dueDate' | 'watermarkOpacity' | 'invoiceNotes' | 'termsAndConditions' | 'globalDiscountType' | 'globalDiscountValue' | 'themeColor' | 'fontTheme' | 'templateStyle' | 'customerAddress' | 'customerEmail' | 'customerPhone'> {
   id: string;
   invoiceDate: string; // ISO string
@@ -162,9 +165,9 @@ export interface StoredInvoiceData extends Omit<InvoiceFormSchemaType, 'companyL
   totalFee: number;
   currency: AvailableCurrency;
   amountInWords?: string;
-  themeColor?: string; // e.g., 'default', 'emerald-green'
-  fontTheme?: 'default' | 'serif' | 'mono';
-  templateStyle?: 'classic' | 'modern' | 'compact' | 'minimalist';
+  themeColor: string;
+  fontTheme: 'default' | 'serif' | 'mono';
+  templateStyle: 'classic' | 'modern' | 'compact' | 'minimalist';
 }
 
 // Settings Page Types
@@ -174,6 +177,7 @@ export interface CompanyProfileData {
   defaultInvoiceNotes?: string;
   defaultTermsAndConditions?: string;
   defaultTemplateStyle?: 'classic' | 'modern' | 'compact' | 'minimalist';
+  defaultFontTheme?: 'default' | 'serif' | 'mono';
   currency?: AvailableCurrency;
   showClientAddressOnInvoice?: boolean; // Default to true if undefined
 }

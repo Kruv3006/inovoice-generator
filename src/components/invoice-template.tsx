@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import React from 'react'; 
 import { MapPin, Mail, Phone } from "lucide-react";
 import { getCompanyProfile } from "@/lib/settings-store"; 
+import { availableCurrencies } from "@/lib/invoice-types";
 
 interface InvoiceTemplateProps {
   data: StoredInvoiceData;
@@ -14,8 +15,8 @@ interface InvoiceTemplateProps {
 }
 
 const formatCurrency = (amount?: number, currency?: AvailableCurrency) => {
-  if (typeof amount !== 'number') return `${currency?.symbol || '₹'}0.00`;
-  const currentCurrency = currency || { symbol: '₹', code: 'INR', name: 'Indian Rupee' }; 
+  const currentCurrency = currency || availableCurrencies[0]; 
+  if (typeof amount !== 'number') return `${currentCurrency.symbol}0.00`;
   try {
     return new Intl.NumberFormat('en-IN', { 
         style: 'currency', 
@@ -236,6 +237,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
   } = data;
 
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
+  const currentCurrency = currency || availableCurrencies[0];
 
   let globalDiscountAmount = 0;
   if (globalDiscountValue && globalDiscountValue > 0 && subTotal) {
@@ -247,8 +249,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
   }
 
   const fontThemeClass = `font-theme-${fontTheme}`;
-  const currentCurrency = currency || { symbol: '₹', code: 'INR', name: 'Indian Rupee' };
-
+  
   const renderHeader = () => {
     switch(templateStyle) {
       case 'modern':
@@ -291,16 +292,15 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
     "flex justify-between items-center py-3 bg-[var(--invoice-primary-color)]/10 dark:bg-[var(--invoice-primary-color)]/20 px-3 rounded-md",
     templateStyle === 'minimalist' && "bg-transparent dark:bg-transparent px-0 border-t-2 border-[var(--invoice-primary-color)] pt-3 text-[var(--invoice-primary-color)]"
   );
-  const notesTermsGridClasses = cn(
-    "grid gap-6",
-    (invoiceNotes && termsAndConditions && (templateStyle === 'classic' || templateStyle === 'compact' || templateStyle === 'minimalist')) && "grid-cols-1",
-    (invoiceNotes && termsAndConditions && templateStyle === 'modern') && "md:grid-cols-2",
-    (!invoiceNotes || !termsAndConditions) && "grid-cols-1"
+  const notesSectionClasses = cn(
+    "pt-4", 
+    templateStyle !== 'minimalist' && "border-t border-[var(--invoice-border-color)]", 
+    templateStyle === 'compact' && "pt-2 text-xs", 
+    templateStyle === 'minimalist' && "pt-0"
   );
   const termsSectionClasses = cn(
     "pt-4 border-t border-[var(--invoice-border-color)]",
     templateStyle === 'compact' && "pt-2 text-xs",
-    (invoiceNotes && templateStyle === 'modern') && "md:border-t-0 md:pt-0 md:pl-6 md:border-l",
     templateStyle === 'minimalist' && "pt-3 text-xs"
   );
   const termsTextClasses = cn(
@@ -308,6 +308,56 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
     templateStyle === 'compact' && "text-[10px]",
     templateStyle === 'minimalist' && "text-[10px] leading-relaxed"
   );
+
+  // Layout for Notes and Terms
+  let notesAndTermsLayout;
+  if (invoiceNotes && termsAndConditions) {
+    if (templateStyle === 'modern' || templateStyle === 'minimalist') {
+      notesAndTermsLayout = (
+        <div className="grid md:grid-cols-2 gap-6">
+          <section className={notesSectionClasses}>
+            <h4 className={cn("text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600", templateStyle === 'minimalist' && 'text-xs')}>Notes</h4>
+            <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
+          </section>
+          <section className={cn(termsSectionClasses, "md:border-t-0 md:pt-0 md:pl-6 md:border-l")}>
+            <h4 className={cn("text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600", templateStyle === 'minimalist' && 'text-xs')}>Terms &amp; Conditions</h4>
+            <p className={termsTextClasses}>{termsAndConditions}</p>
+          </section>
+        </div>
+      );
+    } else {
+      notesAndTermsLayout = (
+        <>
+          {invoiceNotes && (
+            <section className={notesSectionClasses}>
+              <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Notes</h4>
+              <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
+            </section>
+          )}
+          {termsAndConditions && (
+            <section className={cn(termsSectionClasses, invoiceNotes && "mt-4")}>
+              <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Terms &amp; Conditions</h4>
+              <p className={termsTextClasses}>{termsAndConditions}</p>
+            </section>
+          )}
+        </>
+      );
+    }
+  } else if (invoiceNotes) {
+    notesAndTermsLayout = (
+      <section className={notesSectionClasses}>
+        <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Notes</h4>
+        <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
+      </section>
+    );
+  } else if (termsAndConditions) {
+    notesAndTermsLayout = (
+      <section className={termsSectionClasses}>
+        <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">Terms &amp; Conditions</h4>
+        <p className={termsTextClasses}>{termsAndConditions}</p>
+      </section>
+    );
+  }
 
 
   return (
@@ -320,7 +370,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
       )}
       style={{
         width: '100%',
-        border: (templateStyle === 'minimalist' && !forceLightMode) ? 'none' : '1px solid var(--invoice-border-color)', // No border for minimalist unless forced (e.g. print preview)
+        border: (templateStyle === 'minimalist' && !forceLightMode) ? 'none' : '1px solid var(--invoice-border-color)', 
         borderRadius: (templateStyle === 'minimalist' && !forceLightMode) ? '0' : '0.5rem',
         boxShadow: (templateStyle === 'minimalist' && !forceLightMode) ? 'none' : undefined,
         overflow: 'hidden',
@@ -363,7 +413,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
               <thead className={cn(
                 "bg-[var(--invoice-header-bg)] print:bg-gray-100",
                 (templateStyle === 'modern' || templateStyle === 'compact') && "border-b-2 border-[var(--invoice-primary-color)]",
-                templateStyle === 'minimalist' && "bg-transparent print:bg-transparent" // Minimalist no header bg
+                templateStyle === 'minimalist' && "bg-transparent print:bg-transparent" 
               )}>
                 <tr>
                   <th className={cn(thClasses, "w-2/5 sm:w-[40%]", templateStyle === 'minimalist' && "text-left")}>Description</th>
@@ -484,27 +534,13 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
         {amountInWords && (
             <section className={cn("mb-6 pt-3", templateStyle !== 'minimalist' && "border-t border-[var(--invoice-border-color)]", templateStyle === 'minimalist' && "mt-10")}>
                 <p className="text-xs text-[var(--invoice-muted-text)] italic print:text-gray-600">
-                    <span className="font-semibold">Amount in Words:</span> {amountInWords}
+                    <span className="font-semibold">Amount in Words:</span> {`[Amount for ${currentCurrency.symbol}${(totalFee || 0).toFixed(2)} in words - Auto-generation pending]`}
                 </p>
             </section>
         )}
 
 
-        <div className={notesTermsGridClasses}>
-          {invoiceNotes && (
-            <section className={cn("pt-4", templateStyle !== 'minimalist' && "border-t border-[var(--invoice-border-color)]", templateStyle === 'compact' && "pt-2 text-xs", templateStyle === 'minimalist' && "pt-0")}>
-              <h4 className="text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600">{templateStyle === 'minimalist' ? 'Additional Notes' : 'Notes'}</h4>
-              <p className="text-sm text-[var(--invoice-muted-text)] whitespace-pre-line print:text-gray-600">{invoiceNotes}</p>
-            </section>
-          )}
-
-          {termsAndConditions && (
-            <section className={termsSectionClasses}>
-              <h4 className={cn("text-sm font-semibold uppercase text-[var(--invoice-muted-text)] mb-1 print:text-gray-600", templateStyle === 'compact' && "text-xs", templateStyle === 'minimalist' && "text-xs")}>Terms &amp; Conditions</h4>
-              <p className={termsTextClasses}>{termsAndConditions}</p>
-            </section>
-          )}
-        </div>
+        {notesAndTermsLayout && <div className="mt-8">{notesAndTermsLayout}</div>}
 
         <footer className={cn("text-center text-xs text-[var(--invoice-muted-text)] pt-6 mt-8 border-t border-[var(--invoice-border-color)] print:text-gray-500", templateStyle === 'compact' && "pt-4 mt-6 text-[10px]", templateStyle === 'minimalist' && "pt-6 mt-10 text-[10px]")}>
           <p>Thank you for your business!</p>
@@ -513,4 +549,3 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = React.memo(functi
     </div>
   );
 });
-

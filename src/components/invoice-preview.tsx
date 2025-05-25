@@ -76,7 +76,7 @@ export default function InvoicePreview() {
   }
 
   return (
-    <div className="py-8 bg-muted/30 dark:bg-muted/10"> {/* Slightly lighter background for preview page */}
+    <div className="py-8 bg-muted/30 dark:bg-muted/10"> 
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <h1 className="text-2xl md:text-3xl font-bold text-primary">Invoice Preview</h1>
@@ -90,10 +90,8 @@ export default function InvoicePreview() {
           </div>
         </div>
 
-        {/* Wrapper to simulate white paper and ensure light mode rendering for the template */}
         <div className="bg-white p-2 sm:p-4 md:p-6 shadow-2xl rounded-lg mx-auto max-w-4xl print-target-area overflow-hidden"> 
-          {/* Scale container for better viewing of potentially large template */}
-          <div className="mx-auto" style={{ transform: 'scale(0.95)', transformOrigin: 'top', width: '105.26%' }}> {/* Adjust scale and width for fit */}
+          <div className="mx-auto" style={{ transform: 'scale(0.95)', transformOrigin: 'top', width: '105.26%' }}> 
              {invoiceData && <InvoiceTemplate data={invoiceData} forceLightMode={true} />}
           </div>
         </div>

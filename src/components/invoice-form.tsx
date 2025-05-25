@@ -91,7 +91,7 @@ const defaultItem: LineItem = {
 };
 
 const generateDefaultFormValues = (companyProfile?: CompanyProfileData | null): InvoiceFormSchemaType => {
-  const profile = companyProfile || getCompanyProfile() || { currency: availableCurrencies[0], defaultTemplateStyle: 'classic', showClientAddressOnInvoice: true, defaultInvoiceNotes: '', defaultTermsAndConditions: '' };
+  const profile = companyProfile || getCompanyProfile() || { currency: availableCurrencies[0], defaultTemplateStyle: 'classic', defaultFontTheme: 'default', showClientAddressOnInvoice: true, defaultInvoiceNotes: '', defaultTermsAndConditions: '' };
   return {
     invoiceNumber: String(Date.now()).slice(-6),
     customerName: "",
@@ -109,9 +109,9 @@ const generateDefaultFormValues = (companyProfile?: CompanyProfileData | null): 
     companyLogoFile: undefined,
     watermarkFile: undefined,
     watermarkOpacity: 0.05,
-    themeColor: 'default', // Matches zod default
-    fontTheme: profile?.defaultTemplateStyle === 'serif' ? 'serif' : profile?.defaultTemplateStyle === 'mono' ? 'mono' : 'default', // Infer from profile if possible
-    templateStyle: profile?.defaultTemplateStyle || 'classic', // Matches zod default
+    themeColor: 'default',
+    fontTheme: profile?.defaultFontTheme || 'default',
+    templateStyle: profile?.defaultTemplateStyle || 'classic',
   };
 };
 
@@ -219,7 +219,7 @@ export function InvoiceForm() {
 
   useEffect(() => {
     const profileData = getCompanyProfile(); 
-    setCompanyProfileState(profileData); // Update local state, used by generateDefaultFormValues
+    setCompanyProfileState(profileData);
     setCurrentCurrency(profileData?.currency || availableCurrencies[0]);
 
     let baseFormValues = generateDefaultFormValues(profileData);
@@ -270,6 +270,7 @@ export function InvoiceForm() {
             };
             if (sourceInvoice.watermarkDataUrl) setWatermarkPreview(sourceInvoice.watermarkDataUrl);
             setCompanyLogoPreview(sourceInvoice.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
+            setCurrentCurrency(sourceInvoice.currency || profileData?.currency || availableCurrencies[0]); // Set currency from duplicated invoice
             toastMessage = { title: "Invoice Duplicated", description: "Review and update the details below.", variant: "default" };
         } else {
             toastMessage = { title: "Duplication Error", description: "Could not load source invoice for duplication. Using defaults.", variant: "destructive" };
@@ -308,11 +309,11 @@ export function InvoiceForm() {
           invoiceNotes: data.invoiceNotes ?? baseFormValues.invoiceNotes,
           termsAndConditions: data.termsAndConditions ?? baseFormValues.termsAndConditions,
           watermarkOpacity: data.watermarkOpacity ?? baseFormValues.watermarkOpacity,
-          globalDiscountType: data.globalDiscountType ?? baseFormValues.globalDiscountType,
-          globalDiscountValue: data.globalDiscountValue ?? baseFormValues.globalDiscountValue,
           themeColor: data.themeColor ?? baseFormValues.themeColor,
           fontTheme: data.fontTheme ?? baseFormValues.fontTheme,
           templateStyle: data.templateStyle ?? baseFormValues.templateStyle,
+          globalDiscountType: data.globalDiscountType ?? baseFormValues.globalDiscountType,
+          globalDiscountValue: data.globalDiscountValue ?? baseFormValues.globalDiscountValue,
           customerName: data.customerName,
           customerAddress: data.customerAddress || '',
           customerEmail: data.customerEmail || '',
@@ -320,6 +321,7 @@ export function InvoiceForm() {
         };
         if (data.watermarkDataUrl) setWatermarkPreview(data.watermarkDataUrl);
         setCompanyLogoPreview(data.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
+        setCurrentCurrency(data.currency || profileData?.currency || availableCurrencies[0]); // Set currency from edited invoice
       } else {
         toastMessage = { title: "Edit Error", description: "Could not load invoice data for editing. Using defaults.", variant: "destructive" };
         setCompanyLogoPreview(profileData?.companyLogoDataUrl || null);
@@ -328,6 +330,7 @@ export function InvoiceForm() {
     } else if (!initialDataLoaded) { 
       setCompanyLogoPreview(profileData?.companyLogoDataUrl || null);
       setWatermarkPreview(null);
+      setCurrentCurrency(profileData?.currency || availableCurrencies[0]);
     }
     
     if (!initialDataLoaded) {
@@ -336,7 +339,7 @@ export function InvoiceForm() {
         setInitialDataLoaded(true); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, reset, toast, initialDataLoaded, router]); 
+  }, [searchParams, reset, toast, initialDataLoaded, router]); //Removed companyProfileState from dep array to avoid loop
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -445,6 +448,7 @@ export function InvoiceForm() {
           ...item,
           quantity: Number(item.quantity) || 0,
           unit: item.unit || '', 
+          rate: Number(item.rate) || 0,
           itemStartDate: item.itemStartDate ? item.itemStartDate.toISOString() : undefined,
           itemEndDate: item.itemEndDate ? item.itemEndDate.toISOString() : undefined,
           itemStartTime: item.itemStartTime || undefined,
@@ -456,13 +460,7 @@ export function InvoiceForm() {
       const finalSubTotal = calculatedSubTotal;
       const finalTotalFee = calculatedTotalFee;
       
-      const currentProfileForStorage = getCompanyProfile();
-      const currentCurrencyForStorage = data.dueDate 
-        ? currentCurrency 
-        : (currentProfileForStorage?.currency || availableCurrencies[0]);
-
-
-      const amountInWordsPlaceholder = `[Amount for ${currentCurrencyForStorage?.symbol || '₹'}${finalTotalFee.toFixed(2)} in words - Auto-generation pending]`;
+      const amountInWordsPlaceholder = `[Amount for ${currentCurrency?.symbol || '₹'}${finalTotalFee.toFixed(2)} in words - Auto-generation pending]`;
 
       const storedData: StoredInvoiceData = {
         id: invoiceId,
@@ -480,7 +478,7 @@ export function InvoiceForm() {
         globalDiscountType: data.globalDiscountType,
         globalDiscountValue: data.globalDiscountValue,
         totalFee: finalTotalFee,
-        currency: currentCurrencyForStorage,
+        currency: currentCurrency,
         amountInWords: amountInWordsPlaceholder,
         invoiceNotes: data.invoiceNotes,
         termsAndConditions: data.termsAndConditions,
@@ -1382,7 +1380,7 @@ export function InvoiceForm() {
                 <div className="mt-2">
                   <FormLabel>Watermark Preview (Opacity applied)</FormLabel>
                   <div className="mt-1 p-2 border rounded-md aspect-video relative w-full max-w-xs bg-muted overflow-hidden">
-                     <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center justify-center">
                         <img
                             src={watermarkPreview}
                             alt="Watermark preview"

@@ -4,9 +4,9 @@
 import type { CompanyProfileData, ClientData, SavedItemData, AvailableCurrency } from './invoice-types';
 import { availableCurrencies } from './invoice-types';
 
-const COMPANY_PROFILE_KEY = 'companyProfileData_v2'; // Incremented version
-const CLIENT_LIST_KEY = 'clientListData_v2'; // Incremented version
-const SAVED_ITEMS_KEY = 'savedItemsData_v1'; // No change here yet for direct fields
+const COMPANY_PROFILE_KEY = 'companyProfileData_v3'; // Incremented version for currency, defaultFontTheme
+const CLIENT_LIST_KEY = 'clientListData_v2';
+const SAVED_ITEMS_KEY = 'savedItemsData_v2'; // Incremented for defaultQuantity/Unit
 
 // Company Profile
 export const saveCompanyProfile = (data: CompanyProfileData): void => {
@@ -14,7 +14,8 @@ export const saveCompanyProfile = (data: CompanyProfileData): void => {
     const profileToSave: CompanyProfileData = {
       ...data,
       defaultTemplateStyle: data.defaultTemplateStyle || 'classic',
-      currency: data.currency || availableCurrencies[0], // Default to INR
+      defaultFontTheme: data.defaultFontTheme || 'default',
+      currency: data.currency || availableCurrencies[0],
       showClientAddressOnInvoice: data.showClientAddressOnInvoice === undefined ? true : data.showClientAddressOnInvoice,
     };
     localStorage.setItem(COMPANY_PROFILE_KEY, JSON.stringify(profileToSave));
@@ -29,16 +30,19 @@ export const getCompanyProfile = (): CompanyProfileData | null => {
       return {
         ...profile,
         defaultTemplateStyle: profile.defaultTemplateStyle || 'classic',
+        defaultFontTheme: profile.defaultFontTheme || 'default',
         currency: profile.currency || availableCurrencies[0],
         showClientAddressOnInvoice: profile.showClientAddressOnInvoice === undefined ? true : profile.showClientAddressOnInvoice,
       };
     }
-    return { // Return a default profile if none exists
+    // Return a default profile if none exists
+    return {
         companyName: '',
         companyLogoDataUrl: null,
         defaultInvoiceNotes: '',
         defaultTermsAndConditions: '',
         defaultTemplateStyle: 'classic',
+        defaultFontTheme: 'default',
         currency: availableCurrencies[0],
         showClientAddressOnInvoice: true,
     };
@@ -127,5 +131,3 @@ export const removeSavedItem = (id: string): SavedItemData[] => {
   saveSavedItems(items);
   return items;
 };
-
-    

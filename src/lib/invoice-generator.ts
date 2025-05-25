@@ -5,10 +5,11 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { toast } from '@/hooks/use-toast';
 import { getCompanyProfile } from '@/lib/settings-store'; 
+import { availableCurrencies } from './invoice-types';
 
 const formatCurrencyForDoc = (amount?: number, currency?: AvailableCurrency) => {
-  if (typeof amount !== 'number') return `${currency?.symbol || '₹'}0.00`;
-  const currentCurrency = currency || { symbol: '₹', code: 'INR', name: 'Indian Rupee' };
+  const currentCurrency = currency || availableCurrencies[0];
+  if (typeof amount !== 'number') return `${currentCurrency.symbol}0.00`;
   return `${currentCurrency.symbol}${amount.toFixed(2)}`;
 };
 
@@ -33,12 +34,12 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   const {
     companyName, customerName, invoiceNumber, invoiceDate, dueDate,
     items, subTotal, globalDiscountType, globalDiscountValue, totalFee, invoiceNotes, termsAndConditions,
-    companyLogoDataUrl, watermarkDataUrl, watermarkOpacity, currency, amountInWords,
+    companyLogoDataUrl, watermarkDataUrl, watermarkOpacity, currency,
     themeColor = 'default', fontTheme = 'default', templateStyle = 'classic',
     customerAddress, customerEmail, customerPhone,
   } = data;
 
-  const currentCurrency = currency || { symbol: '₹', code: 'INR', name: 'Indian Rupee' };
+  const currentCurrency = currency || availableCurrencies[0];
   const displayWatermarkOpacity = typeof watermarkOpacity === 'number' ? watermarkOpacity : 0.05;
   const invoiceBgColorDoc = 'hsl(0 0% 100%)'; 
   const textColorDoc = 'hsl(0 0% 10%)'; 
@@ -269,24 +270,40 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     default: selectedHeaderHtml = classicHeaderHtml;
   }
 
-  const notesAndTermsLayout = ((templateStyle === 'modern' || templateStyle === 'minimalist') && invoiceNotes && termsAndConditions) 
-    ? `<tr>
-        <td style="vertical-align:top; width:48%; padding-right:2%;">${invoiceNotes ? `<h4 style="font-size: ${templateStyle === 'minimalist' ? '8pt' : '9pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">${templateStyle === 'minimalist' ? 'Additional Notes' : 'Notes'}</h4><p style="white-space: pre-line; margin-top:0;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>` : ''}</td>
-        <td style="vertical-align:top; width:48%; padding-left:2%; ${templateStyle === 'minimalist' ? '' : 'border-left: 1px solid '+borderColorDoc};">${termsAndConditions ? `<h4 style="font-size: ${templateStyle === 'minimalist' ? '7pt' : '8pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:0;">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'minimalist' ? '6.5pt' : '7pt'}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>` : ''}</td>
-       </tr>`
-    : `<tr><td colspan="2">${invoiceNotes ? `<h4 style="font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">${templateStyle === 'minimalist' ? 'Additional Notes' : 'Notes'}</h4><p style="white-space: pre-line; margin-top:0; margin-bottom:10px;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>` : ''}${termsAndConditions ? `<h4 style="font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '7pt' : '8pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:${invoiceNotes ? '10px' : '0'}; ${templateStyle !== 'minimalist' && invoiceNotes ? 'border-top:1px solid '+borderColorDoc+'; padding-top:'+(invoiceNotes ? '10px' : '0')+';' : ''}">${termsAndConditions ? `Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '6.5pt' : '7pt')}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>` : ''}` : ''}</td></tr>`;
+  let notesAndTermsLayout;
+  if (invoiceNotes && termsAndConditions) {
+    if (templateStyle === 'modern' || templateStyle === 'minimalist') {
+      notesAndTermsLayout = `<tr>
+        <td style="vertical-align:top; width:48%; padding-right:2%;"><h4 style="font-size: ${templateStyle === 'minimalist' ? '8pt' : '9pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4><p style="white-space: pre-line; margin-top:0;">${invoiceNotes.replace(/\n/g, '<br/>')}</p></td>
+        <td style="vertical-align:top; width:48%; padding-left:2%; ${templateStyle === 'minimalist' ? '' : 'border-left: 1px solid '+borderColorDoc+';'}"><h4 style="font-size: ${templateStyle === 'minimalist' ? '7pt' : '8pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:0;">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'minimalist' ? '6.5pt' : '7pt'}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p></td>
+       </tr>`;
+    } else {
+        notesAndTermsLayout = `<tr><td colspan="2">
+            <h4 style="font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4>
+            <p style="white-space: pre-line; margin-top:0; margin-bottom:10px;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>
+            <h4 style="font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '7pt' : '8pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:10px; ${templateStyle !== 'minimalist' ? 'border-top:1px solid '+borderColorDoc+'; padding-top:10px;' : ''}">Terms &amp; Conditions</h4>
+            <p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '6.5pt' : '7pt')}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>
+        </td></tr>`;
+    }
+  } else if (invoiceNotes) {
+    notesAndTermsLayout = `<tr><td colspan="2"><h4 style="font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4><p style="white-space: pre-line; margin-top:0;">${invoiceNotes.replace(/\n/g, '<br/>')}</p></td></tr>`;
+  } else if (termsAndConditions) {
+     notesAndTermsLayout = `<tr><td colspan="2"><h4 style="font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '7pt' : '8pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:0;">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '6.5pt' : '7pt')}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p></td></tr>`;
+  } else {
+    notesAndTermsLayout = '';
+  }
 
-  const notesAndTermsHtml = (invoiceNotes || termsAndConditions) ? `
+  const notesAndTermsTable = notesAndTermsLayout ? `
     <table style="width:100%; margin-top: ${templateStyle === 'minimalist' ? '30px' : '25px'}; padding-top:${templateStyle === 'minimalist' ? '0' : '15px'}; ${templateStyle !== 'minimalist' ? 'border-top: 1px solid '+borderColorDoc : ''}; font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; color: ${mutedTextColorDoc};">
       ${notesAndTermsLayout}
     </table>
   ` : '';
 
-  const amountInWordsHtml = amountInWords ? `
+  const amountInWordsHtml = `
     <div style="margin-top:${templateStyle === 'minimalist' ? '20px' : '15px'}; padding-top:${templateStyle === 'minimalist' ? '0' : '10px'}; ${templateStyle !== 'minimalist' ? 'border-top: 1px solid '+borderColorDoc : ''}; font-size:${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '7.5pt' : '8pt')}; color:${mutedTextColorDoc}; font-style: italic;">
-        <strong>Amount in Words:</strong> ${amountInWords}
+        <strong>Amount in Words:</strong> [Amount for ${currentCurrency.symbol}${(totalFee || 0).toFixed(2)} in words - Auto-generation pending]
     </div>
-  ` : '';
+  `;
 
   const tableStyles = `
     width: 100%;
@@ -331,7 +348,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
           .content-wrapper-doc { position:relative; z-index:1; }
           .items-table-doc { ${tableStyles} }
           .items-table-doc th { ${thStyles} }
-          .items-table-doc td { /* Handled by itemTdStyle in loop */ }
+          /* .items-table-doc td { Handled by itemTdStyle in loop } */
           .totals-summary-table { ${totalsTableStyles} }
           .totals-summary-table td { ${totalsTdStyle} }
           .grand-total-line { font-weight: bold; font-size: ${templateStyle === 'compact' ? '12pt' : (templateStyle === 'minimalist' ? '14pt' : '14pt')}; color: ${primaryColorDoc}; ${templateStyle === 'minimalist' ? 'border-top: 2px solid '+primaryColorDoc+'; padding-top: 8px;' : 'background-color: '+primaryColorDoc+'1A; padding: '+(templateStyle === 'compact' ? '8px 10px' : '10px 12px')+'; border-radius: 4px;'} }
@@ -370,7 +387,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
                 </tbody>
             </table>
             ${amountInWordsHtml}
-            ${notesAndTermsHtml}
+            ${notesAndTermsTable}
             <div class="footer-section-doc"><p>Thank you for your business!</p></div>
           </div>
         </div>
@@ -393,10 +410,6 @@ export const generatePdf = async (data: StoredInvoiceData, _watermarkIgnored?: s
   
   const originalStyle = {
       opacity: elementToCapture.style.opacity,
-      position: elementToCapture.style.position, 
-      left: elementToCapture.style.left,       
-      top: elementToCapture.style.top,         
-      zIndex: elementToCapture.style.zIndex,     
       backgroundColor: elementToCapture.style.backgroundColor,
       display: elementToCapture.style.display,
   };

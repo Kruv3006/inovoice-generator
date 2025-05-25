@@ -46,6 +46,17 @@ import { invoiceFormSchema } from "@/lib/invoice-types";
 import { getInvoiceData, saveInvoiceData } from "@/lib/invoice-store";
 import { getCompanyProfile, getClients, getSavedItems } from "@/lib/settings-store";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 
 const fileToDataUrl = (file: File, toastFn: ReturnType<typeof useToast>['toast']): Promise<string | null> => {
@@ -138,14 +149,10 @@ export function InvoiceForm() {
     let subTotal = 0;
     if (watchedItems) {
       watchedItems.forEach((item) => {
-        let quantity = Number(item.quantity) || 0;
+        const quantity = Number(item.quantity) || 0; // Quantity is now set by useEffect if auto-calculated
         const rate = Number(item.rate) || 0;
         const discount = Number(item.discount) || 0;
 
-        if (item.itemStartDate && item.itemEndDate && isValid(item.itemStartDate) && isValid(item.itemEndDate) && item.itemEndDate >= item.itemStartDate) {
-          const days = differenceInCalendarDays(item.itemEndDate, item.itemStartDate) + 1;
-          quantity = days;
-        }
         const itemSubtotal = quantity * rate;
         subTotal += itemSubtotal * (1 - discount / 100);
       });
@@ -402,13 +409,10 @@ export function InvoiceForm() {
 
 
       const itemsToStore: StoredLineItem[] = data.items.map(item => {
-        let quantity = Number(item.quantity) || 0;
-        if (item.itemStartDate && item.itemEndDate && isValid(item.itemStartDate) && isValid(item.itemEndDate) && item.itemEndDate >= item.itemStartDate) {
-            quantity = differenceInCalendarDays(item.itemEndDate, item.itemStartDate) + 1;
-        }
+        // Quantity is already correctly set in the form state by the auto-calculation logic
         return {
           ...item,
-          quantity,
+          quantity: Number(item.quantity) || 0, // Ensure it's a number
           unit: item.unit || '',
           itemStartDate: item.itemStartDate ? item.itemStartDate.toISOString() : undefined,
           itemEndDate: item.itemEndDate ? item.itemEndDate.toISOString() : undefined,
@@ -471,7 +475,11 @@ export function InvoiceForm() {
       setValue(`items.${itemIndex}.rate`, selectedSavedItem.rate);
       setValue(`items.${itemIndex}.quantity`, selectedSavedItem.defaultQuantity ?? 1);
       setValue(`items.${itemIndex}.unit`, selectedSavedItem.defaultUnit ?? '');
-      // Times are not part of saved items for now
+      // Reset dates and times as they are not part of saved items
+      setValue(`items.${itemIndex}.itemStartDate`, undefined);
+      setValue(`items.${itemIndex}.itemEndDate`, undefined);
+      setValue(`items.${itemIndex}.itemStartTime`, '');
+      setValue(`items.${itemIndex}.itemEndTime`, '');
       trigger(`items.${itemIndex}.description`);
       trigger(`items.${itemIndex}.rate`);
       trigger(`items.${itemIndex}.quantity`);
@@ -498,14 +506,13 @@ export function InvoiceForm() {
                     name="invoiceNumber"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Invoice Number *</FormLabel>
+                        <FormLabel className="flex items-center">
+                           <Hash className="mr-1 h-4 w-4 text-muted-foreground" /> Invoice Number *
+                        </FormLabel>
                         <FormControl>
-                        <div className="relative">
-                            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="e.g., 00123" {...field} className="pl-8" />
-                        </div>
+                        <Input placeholder="e.g., 00123" {...field} />
                         </FormControl>
-                        <FormDescription>A unique ID for this invoice (e.g., INV-2024-001). You can edit this.</FormDescription>
+                        <FormDescription>A unique ID for this invoice. You can edit this.</FormDescription>
                         <FormMessage />
                     </FormItem>
                     )}
@@ -698,22 +705,100 @@ export function InvoiceForm() {
               <div className="flex justify-between items-center mb-1">
                 <FormLabel className="text-xl font-semibold">Invoice Items *</FormLabel>
               </div>
-              <FormDescription className="mb-4">Add items or services provided. For services with a duration, provide start/end dates and a per-day rate; quantity will be calculated as days. Add a unit (e.g., hours, pcs) if applicable. Start/End times are optional for display. Discounts are per item.</FormDescription>
+              <FormDescription className="mb-4">
+                Add items or services. For services with a duration:
+                <br />- Provide start/end dates &amp; times for hourly calculation (Quantity becomes hours, Rate is per hour).
+                <br />- Provide start/end dates (no times) for daily calculation (Quantity becomes days, Rate is per day).
+                <br />- Otherwise, enter Quantity and Rate manually.
+              </FormDescription>
               <div className="space-y-6 mt-4">
                 {fields.map((item, index) => {
-                  const itemStartDate = watch(`items.${index}.itemStartDate`);
-                  const itemEndDate = watch(`items.${index}.itemEndDate`);
-                  let calculatedDays = 0;
-                  let quantityIsCalculated = false;
+                  const itemIndex = index; // Closure for useEffect
 
-                  if (itemStartDate && itemEndDate && isValid(itemStartDate) && isValid(itemEndDate) && itemEndDate >= itemStartDate) {
-                    calculatedDays = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
-                    quantityIsCalculated = true;
+                  // Watch individual fields for dynamic updates
+                  const itemStartDate = watch(`items.${itemIndex}.itemStartDate`);
+                  const itemEndDate = watch(`items.${itemIndex}.itemEndDate`);
+                  const itemStartTime = watch(`items.${itemIndex}.itemStartTime`);
+                  const itemEndTime = watch(`items.${itemIndex}.itemEndTime`);
+
+                  useEffect(() => {
+                    let newQuantity: number | undefined = undefined;
+                    let isAutoCalculated = false;
+                
+                    if (itemStartDate && itemEndDate && itemStartTime && itemEndTime &&
+                        isValid(itemStartDate) && isValid(itemEndDate) &&
+                        /^\d{2}:\d{2}$/.test(itemStartTime) && /^\d{2}:\d{2}$/.test(itemEndTime)) {
+                        
+                        const startH = parseInt(itemStartTime.split(':')[0], 10);
+                        const startM = parseInt(itemStartTime.split(':')[1], 10);
+                        const endH = parseInt(itemEndTime.split(':')[0], 10);
+                        const endM = parseInt(itemEndTime.split(':')[1], 10);
+                
+                        if (startH >= 0 && startH <= 23 && startM >= 0 && startM <= 59 &&
+                            endH >= 0 && endH <= 23 && endM >= 0 && endM <= 59) {
+                
+                            const startDateObj = new Date(itemStartDate);
+                            startDateObj.setHours(startH, startM, 0, 0);
+                
+                            const endDateObj = new Date(itemEndDate);
+                            endDateObj.setHours(endH, endM, 0, 0);
+                
+                            if (endDateObj.getTime() > startDateObj.getTime()) {
+                                const diffMs = endDateObj.getTime() - startDateObj.getTime();
+                                newQuantity = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
+                                isAutoCalculated = true;
+                            }
+                        }
+                    } else if (itemStartDate && itemEndDate &&
+                               isValid(itemStartDate) && isValid(itemEndDate) &&
+                               itemEndDate >= itemStartDate) {
+                        newQuantity = differenceInCalendarDays(itemEndDate, itemStartDate) + 1;
+                        isAutoCalculated = true;
+                    }
+                
+                    const currentFormQuantity = getValues(`items.${itemIndex}.quantity`);
+                    if (isAutoCalculated && newQuantity !== undefined && newQuantity !== currentFormQuantity) {
+                        setValue(`items.${itemIndex}.quantity`, newQuantity, { shouldValidate: true, shouldDirty: true });
+                    }
+                    // If not auto-calculated, quantity remains as manually entered or default.
+                  }, [itemStartDate, itemEndDate, itemStartTime, itemEndTime, setValue, getValues, itemIndex]);
+
+
+                  // Determine labels and readOnly status based on watched values for rendering
+                  let quantityLabel = "Quantity *";
+                  let rateLabel = "Rate (₹) *";
+                  let isQuantityReadOnly = false;
+
+                  if (itemStartDate && itemEndDate && itemStartTime && itemEndTime &&
+                      isValid(itemStartDate) && isValid(itemEndDate) &&
+                      /^\d{2}:\d{2}$/.test(itemStartTime) && /^\d{2}:\d{2}$/.test(itemEndTime)) {
+                      const startH_render = parseInt(itemStartTime.split(':')[0], 10);
+                      const startM_render = parseInt(itemStartTime.split(':')[1], 10);
+                      const endH_render = parseInt(itemEndTime.split(':')[0], 10);
+                      const endM_render = parseInt(itemEndTime.split(':')[1], 10);
+                      
+                      if (startH_render >= 0 && startH_render <= 23 && startM_render >= 0 && startM_render <= 59 &&
+                          endH_render >= 0 && endH_render <= 23 && endM_render >= 0 && endM_render <= 59) {
+                          const startDateObj_render = new Date(itemStartDate);
+                          startDateObj_render.setHours(startH_render, startM_render, 0, 0);
+                          const endDateObj_render = new Date(itemEndDate);
+                          endDateObj_render.setHours(endH_render, endM_render, 0, 0);
+
+                          if (endDateObj_render.getTime() > startDateObj_render.getTime()) {
+                              quantityLabel = "Hours (Auto)";
+                              rateLabel = "Rate/Hour (₹) *";
+                              isQuantityReadOnly = true;
+                          }
+                      }
+                  } else if (itemStartDate && itemEndDate && isValid(itemStartDate) && isValid(itemEndDate) && itemEndDate >= itemStartDate) {
+                      quantityLabel = "Days (Auto)";
+                      rateLabel = "Rate/Day (₹) *";
+                      isQuantityReadOnly = true;
                   }
-
-                  const currentQuantity = quantityIsCalculated ? calculatedDays : (getValues(`items.${index}.quantity`) || 0);
-                  const currentRate = getValues(`items.${index}.rate`) || 0;
-                  const currentDiscount = getValues(`items.${index}.discount`) || 0;
+                  
+                  const currentQuantity = getValues(`items.${itemIndex}.quantity`) || 0;
+                  const currentRate = getValues(`items.${itemIndex}.rate`) || 0;
+                  const currentDiscount = getValues(`items.${itemIndex}.discount`) || 0;
                   const itemSubtotal = (Number(currentQuantity) * Number(currentRate));
                   const itemAmount = (itemSubtotal * (1 - (Number(currentDiscount) / 100))).toFixed(2);
 
@@ -775,7 +860,6 @@ export function InvoiceForm() {
                                 <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                               </PopoverContent>
                             </Popover>
-                            <FormDescription className="text-xs">If set with end date, quantity becomes days.</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -799,14 +883,13 @@ export function InvoiceForm() {
                                 <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => itemStartDate ? date < itemStartDate : false} initialFocus />
                               </PopoverContent>
                             </Popover>
-                            <FormDescription className="text-xs">Must be on or after item start date.</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
-                    { /* Start and End Time Inputs - Conditionally Rendered */ }
-                    {itemStartDate && (
+                    
+                    {(itemStartDate || itemEndDate) && ( // Show time inputs if either date is selected
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
                             control={control}
@@ -824,24 +907,22 @@ export function InvoiceForm() {
                               </FormItem>
                             )}
                           />
-                          {itemEndDate && (
-                            <FormField
-                              control={control}
-                              name={`items.${index}.itemEndTime`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>End Time (HH:MM) (Opt.)</FormLabel>
-                                  <FormControl>
-                                    <div className="relative">
-                                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                      <Input type="time" placeholder="HH:MM" {...field} value={field.value || ''} className="pl-8"/>
-                                    </div>
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          )}
+                          <FormField
+                            control={control}
+                            name={`items.${index}.itemEndTime`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>End Time (HH:MM) (Opt.)</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input type="time" placeholder="HH:MM" {...field} value={field.value || ''} className="pl-8"/>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                        </div>
                     )}
 
@@ -852,21 +933,20 @@ export function InvoiceForm() {
                         name={`items.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{quantityIsCalculated ? "Days (Auto)" : "Quantity *"}</FormLabel>
+                            <FormLabel>{quantityLabel}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
                                 placeholder="1"
                                 {...field}
-                                value={quantityIsCalculated ? calculatedDays : (field.value === undefined || field.value === null ? '' : String(field.value))}
-                                readOnly={quantityIsCalculated}
+                                value={field.value ?? ''} // Ensure controlled component
+                                readOnly={isQuantityReadOnly}
                                 onChange={e => {
-                                  if (!quantityIsCalculated) {
-                                    const val = parseFloat(e.target.value);
-                                    field.onChange(isNaN(val) ? 0 : val)
+                                  if (!isQuantityReadOnly) {
+                                    field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value));
                                   }
                                 }}
-                                className={quantityIsCalculated ? "bg-muted/50" : ""}
+                                className={isQuantityReadOnly ? "bg-muted/50" : ""}
                               />
                             </FormControl>
                             <FormMessage />
@@ -882,9 +962,10 @@ export function InvoiceForm() {
                             <FormControl>
                              <div className="relative">
                                 <Shapes className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="e.g. hrs, pcs" {...field} value={field.value || ''} className="pl-8"/>
+                                <Input placeholder="e.g. hrs, pcs, day" {...field} value={field.value || ''} className="pl-8"/>
                              </div>
                             </FormControl>
+                            <FormDescription className="text-xs">e.g., hours, pcs, day. Auto-suggested if dates used.</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -894,17 +975,14 @@ export function InvoiceForm() {
                         name={`items.${index}.rate`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{quantityIsCalculated ? "Rate/Day (₹) *" : "Rate (₹) *"}</FormLabel>
+                            <FormLabel>{rateLabel}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
                                 placeholder="100.00"
                                 {...field}
-                                value={field.value === undefined || field.value === null ? '' : String(field.value)}
-                                onChange={e => {
-                                    const val = parseFloat(e.target.value);
-                                    field.onChange(isNaN(val) ? 0 : val)
-                                }}
+                                value={field.value ?? ''}
+                                onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
                               />
                             </FormControl>
                             <FormMessage />
@@ -924,11 +1002,11 @@ export function InvoiceForm() {
                                   type="number"
                                   placeholder="0"
                                   {...field}
-                                  value={field.value === undefined || field.value === null ? '' : String(field.value)}
+                                  value={field.value ?? ''}
                                   onChange={e => {
                                       const val = parseFloat(e.target.value);
                                       const finalVal = isNaN(val) ? 0 : (val < 0 ? 0 : (val > 100 ? 100 : val));
-                                      field.onChange(finalVal);
+                                      field.onChange(finalVal === 0 && e.target.value === '' ? '' : finalVal);
                                   }}
                                   className="pl-8"
                                 />
@@ -1013,14 +1091,14 @@ export function InvoiceForm() {
                                             type="number"
                                             placeholder="0"
                                             {...field}
-                                            value={field.value === undefined || field.value === null ? '' : String(field.value)}
+                                            value={field.value ?? ''}
                                              onChange={e => {
                                                 const val = parseFloat(e.target.value);
                                                 let finalVal = isNaN(val) ? 0 : (val < 0 ? 0 : val);
                                                 if (watch("globalDiscountType") === 'percentage' && finalVal > 100) {
                                                     finalVal = 100;
                                                 }
-                                                field.onChange(finalVal);
+                                                field.onChange(finalVal === 0 && e.target.value === '' ? '' : finalVal);
                                             }}
                                             className="pl-8"
                                         />
@@ -1230,9 +1308,27 @@ export function InvoiceForm() {
                 {isSubmitting ? "Processing..." : (searchParams.get('id') && !searchParams.get('duplicate') ? "Update & Preview Invoice" : "Save & Preview Invoice")}
                 {!isSubmitting && <PartyPopper className="ml-2 h-5 w-5" />}
               </Button>
-              <Button type="button" variant="outline" onClick={resetFormToDefaults} className="w-full sm:w-auto">
-                <RotateCcw className="mr-2 h-4 w-4" /> Reset Form
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="outline" className="w-full sm:w-auto">
+                    <RotateCcw className="mr-2 h-4 w-4" /> Reset Form
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will clear all entries in the form and reset it to default values. Any unsaved changes will be lost.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={resetFormToDefaults} className="bg-destructive hover:bg-destructive/90">
+                      Reset Form
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </form>
         </Form>
@@ -1240,3 +1336,4 @@ export function InvoiceForm() {
     </Card>
   );
 }
+

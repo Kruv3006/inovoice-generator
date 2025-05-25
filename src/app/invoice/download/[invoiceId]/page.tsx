@@ -12,8 +12,8 @@ import { getInvoiceData } from '@/lib/invoice-store';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { generatePdf, generateDoc, generateJpeg } from '@/lib/invoice-generator';
 import { format, parseISO, isValid } from 'date-fns';
-import html2canvas from 'html2canvas'; // Added import
-import jsPDF from 'jspdf'; // Added import
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 export default function InvoiceDownloadPage() {
   const router = useRouter();
@@ -78,23 +78,59 @@ export default function InvoiceDownloadPage() {
       toast({ title: `${formatName} Generated!`, description: "Your download should start shortly.", variant: "default" });
     } catch (e) {
       console.error(`Error generating ${formatName}:`, e);
-      toast({ variant: "destructive", title: "Generation Error", description: `Could not generate the ${formatName}. Please try again or check console.` });
+      // The generator functions are expected to show their own detailed toasts on error.
+      // This is a fallback if they don't.
+      // toast({ variant: "destructive", title: "Generation Error", description: `Could not generate the ${formatName}. Please try again or check console.` });
     } finally {
       setIsGenerating(false);
     }
   };
   
-  const handleEmailInvoice = () => {
-    if (!invoiceData) return;
+  const handleEmailInvoice = async () => {
+    if (!invoiceData || !invoiceTemplateRef.current) {
+      toast({
+        title: "Data Missing",
+        description: "Invoice data or template not ready. Cannot prepare email.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    let pdfGeneratedSuccessfully = false;
+
+    try {
+      toast({ title: "Preparing PDF...", description: "The invoice PDF is being generated for your email." });
+      // generatePdf will handle its own success/error toasts for the generation part
+      await generatePdf(invoiceData, undefined, invoiceTemplateRef.current); 
+      pdfGeneratedSuccessfully = true;
+      toast({ title: "PDF Ready for Email", description: "The PDF has been downloaded. Proceeding to open your email client.", variant: "default"});
+
+    } catch (e) {
+      console.error("Error generating PDF for email:", e);
+      // If generatePdf throws and doesn't toast, or for a general fallback:
+      if (!pdfGeneratedSuccessfully) { 
+          toast({ variant: "destructive", title: "PDF Generation Failed", description: "Could not prepare the PDF for your email. Please try downloading manually." });
+      }
+    } finally {
+      if (!pdfGeneratedSuccessfully) {
+        setIsGenerating(false);
+        return; // Don't proceed to mailto if PDF generation failed
+      }
+    }
+
     const subject = encodeURIComponent(`Invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}`);
     const body = encodeURIComponent(
-      `Hello ${invoiceData.customerName || 'Client'},\n\nPlease find attached invoice ${invoiceData.invoiceNumber}.\n\nThank you for your business!\n\nBest regards,\n${invoiceData.companyName || 'Your Company'}\n\n(Please download the invoice and attach it to this email.)`
+      `Hello ${invoiceData.customerName || 'Client'},\n\nPlease find attached invoice ${invoiceData.invoiceNumber}.pdf, which should have just downloaded to your computer.\n\nIf you don't see it, please ensure pop-ups are allowed and check your downloads folder.\n\nThank you for your business!\n\nBest regards,\n${invoiceData.companyName || 'Your Company'}`
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
+
     toast({
       title: "Email Client Opened",
-      description: "Please attach the downloaded invoice to your email.",
+      description: "Please find the downloaded PDF and attach it to your email.",
     });
+    
+    setIsGenerating(false); // Reset loading state after all actions
   };
 
   const handleShareInvoice = async () => {
@@ -107,7 +143,6 @@ export default function InvoiceDownloadPage() {
         setIsGenerating(true);
         toast({ title: "Preparing PDF for sharing..." });
         try {
-            // Generate PDF as a blob to share
             const canvas = await html2canvas(invoiceTemplateRef.current, { scale: 2, useCORS: true, backgroundColor: null });
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'l' : 'p', unit: 'px', format: [canvas.width, canvas.height], compress: true });
@@ -123,11 +158,10 @@ export default function InvoiceDownloadPage() {
                 });
                 toast({ title: "Shared successfully!" });
             } else {
-                 // Fallback for when files cannot be shared, share text/link
                 await navigator.share({
                     title: `Invoice ${invoiceData.invoiceNumber}`,
                     text: `View invoice ${invoiceData.invoiceNumber} from ${invoiceData.companyName || 'Your Company'}. Please download separately.`,
-                    url: window.location.href, // Shares link to current page
+                    url: window.location.href, 
                 });
                 toast({ title: "Shared link/text successfully!" });
             }
@@ -195,7 +229,7 @@ export default function InvoiceDownloadPage() {
         </div>
         
         <div 
-          className="fixed top-0 left-[-9999px] opacity-100 z-[-1] print:hidden"
+          className="fixed top-0 left-[-9999px] opacity-0 z-[-100] print:hidden" /* Kept off-screen but renderable by html2canvas */
           aria-hidden="true" 
         > 
             <div ref={invoiceTemplateRef} className="bg-transparent print:bg-white" style={{ width: '800px', padding: '0', margin: '0' }}>
@@ -240,7 +274,8 @@ export default function InvoiceDownloadPage() {
               variant="outline"
               className="w-full sm:w-auto shadow-md"
             >
-              <Mail className="mr-2 h-4 w-4" /> Email Invoice
+             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+              Email Invoice
             </Button>
              <Button 
               onClick={handleShareInvoice} 
@@ -248,7 +283,8 @@ export default function InvoiceDownloadPage() {
               variant="outline"
               className="w-full sm:w-auto shadow-md"
             >
-              <Share2 className="mr-2 h-4 w-4" /> Share Invoice
+              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
+              Share Invoice
             </Button>
           </CardFooter>
         </Card>
@@ -270,3 +306,5 @@ export default function InvoiceDownloadPage() {
     </div>
   );
 }
+
+    

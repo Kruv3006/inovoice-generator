@@ -12,6 +12,8 @@ import { getInvoiceData } from '@/lib/invoice-store';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { generatePdf, generateDoc, generateJpeg } from '@/lib/invoice-generator';
 import { format, parseISO, isValid } from 'date-fns';
+import html2canvas from 'html2canvas'; // Added import
+import jsPDF from 'jspdf'; // Added import
 
 export default function InvoiceDownloadPage() {
   const router = useRouter();

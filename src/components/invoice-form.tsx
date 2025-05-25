@@ -5,7 +5,7 @@ import type { ElementRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { format, isValid, parseISO, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, Type, Shapes, CalendarClock } from "lucide-react";
+import { CalendarIcon, ImageUp, PartyPopper, Building, Hash, PlusCircle, Trash2, ListCollapse, Percent, Palette, FileSignature, StickyNote, Type, Shapes, CalendarClock, RotateCcw } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -66,6 +66,37 @@ const fileToDataUrl = (file: File, toastFn: ReturnType<typeof useToast>['toast']
   });
 };
 
+const defaultItem: LineItem = {
+  description: "",
+  quantity: 1,
+  unit: "",
+  rate: 0,
+  discount: 0,
+  itemStartDate: undefined,
+  itemEndDate: undefined
+};
+
+const generateDefaultFormValues = (companyProfile?: CompanyProfileData | null): InvoiceFormSchemaType => {
+  return {
+    invoiceNumber: String(Date.now()).slice(-6),
+    customerName: "",
+    companyName: companyProfile?.companyName || "",
+    invoiceDate: new Date(),
+    dueDate: undefined,
+    items: [defaultItem],
+    globalDiscountType: 'percentage',
+    globalDiscountValue: 0,
+    invoiceNotes: companyProfile?.defaultInvoiceNotes || "",
+    termsAndConditions: companyProfile?.defaultTermsAndConditions || "",
+    companyLogoFile: undefined,
+    watermarkFile: undefined,
+    watermarkOpacity: 0.05,
+    themeColor: 'default',
+    fontTheme: 'default',
+  };
+};
+
+
 export function InvoiceForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -82,37 +113,9 @@ export function InvoiceForm() {
   const watermarkFileRef = useRef<HTMLInputElement | null>(null);
   const companyLogoFileRef = useRef<HTMLInputElement | null>(null);
 
-  const defaultItem: LineItem = {
-    description: "",
-    quantity: 1,
-    unit: "",
-    rate: 0,
-    discount: 0,
-    itemStartDate: undefined,
-    itemEndDate: undefined
-  };
-
-  const defaultFormValues: InvoiceFormSchemaType = {
-    invoiceNumber: String(Date.now()).slice(-6),
-    customerName: "",
-    companyName: "",
-    invoiceDate: new Date(),
-    dueDate: undefined,
-    items: [defaultItem],
-    globalDiscountType: 'percentage',
-    globalDiscountValue: 0,
-    invoiceNotes: "",
-    termsAndConditions: "",
-    companyLogoFile: undefined,
-    watermarkFile: undefined,
-    watermarkOpacity: 0.05,
-    themeColor: 'default',
-    fontTheme: 'default',
-  };
-
   const form = useForm<InvoiceFormSchemaType>({
     resolver: zodResolver(invoiceFormSchema),
-    defaultValues: defaultFormValues,
+    defaultValues: generateDefaultFormValues(getCompanyProfile()),
     mode: "onChange",
   });
 
@@ -135,6 +138,19 @@ export function InvoiceForm() {
     setClients(getClients());
     setSavedItems(getSavedItems());
   }, []);
+
+  const resetFormToDefaults = () => {
+    const profile = getCompanyProfile();
+    const defaults = generateDefaultFormValues(profile);
+    reset(defaults);
+    setCompanyLogoPreview(profile?.companyLogoDataUrl || null);
+    setWatermarkPreview(null);
+    // Optionally clear URL params if they dictated a specific state like 'edit' or 'duplicate'
+    // For now, just resets fields. If router.replace is needed, ensure it doesn't cause loops with other useEffects.
+    // router.replace('/invoice/details', { scroll: false }); // Example, be cautious
+    toast({ title: "Form Reset", description: "Invoice details have been reset to defaults.", variant: "default" });
+  };
+
 
   useEffect(() => {
     let subTotal = 0;
@@ -174,16 +190,7 @@ export function InvoiceForm() {
   useEffect(() => {
     const invoiceIdToEdit = searchParams.get('id');
     const companyProfile = getCompanyProfile();
-    let baseFormValues = { ...defaultFormValues };
-
-    if (companyProfile) {
-      baseFormValues.companyName = companyProfile.companyName || baseFormValues.companyName;
-      baseFormValues.invoiceNotes = companyProfile.defaultInvoiceNotes || baseFormValues.invoiceNotes;
-      baseFormValues.termsAndConditions = companyProfile.defaultTermsAndConditions || baseFormValues.termsAndConditions;
-      if (companyProfile.companyLogoDataUrl) {
-        setCompanyLogoPreview(companyProfile.companyLogoDataUrl);
-      }
-    }
+    let baseFormValues = generateDefaultFormValues(companyProfile);
     
     // Handle "duplicate" action parameter
     const duplicateId = searchParams.get('duplicate');
@@ -209,21 +216,30 @@ export function InvoiceForm() {
                 items: duplicatedItems.length > 0 ? duplicatedItems : [defaultItem],
                 companyLogoFile: undefined, // Don't carry over file objects
                 watermarkFile: undefined,  // Don't carry over file objects
-                // Carry over previews and settings
+                companyName: sourceInvoice.companyName || baseFormValues.companyName, // Prioritize source, then profile
+                invoiceNotes: sourceInvoice.invoiceNotes || baseFormValues.invoiceNotes,
+                termsAndConditions: sourceInvoice.termsAndConditions || baseFormValues.termsAndConditions,
                 watermarkOpacity: sourceInvoice.watermarkOpacity ?? baseFormValues.watermarkOpacity,
                 themeColor: sourceInvoice.themeColor ?? baseFormValues.themeColor,
                 fontTheme: sourceInvoice.fontTheme ?? baseFormValues.fontTheme,
             };
             reset(formData);
             if (sourceInvoice.watermarkDataUrl) setWatermarkPreview(sourceInvoice.watermarkDataUrl);
-            if (sourceInvoice.companyLogoDataUrl) setCompanyLogoPreview(sourceInvoice.companyLogoDataUrl); // Use source logo
+            if (sourceInvoice.companyLogoDataUrl) {
+              setCompanyLogoPreview(sourceInvoice.companyLogoDataUrl);
+            } else if (companyProfile?.companyLogoDataUrl) {
+              setCompanyLogoPreview(companyProfile.companyLogoDataUrl);
+            } else {
+              setCompanyLogoPreview(null);
+            }
             toast({ title: "Invoice Duplicated", description: "Review and update the details below.", variant: "default" });
         } else {
             toast({ title: "Duplication Error", description: "Could not load source invoice for duplication. Using defaults.", variant: "destructive" });
             reset(baseFormValues);
+            setCompanyLogoPreview(baseFormValues.companyLogoFile ? URL.createObjectURL(baseFormValues.companyLogoFile[0]) : companyProfile?.companyLogoDataUrl || null);
+            setWatermarkPreview(null);
         }
         setInitialDataLoaded(true);
-         // Remove 'duplicate' from URL to prevent re-duplication on refresh
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.delete('duplicate');
         router.replace(currentUrl.toString(), { scroll: false });
@@ -249,9 +265,10 @@ export function InvoiceForm() {
           items: formItems.length > 0 ? formItems : [defaultItem],
           companyLogoFile: undefined,
           watermarkFile: undefined,
-          watermarkOpacity: data.watermarkOpacity ?? baseFormValues.watermarkOpacity,
+          companyName: data.companyName || baseFormValues.companyName,
           invoiceNotes: data.invoiceNotes ?? baseFormValues.invoiceNotes,
           termsAndConditions: data.termsAndConditions ?? baseFormValues.termsAndConditions,
+          watermarkOpacity: data.watermarkOpacity ?? baseFormValues.watermarkOpacity,
           globalDiscountType: data.globalDiscountType ?? baseFormValues.globalDiscountType,
           globalDiscountValue: data.globalDiscountValue ?? baseFormValues.globalDiscountValue,
           themeColor: data.themeColor ?? baseFormValues.themeColor,
@@ -260,21 +277,27 @@ export function InvoiceForm() {
         reset(formData);
 
         if (data.watermarkDataUrl) setWatermarkPreview(data.watermarkDataUrl);
-        if (data.companyLogoDataUrl) setCompanyLogoPreview(data.companyLogoDataUrl);
-
+        if (data.companyLogoDataUrl) {
+          setCompanyLogoPreview(data.companyLogoDataUrl);
+        } else if (companyProfile?.companyLogoDataUrl) {
+          setCompanyLogoPreview(companyProfile.companyLogoDataUrl);
+        } else {
+          setCompanyLogoPreview(null);
+        }
       } else {
         toast({ title: "Edit Error", description: "Could not load invoice data for editing. Using defaults.", variant: "destructive" });
         reset(baseFormValues);
+        setCompanyLogoPreview(baseFormValues.companyLogoFile ? URL.createObjectURL(baseFormValues.companyLogoFile[0]) : companyProfile?.companyLogoDataUrl || null);
         setWatermarkPreview(null);
       }
       setInitialDataLoaded(true);
     } else if (!initialDataLoaded) {
       reset(baseFormValues);
-      setWatermarkPreview(null);
       setCompanyLogoPreview(baseFormValues.companyLogoFile ? URL.createObjectURL(baseFormValues.companyLogoFile[0]) : companyProfile?.companyLogoDataUrl || null);
+      setWatermarkPreview(null);
       setInitialDataLoaded(true);
     }
-  }, [searchParams, reset, toast, initialDataLoaded, router]); // Added router
+  }, [searchParams, reset, toast, initialDataLoaded, router]); 
 
   const watchedCompanyLogoFile = watch("companyLogoFile");
   const watchedWatermarkFile = watch("watermarkFile");
@@ -301,22 +324,25 @@ export function InvoiceForm() {
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setCompanyLogoPreview(dataUrl);
-        } else {
+        } else { // File read error or null result
           setValue('companyLogoFile', undefined, { shouldValidate: true });
-          setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null);
+          setCompanyLogoPreview(existingData?.companyLogoDataUrl || profileData?.companyLogoDataUrl || null); // Revert to existing
         }
       });
     } else {
-      const currentLogoFileValue = getValues('companyLogoFile');
-      if (!currentLogoFileValue || currentLogoFileValue.length === 0) {
+      // This handles the case where a file might have been selected and then cleared,
+      // or if we are initializing the form for an existing invoice without a new file upload.
+      const currentLogoFileValue = getValues('companyLogoFile'); // Check RHF's current value
+      if (!currentLogoFileValue || currentLogoFileValue.length === 0) { // No new file pending in RHF
         if (existingData?.companyLogoDataUrl) {
           setCompanyLogoPreview(existingData.companyLogoDataUrl);
         } else if (profileData?.companyLogoDataUrl) {
           setCompanyLogoPreview(profileData.companyLogoDataUrl);
         } else {
-          setCompanyLogoPreview(null);
+          setCompanyLogoPreview(null); // No existing, no profile, no new file
         }
       }
+      // If currentLogoFileValue exists, it means a file is staged in RHF, and its preview is handled by the above block.
     }
   }, [watchedCompanyLogoFile, searchParams, setValue, toast, getValues]);
 
@@ -326,33 +352,38 @@ export function InvoiceForm() {
 
     if (watchedWatermarkFile && watchedWatermarkFile.length > 0) {
       const file = watchedWatermarkFile[0];
-      if (file.size > 5 * 1024 * 1024) {
+      if (file.size > 5 * 1024 * 1024) { // Check file size
         toast({ variant: "destructive", title: "Watermark File Too Large", description: "Watermark must be less than 5MB." });
-        setValue('watermarkFile', undefined, { shouldValidate: true });
-        setWatermarkPreview(existingData?.watermarkDataUrl || null);
+        setValue('watermarkFile', undefined, { shouldValidate: true }); // Clear invalid file from RHF
+        setWatermarkPreview(existingData?.watermarkDataUrl || null); // Revert to existing preview
         return;
       }
-      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+      if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) { // Check file type
         toast({ variant: "destructive", title: "Invalid Watermark File Type", description: "Watermark must be PNG, JPEG, or GIF." });
-        setValue('watermarkFile', undefined, { shouldValidate: true });
-        setWatermarkPreview(existingData?.watermarkDataUrl || null);
+        setValue('watermarkFile', undefined, { shouldValidate: true }); // Clear invalid file from RHF
+        setWatermarkPreview(existingData?.watermarkDataUrl || null); // Revert to existing preview
         return;
       }
       fileToDataUrl(file, toast).then(dataUrl => {
         if (dataUrl) {
           setWatermarkPreview(dataUrl);
-        } else {
-          setValue('watermarkFile', undefined, { shouldValidate: true });
-          setWatermarkPreview(existingData?.watermarkDataUrl || null);
+        } else { // File read error or null result
+          setValue('watermarkFile', undefined, { shouldValidate: true }); // Clear failed file from RHF
+          setWatermarkPreview(existingData?.watermarkDataUrl || null); // Revert to existing preview
         }
       });
     } else {
-      const currentWatermarkFileValue = getValues('watermarkFile');
+      // This handles the case where a file might have been selected and then cleared,
+      // or if we are initializing the form for an existing invoice without a new file upload.
+      const currentWatermarkFileValue = getValues('watermarkFile'); // Check RHF's current value
        if (existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
+        // If editing an invoice that had a watermark, and no new file is staged in RHF
         setWatermarkPreview(existingData.watermarkDataUrl);
       } else if (!existingData?.watermarkDataUrl && (!currentWatermarkFileValue || currentWatermarkFileValue.length === 0)) {
+        // If it's a new invoice or an existing one without a watermark, and no new file is staged
         setWatermarkPreview(null);
       }
+      // If currentWatermarkFileValue exists, it means a file is staged, and its preview is handled by the above block.
     }
   }, [watchedWatermarkFile, searchParams, setValue, toast, getValues]);
 
@@ -365,13 +396,16 @@ export function InvoiceForm() {
 
 
       let companyLogoDataUrlToStore: string | null = companyLogoPreview;
+      // Only convert if a new file was actually provided in the form data and hasn't been cleared due to validation
       if (data.companyLogoFile && data.companyLogoFile.length > 0) {
          const newLogoUrl = await fileToDataUrl(data.companyLogoFile[0], toast);
+         // Only update if conversion was successful, otherwise keep existing (or null)
          if (newLogoUrl) companyLogoDataUrlToStore = newLogoUrl;
       }
 
 
       let watermarkDataUrlToStore: string | null = watermarkPreview;
+      // Only convert if a new file was actually provided and hasn't been cleared
        if (data.watermarkFile && data.watermarkFile.length > 0) {
          const newWatermarkUrl = await fileToDataUrl(data.watermarkFile[0], toast);
          if (newWatermarkUrl) watermarkDataUrlToStore = newWatermarkUrl;
@@ -398,7 +432,7 @@ export function InvoiceForm() {
         const rate = Number(item.rate) || 0;
         const discount = Number(item.discount) || 0;
         const itemSubtotal = quantity * rate;
-        return sum + (itemSubtotal * (1 - discount / 100));
+        return sum + (itemSubtotal * (1 - (discount / 100)));
       }, 0);
 
       let totalFee = subTotal;
@@ -465,6 +499,7 @@ export function InvoiceForm() {
       trigger(`items.${itemIndex}.unit`);
     }
   };
+
 
   return (
     <Card className="w-full max-w-3xl mx-auto shadow-xl my-8">
@@ -1124,7 +1159,7 @@ export function InvoiceForm() {
                       </div>
                       <FormControl>
                         <Slider
-                          value={[ (field.value ?? defaultFormValues.watermarkOpacity ?? 0.05) * 100 ]}
+                          value={[ (field.value ?? generateDefaultFormValues().watermarkOpacity ?? 0.05) * 100 ]}
                           onValueChange={(value) => field.onChange(value[0] / 100)}
                           max={100}
                           step={1}
@@ -1170,11 +1205,15 @@ export function InvoiceForm() {
                 </FormItem>
               )}
             />
-
-            <Button type="submit" disabled={isSubmitting || !initialDataLoaded} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
-              {isSubmitting ? "Processing..." : (searchParams.get('id') && !searchParams.get('duplicate') ? "Update & Preview Invoice" : "Save & Preview Invoice")}
-              {!isSubmitting && <PartyPopper className="ml-2 h-5 w-5" />}
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button type="submit" disabled={isSubmitting || !initialDataLoaded} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
+                {isSubmitting ? "Processing..." : (searchParams.get('id') && !searchParams.get('duplicate') ? "Update & Preview Invoice" : "Save & Preview Invoice")}
+                {!isSubmitting && <PartyPopper className="ml-2 h-5 w-5" />}
+              </Button>
+              <Button type="button" variant="outline" onClick={resetFormToDefaults} className="w-full sm:w-auto">
+                <RotateCcw className="mr-2 h-4 w-4" /> Reset Form
+              </Button>
+            </div>
           </form>
         </Form>
       </CardContent>

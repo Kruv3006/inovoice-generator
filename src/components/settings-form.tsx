@@ -6,7 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Image from 'next/image';
-import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash } from 'lucide-react';
+import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash, RotateCcw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,17 @@ import {
   getClients, addClient, removeClient,
   getSavedItems, addSavedItem, removeSavedItem
 } from '@/lib/settings-store';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const companyProfileSchema = z.object({
   companyName: z.string().optional(),
@@ -200,8 +211,8 @@ export function SettingsForm() {
         <CardContent>
           <form onSubmit={companyProfileForm.handleSubmit(handleCompanyProfileSubmit)} className="space-y-6">
             <div>
-              <Label htmlFor="companyName">Company Name</Label>
-              <Input id="companyName" {...companyProfileForm.register("companyName")} placeholder="Your Company LLC" />
+              <Label htmlFor="companyNameProf">Company Name</Label>
+              <Input id="companyNameProf" {...companyProfileForm.register("companyName")} placeholder="Your Company LLC" />
               <p className="text-xs text-muted-foreground mt-1">The name of your business as it will appear on invoices.</p>
             </div>
             <div>
@@ -283,9 +294,27 @@ export function SettingsForm() {
               {clients.map(client => (
                 <li key={client.id} className="flex justify-between items-center p-3 border rounded-md bg-card hover:bg-muted/50">
                   <span className="text-sm font-medium">{client.name}</span>
-                  <Button variant="ghost" size="icon" onClick={() => handleDeleteClient(client.id)} aria-label={`Remove client ${client.name}`}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" aria-label={`Remove client ${client.name}`}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the client "{client.name}".
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteClient(client.id)} className="bg-destructive hover:bg-destructive/90">
+                          Delete Client
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </li>
               ))}
             </ul>
@@ -351,9 +380,27 @@ export function SettingsForm() {
                       {item.defaultUnit && `, Unit: ${item.defaultUnit}`}
                     </p>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => handleDeleteSavedItem(item.id)} aria-label={`Remove saved item ${item.description}`}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" aria-label={`Remove saved item ${item.description}`}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                           This action cannot be undone. This will permanently delete the saved item "{item.description}".
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteSavedItem(item.id)} className="bg-destructive hover:bg-destructive/90">
+                          Delete Item
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </li>
               ))}
             </ul>

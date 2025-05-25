@@ -6,7 +6,7 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Image from 'next/image';
-import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash, RotateCcw, LayoutTemplate, DollarSign, Mail, Phone, MapPin, Download, Upload, Eye, EyeOff, Database, FileJson, Sheet as ExcelIcon, FileArchive } from 'lucide-react';
+import { Building, UserPlus, Trash2, FileText, PlusCircle, Save, Info, FileSignature, Shapes, Hash, RotateCcw, LayoutTemplate, DollarSign, Mail, Phone, MapPin, Download, Upload, Eye, EyeOff, Database, FileJson, Sheet as ExcelIcon, FileArchive, Type } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 
 import { Button } from '@/components/ui/button';

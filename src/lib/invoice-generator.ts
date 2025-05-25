@@ -117,7 +117,7 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
       const itemSubtotal = itemQuantity * itemRate;
       const discountedAmount = itemSubtotal * (1 - itemDiscount / 100);
 
-      const itemTdStyle = `padding: ${templateStyle === 'minimalist' ? '8px 0' : '10px'}; border: ${templateStyle === 'minimalist' ? '0' : '1px solid ' + borderColorDoc}; ${templateStyle === 'minimalist' ? 'border-bottom: 1px solid ' + borderColorDoc : ''}; vertical-align: top;`;
+      const itemTdStyle = `padding: ${templateStyle === 'minimalist' ? '8px 0' : '10px'}; border: ${templateStyle === 'minimalist' ? '0' : '1px solid ' + borderColorDoc}; ${templateStyle === 'minimalist' ? 'border-bottom: 1px dashed ' + borderColorDoc : (templateStyle === 'classic' ? 'border-bottom: 1px solid ' + borderColorDoc : '')}; vertical-align: top;`;
 
       itemsHtml += `
         <tr style="background-color: ${invoiceBgColorDoc};">
@@ -144,12 +144,13 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
     } else {
       discountAmountDisplay = globalDiscountValue;
     }
+    const discountTdStyle = `padding: ${templateStyle === 'minimalist' ? '4px 0' : '8px'}; text-align: right; font-weight: normal; color: ${mutedTextColorDoc}; ${templateStyle === 'minimalist' ? 'border-bottom: 1px dashed '+borderColorDoc : (templateStyle === 'classic' ? 'border-top: 1px solid '+borderColorDoc : '')};`;
     globalDiscountHtml = `
       <tr>
-        <td colspan="5" style="padding: ${templateStyle === 'minimalist' ? '4px 0' : '8px'}; text-align: right; font-weight: normal; color: ${mutedTextColorDoc}; ${templateStyle === 'minimalist' ? '' : 'border-top: 1px solid '+borderColorDoc};">
+        <td colspan="5" style="${discountTdStyle}">
           ${discountLabel}:
         </td>
-        <td style="padding: ${templateStyle === 'minimalist' ? '4px 0' : '8px'}; text-align: right; font-weight: normal; color: ${mutedTextColorDoc}; ${templateStyle === 'minimalist' ? '' : 'border-top: 1px solid '+borderColorDoc};">
+        <td style="${discountTdStyle}">
           - ${fCurrency(discountAmountDisplay)}
         </td>
       </tr>
@@ -157,147 +158,144 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   }
 
   const clientDetailsHtml = `
-    <p style="margin: 0; color: ${textColorDoc}; font-weight: ${templateStyle === 'minimalist' ? '600' : 'bold'}; font-size: ${templateStyle === 'minimalist' ? '10pt' : 'inherit'};">${customerName || 'Client Name'}</p>
-    ${(showClientAddressOnInvoice && customerAddress) ? `<p style="margin: 2px 0; white-space: pre-line; color: ${mutedTextColorDoc}; font-size: ${templateStyle === 'minimalist' ? '8pt' : '9pt'};">${customerAddress}</p>` : ''}
-    ${customerEmail ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc}; font-size: ${templateStyle === 'minimalist' ? '8pt' : '9pt'};">Email: ${customerEmail}</p>` : ''}
-    ${customerPhone ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc}; font-size: ${templateStyle === 'minimalist' ? '8pt' : '9pt'};">Phone: ${customerPhone}</p>` : ''}
+    <p style="margin: 0; color: ${textColorDoc}; font-weight: ${templateStyle === 'minimalist' ? '600' : 'bold'}; font-size: ${templateStyle === 'minimalist' ? '10pt' : (templateStyle === 'compact' ? '8pt' : '11pt')};">${customerName || 'Client Name'}</p>
+    ${(showClientAddressOnInvoice && customerAddress) ? `<p style="margin: 2px 0; white-space: pre-line; color: ${mutedTextColorDoc}; font-size: ${templateStyle === 'minimalist' ? '8pt' : (templateStyle === 'compact' ? '7pt' : '9pt')};">${customerAddress.replace(/\n/g, '<br/>')}</p>` : ''}
+    ${customerEmail ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc}; font-size: ${templateStyle === 'minimalist' ? '8pt' : (templateStyle === 'compact' ? '7pt' : '9pt')};">Email: ${customerEmail}</p>` : ''}
+    ${customerPhone ? `<p style="margin: 2px 0; color: ${mutedTextColorDoc}; font-size: ${templateStyle === 'minimalist' ? '8pt' : (templateStyle === 'compact' ? '7pt' : '9pt')};">Phone: ${customerPhone}</p>` : ''}
   `;
 
-  const classicHeaderHtml = `
-    <div style="display: table; width: 100%; margin-bottom: 25px; padding-bottom:15px; border-bottom: 1px solid ${borderColorDoc};">
-      <div style="display: table-cell; vertical-align: middle; width: 60%;">
-        ${companyLogoHtml ? `<div style="margin-bottom: 5px;">${companyLogoHtml}</div>` : ''}
-        <div style="font-size: 20px; font-weight: bold; color: ${primaryColorDoc};">${companyName || 'Your Company'}</div>
-      </div>
-      <div style="display: table-cell; vertical-align: middle; text-align: right; font-size: 9.5pt; color: ${mutedTextColorDoc};">
-        <div style="font-size: 24px; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase;">INVOICE</div>
-        <div style="margin-top: 2px;"><strong style="color: ${textColorDoc};">Invoice No:</strong> ${invoiceNumber}</div>
-        <div><strong style="color: ${textColorDoc};">Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</div>
-        ${parsedDueDate ? `<div><strong style="color: ${textColorDoc};">Due Date:</strong> ${format(parsedDueDate, "MMMM d, yyyy")}</div>` : ''}
-      </div>
-    </div>
-    <div style="margin-bottom: 25px; font-size: 9.5pt;">
-      <h3 style="font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Bill To</h3>
-      ${clientDetailsHtml}
-    </div>
-  `;
+  // --- START TEMPLATE-SPECIFIC HEADERS ---
+  let selectedHeaderHtml = '';
 
-  const modernHeaderHtml = `
-    <div style="padding-bottom:15px; margin-bottom: 25px; border-bottom: 1px solid ${borderColorDoc};">
-        <div style="display:table; width:100%; vertical-align:top;">
-            <div style="display:table-cell; width:60%; vertical-align:top;">
-                ${companyLogoHtml ? `<div style="margin-bottom: 5px;">${companyLogoHtml}</div>` : ''}
-                <div style="font-size: 18px; font-weight: bold; color: ${primaryColorDoc};">${companyName || 'Your Company'}</div>
-            </div>
-            <div style="display:table-cell; width:40%; text-align:right; vertical-align:top;">
-                <div style="font-size: 22px; font-weight: bold; margin-bottom: 5px; color: ${mutedTextColorDoc}; text-transform: uppercase;">INVOICE</div>
-                <div style="font-size: 9pt; color: ${mutedTextColorDoc};"><strong style="color: ${textColorDoc};">No:</strong> ${invoiceNumber}</div>
-                <div style="font-size: 9pt; color: ${mutedTextColorDoc};"><strong style="color: ${textColorDoc};">Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</div>
-                ${parsedDueDate ? `<div style="font-size: 9pt; color: ${mutedTextColorDoc};"><strong style="color: ${textColorDoc};">Due:</strong> ${format(parsedDueDate, "MMMM d, yyyy")}</div>` : ''}
-            </div>
+  if (templateStyle === 'classic') {
+    selectedHeaderHtml = `
+      <div style="display: table; width: 100%; margin-bottom: 25px; padding-bottom:15px; border-bottom: 1px solid ${borderColorDoc};">
+        <div style="display: table-cell; vertical-align: middle; width: 60%;">
+          ${companyLogoHtml ? `<div style="margin-bottom: 5px;">${companyLogoHtml}</div>` : ''}
+          <div style="font-size: 20px; font-weight: bold; color: ${primaryColorDoc};">${companyName || 'Your Company'}</div>
         </div>
-        <div style="margin-top: 15px; padding-top:10px; border-top: 1px solid ${borderColorDoc}; font-size: 9.5pt;">
-            <h3 style="font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">BILL TO:</h3>
-            ${clientDetailsHtml}
+        <div style="display: table-cell; vertical-align: middle; text-align: right; font-size: 9.5pt; color: ${mutedTextColorDoc};">
+          <div style="font-size: 24px; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase;">INVOICE</div>
+          <div style="margin-top: 2px;"><strong style="color: ${textColorDoc};">Invoice No:</strong> ${invoiceNumber}</div>
+          <div><strong style="color: ${textColorDoc};">Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</div>
+          ${parsedDueDate ? `<div><strong style="color: ${textColorDoc};">Due Date:</strong> ${format(parsedDueDate, "MMMM d, yyyy")}</div>` : ''}
         </div>
-    </div>
-  `;
-
-  const compactHeaderHtml = `
-    <div style="padding-bottom:10px; margin-bottom:15px; border-bottom: 2px solid ${primaryColorDoc};">
-        <table style="width:100%; border-collapse:collapse;">
-            <tr>
-                <td style="width:20%; vertical-align:top;">
-                    ${companyLogoHtml ? `<div>${companyLogoHtml}</div>` : ''}
-                </td>
-                <td style="width:80%; text-align:right; vertical-align:top;">
-                    <div style="font-size:18px; font-weight:bold; color:${primaryColorDoc}; text-transform:uppercase; margin-bottom:5px;">INVOICE</div>
-                </td>
-            </tr>
-            <tr>
-                <td style="padding-top:5px; font-size:8pt;">
-                    <div style="font-weight:bold; color:${textColorDoc};">${companyName || 'Your Company'}</div>
-                </td>
-                <td style="padding-top:5px; text-align:right; font-size:8pt; color:${mutedTextColorDoc};">
-                    <div><strong style="color:${textColorDoc};">Invoice #:</strong> ${invoiceNumber}</div>
-                    <div><strong style="color:${textColorDoc};">Date:</strong> ${format(parsedInvoiceDate, "dd/MM/yyyy")}</div>
-                    ${parsedDueDate ? `<div><strong style="color:${textColorDoc};">Due:</strong> ${format(parsedDueDate, "dd/MM/yyyy")}</div>` : ''}
-                </td>
-            </tr>
-        </table>
-    </div>
-    <div style="margin-bottom:15px; font-size:8pt;">
-        <h3 style="font-size:8pt; font-weight:bold; color:${mutedTextColorDoc}; text-transform:uppercase; margin-bottom:2px; margin-top:0;">BILLED TO:</h3>
+      </div>
+      <div style="margin-bottom: 25px; font-size: 9.5pt;">
+        <h3 style="font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Bill To</h3>
         ${clientDetailsHtml}
-    </div>
-  `;
-
-  const minimalistHeaderHtml = `
-    <div style="padding-bottom:20px; margin-bottom:20px;">
-        <table style="width:100%; border-collapse:collapse;">
-            <tr>
-                <td style="width:60%; vertical-align:top;">
-                    ${companyLogoHtml ? `<div>${companyLogoHtml}</div>` : `<div style="font-size:22px; font-weight:600; color:${primaryColorDoc};">${companyName || 'Your Company'}</div>`}
-                    ${companyLogoHtml && companyName ? `<div style="font-size:18px; font-weight:600; color:${primaryColorDoc}; margin-top:5px;">${companyName}</div>` : ''}
-                </td>
-                <td style="width:40%; text-align:right; vertical-align:top;">
-                    <div style="font-size:16px; font-weight:normal; color:${mutedTextColorDoc}; text-transform:uppercase; letter-spacing:1px;">INVOICE</div>
-                    <div style="font-size:9pt; color:${mutedTextColorDoc}; margin-top:2px;">${invoiceNumber}</div>
-                </td>
-            </tr>
-        </table>
-        <table style="width:100%; border-collapse:collapse; margin-top:15px;">
-            <tr>
-                <td style="width:60%; vertical-align:top; font-size:8pt;">
-                    <h3 style="font-size:8pt; font-weight:500; color:${mutedTextColorDoc}; text-transform:uppercase; margin-bottom:4px; margin-top:0; letter-spacing:0.5px;">Billed To</h3>
-                    ${clientDetailsHtml}
-                </td>
-                <td style="width:40%; text-align:right; vertical-align:top; font-size:9pt;">
-                    <p style="margin:0; color:${textColorDoc};"><strong style="font-weight:500;">Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</p>
-                    ${parsedDueDate ? `<p style="margin:2px 0 0 0; color:${textColorDoc};"><strong style="font-weight:500;">Due Date:</strong> ${format(parsedDueDate, "MMMM d, yyyy")}</p>` : ''}
-                </td>
-            </tr>
-        </table>
-    </div>
-  `;
-  
-  let selectedHeaderHtml;
-  switch(templateStyle) {
-    case 'modern': selectedHeaderHtml = modernHeaderHtml; break;
-    case 'compact': selectedHeaderHtml = compactHeaderHtml; break;
-    case 'minimalist': selectedHeaderHtml = minimalistHeaderHtml; break;
-    case 'classic':
-    default: selectedHeaderHtml = classicHeaderHtml;
+      </div>
+    `;
+  } else if (templateStyle === 'modern') {
+    selectedHeaderHtml = `
+      <div style="padding-bottom:15px; margin-bottom: 25px; border-bottom: 2px solid ${primaryColorDoc};">
+          <div style="display:table; width:100%; vertical-align:top;">
+              <div style="display:table-cell; width:60%; vertical-align:top;">
+                  ${companyLogoHtml ? `<div style="margin-bottom: 5px; padding:5px; background-color:${headerBgColorDoc}; border-radius:4px; display:inline-block;">${companyLogoHtml}</div>` : ''}
+                  <div style="font-size: 18px; font-weight: bold; color: ${primaryColorDoc}; margin-top: 5px;">${companyName || 'Your Company'}</div>
+              </div>
+              <div style="display:table-cell; width:40%; text-align:right; vertical-align:top;">
+                  <div style="font-size: 22px; font-weight: bold; margin-bottom: 5px; color: ${mutedTextColorDoc}; text-transform: uppercase;">INVOICE</div>
+                  <div style="font-size: 9pt; color: ${mutedTextColorDoc};"><strong style="color: ${textColorDoc};">No:</strong> ${invoiceNumber}</div>
+                  <div style="font-size: 9pt; color: ${mutedTextColorDoc};"><strong style="color: ${textColorDoc};">Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</div>
+                  ${parsedDueDate ? `<div style="font-size: 9pt; color: ${mutedTextColorDoc};"><strong style="color: ${textColorDoc};">Due:</strong> ${format(parsedDueDate, "MMMM d, yyyy")}</div>` : ''}
+              </div>
+          </div>
+          <div style="margin-top: 15px; padding-top:10px; border-top: 1px solid ${borderColorDoc}; font-size: 9.5pt;">
+              <h3 style="font-size: 9pt; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">BILL TO:</h3>
+              ${clientDetailsHtml}
+          </div>
+      </div>
+    `;
+  } else if (templateStyle === 'compact') {
+     selectedHeaderHtml = `
+      <div style="padding-bottom:10px; margin-bottom:15px; border-bottom: 2px solid ${primaryColorDoc};">
+          <table style="width:100%; border-collapse:collapse;">
+              <tr>
+                  <td style="width:20%; vertical-align:top;">
+                      ${companyLogoHtml ? `<div>${companyLogoHtml}</div>` : ''}
+                  </td>
+                  <td style="width:80%; text-align:right; vertical-align:top;">
+                      <div style="font-size:18px; font-weight:bold; color:${primaryColorDoc}; text-transform:uppercase; margin-bottom:5px;">INVOICE</div>
+                  </td>
+              </tr>
+              <tr>
+                  <td style="padding-top:5px; font-size:8pt;">
+                      <div style="font-weight:bold; color:${textColorDoc};">${companyName || 'Your Company'}</div>
+                  </td>
+                  <td style="padding-top:5px; text-align:right; font-size:8pt; color:${mutedTextColorDoc};">
+                      <div><strong style="color:${textColorDoc};">Invoice #:</strong> ${invoiceNumber}</div>
+                      <div><strong style="color:${textColorDoc};">Date:</strong> ${format(parsedInvoiceDate, "dd/MM/yyyy")}</div>
+                      ${parsedDueDate ? `<div><strong style="color:${textColorDoc};">Due:</strong> ${format(parsedDueDate, "dd/MM/yyyy")}</div>` : ''}
+                  </td>
+              </tr>
+          </table>
+      </div>
+      <div style="margin-bottom:15px; font-size:8pt;">
+          <h3 style="font-size:8pt; font-weight:bold; color:${mutedTextColorDoc}; text-transform:uppercase; margin-bottom:2px; margin-top:0;">BILLED TO:</h3>
+          ${clientDetailsHtml}
+      </div>
+    `;
+  } else if (templateStyle === 'minimalist') {
+    selectedHeaderHtml = `
+      <div style="padding-bottom:20px; margin-bottom:20px;">
+          <table style="width:100%; border-collapse:collapse;">
+              <tr>
+                  <td style="width:60%; vertical-align:top;">
+                      ${companyLogoHtml ? `<div>${companyLogoHtml}</div>` : `<div style="font-size:22px; font-weight:600; color:${primaryColorDoc};">${companyName || 'Your Company'}</div>`}
+                      ${companyLogoHtml && companyName ? `<div style="font-size:18px; font-weight:600; color:${primaryColorDoc}; margin-top:5px;">${companyName}</div>` : ''}
+                  </td>
+                  <td style="width:40%; text-align:right; vertical-align:top;">
+                      <div style="font-size:16px; font-weight:normal; color:${mutedTextColorDoc}; text-transform:uppercase; letter-spacing:1px;">INVOICE</div>
+                      <div style="font-size:9pt; color:${mutedTextColorDoc}; margin-top:2px;">${invoiceNumber}</div>
+                  </td>
+              </tr>
+          </table>
+          <table style="width:100%; border-collapse:collapse; margin-top:25px;">
+              <tr>
+                  <td style="width:60%; vertical-align:top; font-size:8pt;">
+                      <h3 style="font-size:8pt; font-weight:500; color:${mutedTextColorDoc}; text-transform:uppercase; margin-bottom:4px; margin-top:0; letter-spacing:0.5px;">Billed To</h3>
+                      ${clientDetailsHtml}
+                  </td>
+                  <td style="width:40%; text-align:right; vertical-align:top; font-size:9pt;">
+                      <p style="margin:0; color:${textColorDoc};"><strong style="font-weight:500;">Date:</strong> ${format(parsedInvoiceDate, "MMMM d, yyyy")}</p>
+                      ${parsedDueDate ? `<p style="margin:2px 0 0 0; color:${textColorDoc};"><strong style="font-weight:500;">Due Date:</strong> ${format(parsedDueDate, "MMMM d, yyyy")}</p>` : ''}
+                  </td>
+              </tr>
+          </table>
+      </div>
+    `;
   }
+  // --- END TEMPLATE-SPECIFIC HEADERS ---
+  
 
   let notesAndTermsLayout;
+  const notesAndTermsBaseStyle = `font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; color: ${mutedTextColorDoc};`;
+  const notesAndTermsHeadingStyle = `font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;`;
+  const termsTextParaStyle = `white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '6.5pt' : '7pt')}; color: ${mutedTextColorDoc}CC;`;
+
   if (invoiceNotes && termsAndConditions) {
     if (templateStyle === 'modern' || templateStyle === 'minimalist') {
-      notesAndTermsLayout = `<tr>
-        <td style="vertical-align:top; width:48%; padding-right:2%;"><h4 style="font-size: ${templateStyle === 'minimalist' ? '8pt' : '9pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4><p style="white-space: pre-line; margin-top:0;">${invoiceNotes.replace(/\n/g, '<br/>')}</p></td>
-        <td style="vertical-align:top; width:48%; padding-left:2%; ${templateStyle === 'minimalist' ? '' : 'border-left: 1px solid '+borderColorDoc+';'}"><h4 style="font-size: ${templateStyle === 'minimalist' ? '7pt' : '8pt'}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:0;">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'minimalist' ? '6.5pt' : '7pt'}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p></td>
-       </tr>`;
-    } else {
-        notesAndTermsLayout = `<tr><td colspan="2">
-            <h4 style="font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4>
+      notesAndTermsLayout = `<table style="width:100%; margin-top:20px; ${notesAndTermsBaseStyle}"><tr>
+        <td style="vertical-align:top; width:48%; padding-right:2%;"><h4 style="${notesAndTermsHeadingStyle}">Notes</h4><p style="white-space: pre-line; margin-top:0;">${invoiceNotes.replace(/\n/g, '<br/>')}</p></td>
+        <td style="vertical-align:top; width:48%; padding-left:2%; ${templateStyle === 'modern' ? 'border-left: 1px solid '+borderColorDoc+';' : ''}"><h4 style="${notesAndTermsHeadingStyle}">Terms &amp; Conditions</h4><p style="${termsTextParaStyle}">${termsAndConditions.replace(/\n/g, '<br/>')}</p></td>
+       </tr></table>`;
+    } else { // Classic & Compact
+        notesAndTermsLayout = `<div style="${notesAndTermsBaseStyle} margin-top:20px;">
+            <h4 style="${notesAndTermsHeadingStyle}">Notes</h4>
             <p style="white-space: pre-line; margin-top:0; margin-bottom:10px;">${invoiceNotes.replace(/\n/g, '<br/>')}</p>
-            <h4 style="font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '7pt' : '8pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:10px; ${templateStyle !== 'minimalist' ? 'border-top:1px solid '+borderColorDoc+'; padding-top:10px;' : ''}">Terms &amp; Conditions</h4>
-            <p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '6.5pt' : '7pt')}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p>
-        </td></tr>`;
+            <h4 style="${notesAndTermsHeadingStyle} margin-top:15px; padding-top:10px; border-top:1px solid ${borderColorDoc};">Terms &amp; Conditions</h4>
+            <p style="${termsTextParaStyle}">${termsAndConditions.replace(/\n/g, '<br/>')}</p>
+        </div>`;
     }
   } else if (invoiceNotes) {
-    notesAndTermsLayout = `<tr><td colspan="2"><h4 style="font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 4px; margin-top:0;">Notes</h4><p style="white-space: pre-line; margin-top:0;">${invoiceNotes.replace(/\n/g, '<br/>')}</p></td></tr>`;
+    notesAndTermsLayout = `<div style="${notesAndTermsBaseStyle} margin-top:20px;"><h4 style="${notesAndTermsHeadingStyle}">Notes</h4><p style="white-space: pre-line; margin-top:0;">${invoiceNotes.replace(/\n/g, '<br/>')}</p></div>`;
   } else if (termsAndConditions) {
-     notesAndTermsLayout = `<tr><td colspan="2"><h4 style="font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '7pt' : '8pt')}; font-weight: bold; color: ${mutedTextColorDoc}; text-transform: uppercase; margin-bottom: 3px; margin-top:0;">Terms &amp; Conditions</h4><p style="white-space: pre-line; margin-top:0; font-size: ${templateStyle === 'compact' ? '6pt' : (templateStyle === 'minimalist' ? '6.5pt' : '7pt')}; color: ${mutedTextColorDoc}CC;">${termsAndConditions.replace(/\n/g, '<br/>')}</p></td></tr>`;
+     notesAndTermsLayout = `<div style="${notesAndTermsBaseStyle} margin-top:20px;"><h4 style="${notesAndTermsHeadingStyle}">Terms &amp; Conditions</h4><p style="${termsTextParaStyle}">${termsAndConditions.replace(/\n/g, '<br/>')}</p></div>`;
   } else {
     notesAndTermsLayout = '';
   }
 
-  const notesAndTermsTable = notesAndTermsLayout ? `
-    <table style="width:100%; margin-top: ${templateStyle === 'minimalist' ? '30px' : '25px'}; padding-top:${templateStyle === 'minimalist' ? '0' : '15px'}; ${templateStyle !== 'minimalist' ? 'border-top: 1px solid '+borderColorDoc : ''}; font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '9pt')}; color: ${mutedTextColorDoc};">
-      ${notesAndTermsLayout}
-    </table>
-  ` : '';
 
   const amountInWordsHtml = `
     <div style="margin-top:${templateStyle === 'minimalist' ? '20px' : '15px'}; padding-top:${templateStyle === 'minimalist' ? '0' : '10px'}; ${templateStyle !== 'minimalist' ? 'border-top: 1px solid '+borderColorDoc : ''}; font-size:${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '7.5pt' : '8pt')}; color:${mutedTextColorDoc}; font-style: italic;">
@@ -308,10 +306,11 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   const tableStyles = `
     width: 100%;
     text-align: left;
-    border-collapse: collapse;
+    border-collapse: ${templateStyle === 'classic' ? 'collapse' : 'separate'};
+    border-spacing: 0;
     margin-bottom: 20px; 
     font-size: ${templateStyle === 'compact' ? '8pt' : (templateStyle === 'minimalist' ? '9pt' : '9.5pt')};
-    ${templateStyle !== 'minimalist' ? 'border: 1px solid '+borderColorDoc+'; border-radius: 6px;' : ''}
+    ${(templateStyle === 'classic' || templateStyle === 'modern') ? 'border: 1px solid '+borderColorDoc+'; border-radius: 6px;' : ''}
     overflow: hidden;
   `;
   const thStyles = `
@@ -334,6 +333,8 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
   `;
 
   const totalsTdStyle = `padding: ${templateStyle === 'minimalist' ? '4px 0' : '8px'};`;
+  const grandTotalStyle = `font-weight: bold; font-size: ${templateStyle === 'compact' ? '11pt' : (templateStyle === 'minimalist' ? '13pt' : '13pt')}; color: ${templateStyle === 'minimalist' ? primaryColorDoc : textColorDoc}; ${templateStyle === 'minimalist' ? 'border-top: 2px solid '+primaryColorDoc+'; padding-top: 8px;' : (templateStyle === 'classic' || templateStyle === 'modern' ? 'background-color: '+primaryColorDoc+'1A; color: '+primaryColorDoc+'; padding: '+(templateStyle === 'compact' ? '6px 8px' : '8px 10px')+'; border-radius: 4px;' : '')} `;
+
 
   return `
     <html>
@@ -348,11 +349,10 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
           .content-wrapper-doc { position:relative; z-index:1; }
           .items-table-doc { ${tableStyles} }
           .items-table-doc th { ${thStyles} }
-          /* .items-table-doc td { Handled by itemTdStyle in loop } */
           .totals-summary-table { ${totalsTableStyles} }
           .totals-summary-table td { ${totalsTdStyle} }
-          .grand-total-line { font-weight: bold; font-size: ${templateStyle === 'compact' ? '12pt' : (templateStyle === 'minimalist' ? '14pt' : '14pt')}; color: ${primaryColorDoc}; ${templateStyle === 'minimalist' ? 'border-top: 2px solid '+primaryColorDoc+'; padding-top: 8px;' : 'background-color: '+primaryColorDoc+'1A; padding: '+(templateStyle === 'compact' ? '8px 10px' : '10px 12px')+'; border-radius: 4px;'} }
-          .footer-section-doc { text-align: center; font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '8pt')}; color: #9ca3af; margin-top: 30px; padding-top: 15px; border-top: 1px solid ${borderColorDoc}; }
+          .grand-total-line td { ${grandTotalStyle} }
+          .footer-section-doc { text-align: center; font-size: ${templateStyle === 'compact' ? '7pt' : (templateStyle === 'minimalist' ? '8pt' : '8pt')}; color: #9ca3af; margin-top: 30px; padding-top: 15px; border-top: ${templateStyle === 'minimalist' ? 'none' : '1px solid ' + borderColorDoc}; }
         </style>
       </head>
       <body>
@@ -376,18 +376,18 @@ const getInvoiceHtmlForDoc = (data: StoredInvoiceData): string => {
             <table class="totals-summary-table">
                 <tbody>
                     <tr>
-                        <td colspan="5" style="text-align: right; font-weight: ${templateStyle === 'minimalist' ? '500' : 'bold'}; color: ${mutedTextColorDoc}; ${templateStyle !== 'minimalist' ? 'border-top: 2px solid '+borderColorDoc : ''}; ${totalsTdStyle}">SUBTOTAL:</td>
-                        <td style="text-align: right; font-weight: ${templateStyle === 'minimalist' ? '500' : 'bold'}; color: ${textColorDoc}; ${templateStyle !== 'minimalist' ? 'border-top: 2px solid '+borderColorDoc : ''}; ${totalsTdStyle}">${fCurrency(subTotal)}</td>
+                        <td colspan="5" style="text-align: right; font-weight: ${templateStyle === 'minimalist' ? '500' : 'normal'}; color: ${mutedTextColorDoc}; ${templateStyle !== 'minimalist' ? 'border-top: 1px solid '+borderColorDoc : ''}; ${totalsTdStyle}">SUBTOTAL:</td>
+                        <td style="text-align: right; font-weight: ${templateStyle === 'minimalist' ? '500' : 'normal'}; color: ${textColorDoc}; ${templateStyle !== 'minimalist' ? 'border-top: 1px solid '+borderColorDoc : ''}; ${totalsTdStyle}">${fCurrency(subTotal)}</td>
                     </tr>
                     ${globalDiscountHtml}
                     <tr class="grand-total-line">
-                         <td colspan="5" style="text-align: right; ${totalsTdStyle}">TOTAL:</td>
-                        <td style="text-align: right; ${totalsTdStyle}">${fCurrency(totalFee)}</td>
+                         <td colspan="5" style="text-align: right;">TOTAL:</td>
+                        <td style="text-align: right;">${fCurrency(totalFee)}</td>
                     </tr>
                 </tbody>
             </table>
             ${amountInWordsHtml}
-            ${notesAndTermsTable}
+            ${notesAndTermsLayout}
             <div class="footer-section-doc"><p>Thank you for your business!</p></div>
           </div>
         </div>
